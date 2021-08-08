@@ -7,8 +7,8 @@ services:
     build: .
     image: marcelo-munhoz_img
     volumes:
-      - .:/marcelo-munhoz
-    working_dir: /marcelo-munhoz
+      - .:/app
+    working_dir: /app
     container_name: "marcelo-munhoz_ctn"
     hostname: "marcelo-munhoz"
     ports:
