@@ -1,0 +1,65 @@
+@import "variables";
+
+html {
+  font-size: calc(15px + 0.25vw);
+}
+
+body {
+  font-family: "Fira Sans", arial, sans-serif;
+}
+
+img {
+  @media #{$small-screens} {
+    width: 100%;
+  }
+}
+
+p {
+  font-size: 1.2rem;
+}
+
+a {
+  color: #6c757d; // text-secondary
+}
+
+.icon {
+  &.icon-link {
+    background-image: url("#{$folder-img}hashtag.svg");
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-size: 20px 20px;
+  }
+}
+
+.container-fluid {
+  h1 {
+    letter-spacing: 10px;
+  }
+
+  p {
+    line-height: 1.75;
+
+    @media #{$small-screens} {
+      text-align: justify;
+    }
+  }
+}
+
+.darkmode-toggle {
+  z-index: 1;
+}
+
+.author {
+  img {
+    max-width: 180px;
+  }
+}
+
+.next-prev {
+  font-size: smaller;
+
+  @media #{$small-screens} {
+    gap: 2em;
+  }
+}
