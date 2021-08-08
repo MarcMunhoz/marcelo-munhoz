@@ -20,5 +20,5 @@ build:
   preview_output_directory: dist
   install_dependencies_command: npm i
   preview_docker_image: node:14-alpine
-  mount_path: dist/
+  mount_path: "/marcelo-munhoz"
   instant_preview_command: nuxt
