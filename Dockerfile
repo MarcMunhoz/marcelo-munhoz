@@ -5,7 +5,7 @@ LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   date_created="2021-07-16" \
   deploy="2021-07-16"
 
-ARG APP_PATH=/marcelo-munhoz
+ARG APP_PATH=/app
 
 ENV PORT=4242
 
