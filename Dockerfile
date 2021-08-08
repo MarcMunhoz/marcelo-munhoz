@@ -5,10 +5,18 @@ LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   date_created="2021-07-16" \
   deploy="2021-07-16"
 
-COPY package.json .
+ARG APP_PATH=/marcelo-munhoz
 
-RUN npm i -g nuxt
+ENV PORT=4242
 
-COPY package-lock.json .
+COPY package* ./
 
-RUN npm up && npm i && npm audit fix
+RUN npm i -g nuxt \
+  && npm audit fix \
+  && rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/share/man
+
+WORKDIR $APP_PATH
+
+VOLUME $APP_PATH
+
+ENTRYPOINT ["nuxt"]
