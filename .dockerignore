@@ -1,0 +1,22 @@
+# Folders
+.forestry
+coverage
+dist
+node_modules
+
+# git
+.git
+.gitignore
+.gitlab-ci.yml
+
+# Unusefull
+.DS_Store
+netlify.toml
+README.md
+
+# Docker config
+.dockerignore
+Dockerfile
+docker-compose.yaml
+docker-compose_dev.yaml
+docker-compose_prod.yaml
