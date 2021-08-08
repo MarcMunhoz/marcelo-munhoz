@@ -20,6 +20,6 @@ build:
   preview_output_directory: dist
   install_dependencies_command: npm i
   preview_docker_image: node:14-alpine
-  mount_path: "/srv"
-  working_dir: "/srv"
+  mount_path: "/app"
+  working_dir: "/app"
   instant_preview_command: nuxt
