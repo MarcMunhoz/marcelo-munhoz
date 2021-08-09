@@ -15,6 +15,13 @@ const data = [
     useItOn: ["where"],
   },
   {
+    nameAccount: "github",
+    iconPrefix: "fab",
+    urlAccount: "https://github.com/",
+    userAccount: "hiMunhoz",
+    useItOn: ["where"],
+  },
+  {
     nameAccount: "linkedin",
     iconPrefix: "fab",
     urlAccount: "https://www.linkedin.com/in/",
