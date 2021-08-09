@@ -1,3 +1,5 @@
+[![Netlify Status](https://api.netlify.com/api/v1/badges/4c287ef7-8060-480b-9aa4-42c4704b1c13/deploy-status)](https://app.netlify.com/sites/marcelomunhoz/deploys)
+
 # Build Setup (No Docker)
 
 My personal website
