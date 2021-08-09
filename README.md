@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/hiMunhoz/marcelo-munhoz/branch/develop/graph/badge.svg?token=${CODECOV_BADGE_TK})](https://codecov.io/gh/hiMunhoz/marcelo-munhoz)
+
 # Build Setup (No Docker)
 
 **\* Node 14 is required on hosts without Docker**
