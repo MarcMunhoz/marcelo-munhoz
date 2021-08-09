@@ -1,5 +1,3 @@
-[![codecov](https://codecov.io/gh/hiMunhoz/marcelo-munhoz/branch/develop/graph/badge.svg?token=${CODECOV_BADGE_TK})](https://codecov.io/gh/hiMunhoz/marcelo-munhoz)
-
 # Build Setup (No Docker)
 
 My personal website
