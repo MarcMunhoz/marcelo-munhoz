@@ -1,20 +1,20 @@
 ---
 new_page_extension: md
 auto_deploy: false
-admin_path: ""
+admin_path: ''
 webhook_url: "${{ secrets.NETLIFY_WEBHOOK }}"
 sections:
-  - type: directory
-    path: content/articles
-    label: Blog
-    create: documents
-    match: "*"
-    templates:
-      - article
-upload_dir: ""
+- type: directory
+  path: content/articles
+  label: Blog
+  create: documents
+  match: "*"
+  templates:
+  - article
+upload_dir: ''
 public_path: https://res.cloudinary.com/marcelo-munhoz/image/upload
-front_matter_path: ""
-use_front_matter_path:
+front_matter_path: ''
+use_front_matter_path: 
 file_template: ":filename:"
 build:
   preview_output_directory: dist
