@@ -1,6 +1,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
+    Content-Security-Policy= "default-src https:"
     Referrer-Policy = "no-referrer-when-downgrade"
     Strict-Transport-Security = "max-age=15552000; includeSubDomains; preload"
     X-Content-Type-Options = "nosniff"
