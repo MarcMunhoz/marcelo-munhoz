@@ -12,6 +12,26 @@ const data = [
     projectUrl: "https://munhoz-weather-app.herokuapp.com",
     projectEmoji: "partly_sunny_rain",
   },
+  {
+    projectName: "Random Pass",
+    projectUrl: "https://random-pass.marcelomunhoz.com",
+    projectEmoji: "pencil",
+  },
+  {
+    projectName: "Public Flickr Photos",
+    projectUrl: "https://flickr-gallery.marcelomunhoz.com",
+    projectEmoji: "camera_with_flash",
+  },
+  {
+    projectName: "Vuetify Todo",
+    projectUrl: "https://vuetify-todo.marcelomunhoz.com",
+    projectEmoji: "pushpin",
+  },
+  {
+    projectName: "365 Movies",
+    projectUrl: "https://365movies.marcelomunhoz.com",
+    projectEmoji: "movie_camera",
+  },
 ];
 
 export default data;
