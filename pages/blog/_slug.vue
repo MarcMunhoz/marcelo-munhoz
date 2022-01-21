@@ -38,7 +38,8 @@
             :hashtags="hashtags"
             class="text-capitalize"
           >
-            <font-awesome-icon :icon="[social.iconPrefix, social.nameAccount.split('-')[0]]" /> {{ social.nameAccount.split("-")[0] }}
+            <font-awesome-icon :icon="[social.iconPrefix, social.nameAccount.split('-')[0]]" />
+            {{ social.nameAccount.split("-")[0] }}
           </ShareNetwork>
         </b-button>
       </b-button-group>
@@ -49,12 +50,19 @@
     <nav class="article-navbar font-weight-bold text-uppercase">
       <ul>
         <li v-for="link of article.toc" :key="link.id">
-          <NuxtLink :to="`#${link.id}`" :class="{ 'py-2': link.depth === 2, 'ml-2 pb-2': link.depth === 3 }">{{ link.text }}</NuxtLink>
+          <NuxtLink :to="`#${link.id}`" :class="{ 'py-2': link.depth === 2, 'ml-2 pb-2': link.depth === 3 }">
+            {{ link.text }}
+          </NuxtLink>
         </li>
       </ul>
     </nav>
 
-    <img v-if="article.thumb" :src="`${cloudinaryImg(article.thumb)}.jpg`" :title="article.alt" class="article-image d-block mt-0 mx-auto mb-4" />
+    <img
+      v-if="article.thumb"
+      :src="`${cloudinaryImg(article.thumb)}.jpg`"
+      :title="article.alt"
+      class="article-image d-block mt-0 mx-auto mb-4"
+    />
 
     <nuxt-content :document="article" class="mb-4" />
 
@@ -71,7 +79,7 @@
 <script>
 import VideoPlayer from "nuxt-video-player";
 import Vue from "vue";
-import sortSocialNetwork from "@/pages/index";
+import sortAnything from "@/pages/index";
 import VueSocialSharing from "vue-social-sharing";
 
 Vue.use(VueSocialSharing);
@@ -85,7 +93,11 @@ export default {
         // Open Graph
         { hid: "og:title", property: "og:title", content: this.article.title },
         { hid: "og:description", property: "og:description", content: this.article.description },
-        { hid: "og:image", property: "og:image", content: `https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_274,q_auto,w_524/${this.article.thumb}.jpg` },
+        {
+          hid: "og:image",
+          property: "og:image",
+          content: `https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_274,q_auto,w_524/${this.article.thumb}.jpg`,
+        },
         // Twitter Card
         { hid: "twitter:title", name: "twitter:title", content: this.article.title },
         { hid: "twitter:description", name: "twitter:description", content: this.article.description },
@@ -113,7 +125,7 @@ export default {
       baseURL: null,
     };
   },
-  mixins: [sortSocialNetwork],
+  mixins: [sortAnything],
   components: {
     VideoPlayer,
   },
@@ -132,7 +144,7 @@ export default {
       return this.$cloudinary.image.url(`${imgName}`, { crop: "fill", height: 380, width: 1000 });
     },
     socialShareList() {
-      return this.sortSocialNetwork()
+      return this.sortAnything(this.SocialNetwork, "nameAccount")
         .filter((social) => social.useItOn.includes("share"))
         .slice();
     },
