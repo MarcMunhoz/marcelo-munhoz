@@ -9,14 +9,14 @@ ARG APP_PATH=/app
 
 ENV PORT=4242
 
-COPY package* ./
+COPY ["package.json", "yarn.lock", "./"]
 
-RUN npm i -g nuxt \
-  && npm audit fix \
+RUN yarn global add nuxt \
+  && yarn \
   && rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/share/man
 
 WORKDIR $APP_PATH
 
 VOLUME $APP_PATH
 
-ENTRYPOINT ["nuxt"]
+ENTRYPOINT ["yarn", "dev"]
