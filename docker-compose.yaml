@@ -13,5 +13,5 @@ services:
     hostname: "marcelo-munhoz"
     ports:
       - 4242:4242
-    entrypoint: ["nuxt"]
+    entrypoint: ["yarn", "dev"]
     # entrypoint: ["sh", "-c", "sleep 2073600"] for debug
