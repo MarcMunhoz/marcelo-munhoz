@@ -1,4 +1,4 @@
-FROM node:14-alpine
+FROM node:16-alpine3.12
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   version="1.0.0" \
