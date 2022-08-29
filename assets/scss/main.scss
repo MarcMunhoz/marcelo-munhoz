@@ -22,16 +22,6 @@ a {
   color: #6c757d; // text-secondary
 }
 
-.icon {
-  &.icon-link {
-    background-image: url("#{$folder-img}hashtag.svg");
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    background-size: 20px 20px;
-  }
-}
-
 .container-fluid {
   h1 {
     letter-spacing: 10px;
