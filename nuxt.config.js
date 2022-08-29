@@ -33,6 +33,7 @@ export default {
   css: [
     // SCSS file in the project
     "@/assets/scss/main.scss",
+    "@fortawesome/fontawesome-svg-core/styles.css",
   ],
   components: true,
   content: {
