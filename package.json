@@ -7,6 +7,10 @@
     "email": "me@marcelomunhoz.com"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.1.2",
+    "@fortawesome/free-brands-svg-icons": "^6.1.2",
+    "@fortawesome/free-solid-svg-icons": "^6.1.2",
+    "@fortawesome/vue-fontawesome": "^2.0.8",
     "@nuxt/content": "^1.14.0",
     "@nuxtjs/axios": "^5.3.6",
     "@nuxtjs/cloudinary": "^1.0.3-beta-4",
@@ -20,10 +24,7 @@
     "vuejs-emojis": "^0.0.1"
   },
   "devDependencies": {
-    "@fortawesome/free-brands-svg-icons": "^5.15.3",
-    "@fortawesome/free-solid-svg-icons": "^5.11.2",
     "@nuxtjs/dotenv": "^1.4.1",
-    "@nuxtjs/fontawesome": "^1.1.2",
     "@nuxtjs/google-analytics": "^2.4.0",
     "@vue/test-utils": "^1.0.0-beta.27",
     "babel-jest": "^26.6.3",
