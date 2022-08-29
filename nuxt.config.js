@@ -33,8 +33,7 @@ export default {
   css: [
     // SCSS file in the project
     "@/assets/scss/main.scss",
-    "@fortawesome/free-solid-svg-icons",
-    "@fortawesome/free-brands-svg-icons",
+    "@fortawesome/fontawesome-svg-core/styles.css",
   ],
   components: true,
   content: {
@@ -43,7 +42,7 @@ export default {
       remarkPlugins: ["remark-emoji"],
     },
   },
-  buildModules: ["@nuxtjs/dotenv", "@nuxtjs/fontawesome", "@nuxtjs/google-analytics"],
+  buildModules: ["@nuxtjs/dotenv", "@nuxtjs/google-analytics"],
   /*
    ** Nuxt.js modules
    */
@@ -58,16 +57,11 @@ export default {
     "@nuxtjs/cloudinary",
     "vue-social-sharing/nuxt",
   ],
+  plugins: ["~/plugins/fontawesome.js"],
   cloudinary: {
     cloudName: "marcelo-munhoz",
     apikey: process.env.CLODINARY_APIKEY,
     apiSecret: process.env.CLODINARY_APIKEYSECRET,
-  },
-  fontawesome: {
-    icons: {
-      solid: true,
-      brands: true,
-    },
   },
   googleAnalytics: {
     id: process.env.GOOGLE_USERID,
