@@ -9,19 +9,19 @@
 <script>
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
+import "@fortawesome/fontawesome-svg-core/styles.css";
 
 export default {
   components: {
     NavBar,
-    Footer
-  }
+    Footer,
+  },
 };
 </script>
 
 <style>
 html {
-  font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 16px;
   word-spacing: 1px;
   -ms-text-size-adjust: 100%;
