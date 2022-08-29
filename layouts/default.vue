@@ -9,7 +9,6 @@
 <script>
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
-import "@fortawesome/fontawesome-svg-core/styles.css";
 
 export default {
   components: {
