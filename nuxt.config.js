@@ -8,7 +8,11 @@ export default {
       { charset: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "author", content: "Marcelo Munhoz <me@marcelomunhoz.com>" },
-      { hid: "description", name: "description", content: "Some brief histories of my past-present development experience. The life, the universe and everything about a tech life" },
+      {
+        hid: "description",
+        name: "description",
+        content: "Some brief histories of my past-present development experience. The life, the universe and everything about a tech life",
+      },
       { name: "keywords", content: "blog,personal,pessoal,developer,NuxtJS,coding,webtech,tips,dicas" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -29,6 +33,8 @@ export default {
   css: [
     // SCSS file in the project
     "@/assets/scss/main.scss",
+    "@fortawesome/free-solid-svg-icons",
+    "@fortawesome/free-brands-svg-icons",
   ],
   components: true,
   content: {
