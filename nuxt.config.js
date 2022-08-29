@@ -33,8 +33,6 @@ export default {
   css: [
     // SCSS file in the project
     "@/assets/scss/main.scss",
-    "@fortawesome/free-solid-svg-icons",
-    "@fortawesome/free-brands-svg-icons",
   ],
   components: true,
   content: {
