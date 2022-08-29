@@ -17,11 +17,11 @@
     "nuxtjs-darkmode-js-module": "^1.0.3",
     "remark-emoji": "^2.2.0",
     "vue-social-sharing": "^3.0.7",
-    "vuejs-emojis": "^0.0.1"
-  },
-  "devDependencies": {
+    "vuejs-emojis": "^0.0.1",
     "@fortawesome/free-brands-svg-icons": "^5.15.3",
-    "@fortawesome/free-solid-svg-icons": "^5.11.2",
+    "@fortawesome/free-solid-svg-icons": "^5.11.2"
+  },
+  "devDependencies": {    
     "@nuxtjs/dotenv": "^1.4.1",
     "@nuxtjs/fontawesome": "^1.1.2",
     "@nuxtjs/google-analytics": "^2.4.0",
