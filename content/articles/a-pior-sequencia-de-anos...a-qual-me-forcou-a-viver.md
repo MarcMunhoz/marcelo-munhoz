@@ -16,3 +16,4 @@ author:
 lang: pt-br
 
 ---
+Desde 2019 venho vivendo tempos sombrios e alvoroçados. Na verdade, e certamente, nuvens apresentaram chuvas torrenciais 
