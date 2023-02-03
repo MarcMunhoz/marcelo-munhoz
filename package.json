@@ -21,7 +21,8 @@
     "nuxtjs-darkmode-js-module": "^1.0.3",
     "remark-emoji": "^2.2.0",
     "vue-social-sharing": "^3.0.7",
-    "vuejs-emojis": "^0.0.1"
+    "vuejs-emojis": "^0.0.1",
+    "node-fetch-native":"^1.0.1"
   },
   "devDependencies": {
     "@nuxtjs/dotenv": "^1.4.1",
