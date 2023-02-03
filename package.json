@@ -42,7 +42,8 @@
     "parse-path": "^5.0.0",
     "parse-url": "^8.1.0",
     "vm2": "^3.9.11",
-    "decode-uri-component": "^0.2.1"
+    "decode-uri-component": "^0.2.1",
+    "json5": "^1.0.2"
   },
   "engines": {
     "node": ">=16.0.0"
