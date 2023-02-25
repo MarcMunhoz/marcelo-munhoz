@@ -18,26 +18,10 @@
     <div class="socialShare d-flex justify-content-end align-items-center my-2">
       <b-button-group>
         <b-button variant="outline-secondary">
-          <ShareNetwork
-            network="email"
-            :url="`${baseURL}${$nuxt.$route.path}`"
-            :title="`${article.author.name} - ${article.title}`"
-            :description="article.description"
-            :hashtags="hashtags"
-            class="text-capitalize"
-          >
-            <font-awesome-icon icon="envelope-open-text" /> E-mail
-          </ShareNetwork>
+          <ShareNetwork network="email" :url="`${baseURL}${$nuxt.$route.path}`" :title="`${article.author.name} - ${article.title}`" :description="article.description" :hashtags="hashtags" class="text-capitalize"> <font-awesome-icon icon="envelope-open-text" /> E-mail </ShareNetwork>
         </b-button>
         <b-button variant="outline-secondary" v-for="social in socialShareList()" :key="social.index">
-          <ShareNetwork
-            :network="social.nameAccount.split('-')[0]"
-            :url="`${baseURL}${$nuxt.$route.path}`"
-            :title="`${article.author.name} - ${article.title}`"
-            :description="article.description"
-            :hashtags="hashtags"
-            class="text-capitalize"
-          >
+          <ShareNetwork :network="social.nameAccount.split('-')[0]" :url="`${baseURL}${$nuxt.$route.path}`" :title="`${article.author.name} - ${article.title}`" :description="article.description" :hashtags="hashtags" class="text-capitalize">
             <font-awesome-icon :icon="[social.iconPrefix, social.nameAccount.split('-')[0]]" />
             {{ social.nameAccount.split("-")[0] }}
           </ShareNetwork>
@@ -57,12 +41,7 @@
       </ul>
     </nav>
 
-    <img
-      v-if="article.thumb"
-      :src="`${cloudinaryImg(article.thumb)}.jpg`"
-      :title="article.alt"
-      class="article-image d-block mt-0 mx-auto mb-4"
-    />
+    <img v-if="article.thumb" :src="`${cloudinaryImg(article.thumb)}.jpg`" :title="article.alt" class="article-image d-block mt-0 mx-auto mb-4" />
 
     <nuxt-content :document="article" class="mb-4" />
 
@@ -96,7 +75,7 @@ export default {
         {
           hid: "og:image",
           property: "og:image",
-          content: `https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_274,q_auto,w_524/${this.article.thumb}.jpg`,
+          content: `https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_274,q_auto,w_524/marcelo-munhoz-website/${this.article.thumb}.jpg`,
         },
         // Twitter Card
         { hid: "twitter:title", name: "twitter:title", content: this.article.title },
@@ -107,12 +86,7 @@ export default {
   async asyncData({ $content, params }) {
     const article = await $content("articles", params.slug).fetch();
 
-    const [prev, next] = await $content("articles")
-      .only(["title", "slug"])
-      .sortBy("createdAt", "desc")
-      .where({ draft: false })
-      .surround(params.slug)
-      .fetch();
+    const [prev, next] = await $content("articles").only(["title", "slug"]).sortBy("createdAt", "desc").where({ draft: false }).surround(params.slug).fetch();
 
     return {
       article,
@@ -141,7 +115,7 @@ export default {
       return new Date(date).toLocaleString(language, options);
     },
     cloudinaryImg(imgName) {
-      return this.$cloudinary.image.url(`${imgName}`, { crop: "fill", height: 380, width: 1000 });
+      return this.$cloudinary.image.url(`marcelo-munhoz-website/${imgName}`, { crop: "fill", height: 380, width: 1000 });
     },
     socialShareList() {
       return this.sortAnything(this.SocialNetwork, "nameAccount")

@@ -35,7 +35,7 @@ Eu <del>diria</del> digo que todo desenvolvedor deve ser no mínimo curioso. Cur
 
 > "Quando eu era criança, falava como criança, pensava como criança, raciocinava como criança. Desde que me tornei homem, eliminei as coisas de criança." - Coríntios 13:11
 
-<img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_380,q_auto,w_1000/kid-curiosity.jpg" class="d-block mt-0 mx-auto mb-4">
+<img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_380,q_auto,w_1000/marcelo-munhoz-website/kid-curiosity.jpg" class="d-block mt-0 mx-auto mb-4">
 
 Esse provérbio, ao meu ver, é em parte verdadeiro. Sem algum resquício da criança que fomos um dia, nossa alma está apagada. #opiniao:star:
 

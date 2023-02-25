@@ -1,7 +1,7 @@
 <template>
   <div class="container-fluid mt-4">
     <picture class="home-cover d-flex justify-content-center">
-      <img :src="`${cloudinaryImg('', 'cover', 1875)}.jpg`" alt="" class="w-100" />
+      <img :src="`${cloudinaryImg('marcelo-munhoz-website', 'cover', 1875)}.jpg`" alt="" class="w-100" />
     </picture>
 
     <p class="my-4 display-3 text-center">Eu. Nascido em São Paulo, Brasil. Estou com {{ age() }} anos.</p>
@@ -75,7 +75,6 @@ export default {
       return this.$cloudinary.image.url(`${imgPath}/${imgName}`, {
         crop: "fit",
         width: imgWidth,
-        transformation: [{ if: "w_lte_1875" }, { effect: "art:audrey" }, { if: "end" }],
       });
     },
     computedEmoji: function (projectEmoji) {

@@ -13,7 +13,7 @@ author:
 lang: pt-BR
 ---
 
-<img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_240,q_auto,w_337/cvc.png" class="d-block mt-0 mx-auto mb-4">
+<img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/c_fill,f_auto,h_240,q_auto,w_337/marcelo-munhoz-website/cvc.png" class="d-block mt-0 mx-auto mb-4">
 
 Ao sentar para trabalhar pergunto onde posso encontrar os arquivos a serem tratados (era uma leva de PSDs). O pessoal começou a falar repositório, "dar um *pull*" sei lá onde. Resumindo, eu não fazia ideia do que falavam e precisei fazer tudo localmente em minha máquina, tomar o tempo de alguém que pudesse receber minhas alterações via rede e mesclar com o que todo mundo fazia. Essa situação foi péssima primeiro porque, eu nunca sabia no que os outros trabalhavam, atrapalhava alguém para ajustar minhas alterações e o risco de conflitos entre o que eu tinha e todos outros tinham era muito alto.
 
