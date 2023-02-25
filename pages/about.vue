@@ -2,15 +2,11 @@
   <div class="container-fluid about mt-4">
     <div class="row">
       <div class="col-md-5">
-        <img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/v1619299261/me.jpg" title="Marcelo Munhoz" class="rounded" />
+        <img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/v1619299261/marcelo-munhoz-website/me.jpg" title="Marcelo Munhoz" class="rounded" />
       </div>
       <div class="col-md-7">
-        <p>
-          Eu sou um desenvolvedor front-end que reside em São Paulo, Brasil.
-        </p>
-        <p>
-          Desde a adolescência, quando tive o primeiro contato com um computador com monitor de fósforo verde, fiquei fascinado pela tecnologia e tenho transitado pelo mundo digital.
-        </p>
+        <p>Eu sou um desenvolvedor front-end que reside em São Paulo, Brasil.</p>
+        <p>Desde a adolescência, quando tive o primeiro contato com um computador com monitor de fósforo verde, fiquei fascinado pela tecnologia e tenho transitado pelo mundo digital.</p>
 
         <p>
           Entre em contato pelo e-mail:

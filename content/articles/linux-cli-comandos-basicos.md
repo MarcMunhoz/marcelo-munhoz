@@ -34,7 +34,7 @@ Dada a natureza aberta do Bash, com o tempo ele foi adotado como o _shell_ padr�
 
 # Comecemos do início
 
-<img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/shell-ubuntu.jpg" class="d-block mt-0 mx-auto mb-4" title="Ubuntu Shell">
+<img src="https://res.cloudinary.com/marcelo-munhoz/image/upload/marcelo-munhoz-website/shell-ubuntu.jpg" class="d-block mt-0 mx-auto mb-4" title="Ubuntu Shell">
 
 Este é o terminal(Shell) padrão do Ubuntu.
 

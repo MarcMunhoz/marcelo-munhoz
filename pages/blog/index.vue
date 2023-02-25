@@ -18,9 +18,7 @@
     </ul>
 
     <section class="next-prev d-flex flex-row flex-wrap align-items-center justify-content-around border-top border-info mt-5 pt-4 text-uppercase font-weight-bold" v-if="nextPage">
-      <nuxt-link class="text-decoration-none" to="/blog/page/2">
-        Próxima página [ 2 ]
-      </nuxt-link>
+      <nuxt-link class="text-decoration-none" to="/blog/page/2"> Próxima página [ 2 ] </nuxt-link>
     </section>
   </div>
 </template>
@@ -29,12 +27,7 @@
 export default {
   layout: "default",
   async asyncData({ $content, params }) {
-    const articles = await $content("articles")
-      .only(["title", "description", "slug", "lang", "author"])
-      .sortBy("createdAt", "desc")
-      .where({ draft: false })
-      .limit(5)
-      .fetch();
+    const articles = await $content("articles").only(["title", "description", "slug", "lang", "author"]).sortBy("createdAt", "desc").where({ draft: false }).limit(5).fetch();
 
     const nextPage = articles.length === 5;
     const posts = nextPage ? articles.slice(0, -1) : articles;
@@ -45,8 +38,8 @@ export default {
     };
   },
   methods: {
-    cloudinaryImg: function(imgName) {
-      return this.$cloudinary.image.url(`${imgName}`, { crop: "fill", height: 300, width: 900 });
+    cloudinaryImg: function (imgName) {
+      return this.$cloudinary.image.url(`marcelo-munhoz-website/${imgName}`, { crop: "fill", height: 300, width: 900 });
     },
   },
 };
