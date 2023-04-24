@@ -1,53 +1,53 @@
 // Define the list 'useItOn' with "share" to share buttons or "where" to network list
 
-const SocialNetwork = [
+const socialNetwork = [
   {
     nameAccount: "gitlab",
-    iconPrefix: "fab",
+    iconPrefix: "fa-brands fa",
     urlAccount: "https://gitlab.com/",
     userAccount: "hiMunhoz",
     useItOn: ["where"],
   },
   {
     nameAccount: "github",
-    iconPrefix: "fab",
+    iconPrefix: "fa-brands fa",
     urlAccount: "https://github.com/",
     userAccount: "hiMunhoz",
     useItOn: ["where"],
   },
   {
     nameAccount: "linkedin",
-    iconPrefix: "fab",
+    iconPrefix: "fa-brands fa",
     urlAccount: "https://www.linkedin.com/in/",
     userAccount: "marcelomunhoz",
     useItOn: ["share", "where"],
   },
   {
     nameAccount: "twitter",
-    iconPrefix: "fab",
+    iconPrefix: "fa-brands fa",
     urlAccount: "https://twitter.com/",
     userAccount: "heyMunhoz",
     useItOn: ["share", "where"],
   },
   {
     nameAccount: "facebook-square",
-    iconPrefix: "fab",
+    iconPrefix: "fa-brands fa",
     urlAccount: "https://www.facebook.com/",
     userAccount: "marcelo.munhoz",
     useItOn: ["share", "where"],
   },
   {
     nameAccount: "envelope",
-    iconPrefix: "fas",
+    iconPrefix: "fa-solid fa",
     urlAccount: "mailto:me@marcelomunhoz.com",
     userAccount: "",
     useItOn: ["where"],
   },
   {
     nameAccount: "whatsapp",
-    iconPrefix: "fab",
+    iconPrefix: "fa-brands fa",
     useItOn: ["share"],
   },
 ];
 
-export default SocialNetwork;
+export default socialNetwork;
