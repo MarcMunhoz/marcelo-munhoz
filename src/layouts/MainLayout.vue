@@ -20,15 +20,13 @@
             © 2018–Today / Copyright Marcelo Munhoz. All rights reserved.
             <p class="text-sm">
               This site is built with
-              <a href="https://nuxtjs.org" class="font-weight-bold text-blue-grey-5">Nuxt</a>
-              and hosted on
-              <a href="https://www.netlify.com" class="font-weight-bold text-blue-grey-5">Netlify</a>. The source code is hosted on <a href="https://github.com" class="font-weight-bold text-blue-grey-5">Github</a>.
+              <a href="https://quasar.dev" class="font-weight-bold text-blue-grey-5">Quasar</a>, and hosted on <a href="https://www.netlify.com" class="font-weight-bold text-blue-grey-5">Netlify</a>. The source code is hosted on <a href="https://github.com" class="font-weight-bold text-blue-grey-5">Github</a>.
             </p>
           </q-toolbar-title>
         </q-toolbar>
       </q-footer>
 
-      <q-page-container>
+      <q-page-container class="mb-7">
         <router-view />
       </q-page-container>
     </q-layout>
