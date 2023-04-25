@@ -7,9 +7,12 @@
             <img src="~/assets/rebellion-rebel-alliance-logo.png" class="opacity-[.1]" />
           </q-avatar>
 
-          <q-toolbar-title>Marcelo Munhoz</q-toolbar-title>
+          <q-toolbar-title>
+            Marcelo Munhoz
+            <span v-if="$route.name"> | {{ $route.name }}</span>
+          </q-toolbar-title>
 
-          <q-btn outline icon="badge" label="About" size="sm" class="mr-4" color="blue-grey-5" />
+          <q-btn outline icon="badge" label="About" to="/about" size="sm" class="mr-4" color="blue-grey-5" />
           <q-btn outline icon="newspaper" label="Blog" size="sm" color="blue-grey-5" />
         </q-toolbar>
       </q-header>
