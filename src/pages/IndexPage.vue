@@ -4,11 +4,21 @@
       <img :src="cloudinaryImg('cover', 1875)" class="w-100 object-cover" />
     </picture>
 
-    <p class="my-4 text-[5em]">Eu. Nascido em São Paulo, Brasil. Estou com {{ yearCount("1982-05-15") }} anos.</p>
+    <p class="my-4 text-[4em]">Eu. Nascido em São Paulo, Brasil. Estou com {{ yearCount("1982-05-15") }} anos.</p>
 
     <p class="my-4 text-[3em] font-light">Estou há {{ yearCount("2004-06-04") }} anos trabalhando com web. HTML, CSS, JS e derivados.</p>
 
     <p class="my-4 text-[3em] font-light">Artes, games, literatura e cinema... Amo!</p>
+
+    <q-separator />
+
+    <section class="mb-5 flex justify-center gap-8">
+      <h1 class="w-full text-[3em] font-bold">Confortável com</h1>
+      <picture v-for="item in confortableWith" :key="item.index">
+        <img :src="`https://raw.githubusercontent.com/MarcMunhoz/devicon/master/icons/${item.imagePath}/${item.imageName}.svg`" height="30" width="40" />
+        <q-tooltip>{{ item.tooltip }}</q-tooltip>
+      </picture>
+    </section>
 
     <q-separator />
 
@@ -19,14 +29,12 @@
 
     <q-separator />
 
-    <h1 class="text-[3em] font-bold">Onde estou</h1>
-    <ul class="toShare mt-5">
-      <li class="toShare_item" v-for="social in filteredSocialList()" :key="social.index">
-        <a :href="`${social.urlAccount}${social.userAccount}`" :title="capitalizeIt(social)">
-          <q-icon :name="`${social.iconPrefix}-${social.nameAccount}`" color="blue-grey-5" size="8em" />
-        </a>
-      </li>
-    </ul>
+    <section>
+      <h1 class="text-[3em] font-bold">Encontre-me</h1>
+      <div class="row">
+        <q-btn rounded :icon="`${social.iconPrefix}-${social.nameAccount}`" v-for="social in filteredSocialList()" :key="social.index" @click="onClickItem(`${social.urlAccount}${social.userAccount}`)" size="xl" color="blue-grey-5" class="col my-2.5 mx-4" />
+      </div>
+    </section>
   </q-page>
 </template>
 
@@ -36,6 +44,7 @@ import { Cloudinary } from "@cloudinary/url-gen";
 import { fit } from "@cloudinary/url-gen/actions/resize";
 import projectsList from "../utils/projectsList";
 import socialNetwork from "../utils/socialNetwork";
+import confortableWith from "../utils/confortableWith";
 
 const cld = new Cloudinary({
   cloud: {
@@ -51,6 +60,7 @@ export default defineComponent({
     return {
       projectsList,
       socialNetwork,
+      confortableWith,
     };
   },
   methods: {
@@ -80,29 +90,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.toShare {
-  display: grid;
-  grid-gap: 3em;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  justify-items: center;
-  list-style: none;
-
-  .toShare_item {
-    align-self: center;
-    max-width: 200px;
-    text-align: center;
-    width: 100%;
-
-    a {
-      display: block;
-      width: 100%;
-
-      &:hover {
-        color: lightgrey;
-      }
-    }
-  }
-}
-</style>

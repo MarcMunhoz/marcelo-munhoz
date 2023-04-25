@@ -12,7 +12,7 @@ const socialNetwork = [
     nameAccount: "github",
     iconPrefix: "fa-brands fa",
     urlAccount: "https://github.com/",
-    userAccount: "hiMunhoz",
+    userAccount: "MarcMunhoz",
     useItOn: ["where"],
   },
   {
