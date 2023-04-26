@@ -40,19 +40,11 @@
 
 <script>
 import { defineComponent } from "vue";
-import { Cloudinary } from "@cloudinary/url-gen";
+import cld from "../utils/coudinaryGallery";
 import { fit } from "@cloudinary/url-gen/actions/resize";
 import projectsList from "../utils/projectsList";
 import socialNetwork from "../utils/socialNetwork";
 import confortableWith from "../utils/confortableWith";
-
-const cld = new Cloudinary({
-  cloud: {
-    cloudName: "marcelo-munhoz",
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  },
-});
 
 export default defineComponent({
   name: "IndexPage",
