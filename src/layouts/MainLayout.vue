@@ -1,40 +1,62 @@
 <template>
-  <div class="q-pa-md">
-    <q-layout view="lHh lpr lFf">
-      <q-header elevated class="bg-grey-5">
-        <q-toolbar>
-          <q-avatar>
-            <!-- <img src="~/assets/rebellion-rebel-alliance-logo.png" class="opacity-[.1]" /> -->
-            <img src="https://0.gravatar.com/avatar/357cd42b0a2cc03c5c2ffb011aec5e8f" class="opacity-[.8]" />
-          </q-avatar>
+  <q-layout view="hHh lpR fff">
+    <q-header elevated reveal class="bg-grey-5">
+      <q-toolbar>
+        <q-avatar>
+          <img :src="avatar" class="" />
+        </q-avatar>
 
-          <q-toolbar-title>
-            <span v-if="$route.path !== '/'" @click="$router.push('/')" class="cursor-pointer">
-              Marcelo Munhoz | <i class="not-italic text-blue-grey-5">{{ $route.name }}</i>
-            </span>
-            <span v-else>Marcelo Munhoz</span>
-          </q-toolbar-title>
+        <q-toolbar-title>
+          <span v-if="$route.path !== '/'">
+            <span @click="$router.push('/')" @mouseover="avatarOver" @mouseleave="avatarLeave" class="cursor-pointer uppercase">Marcelo Munhoz</span>
+            | <i class="not-italic text-blue-grey-5 capitalize">{{ $route.name }}</i>
+          </span>
+          <span v-else @mouseover="avatarOver" @mouseleave="avatarLeave" class="uppercase"> Marcelo Munhoz </span>
+        </q-toolbar-title>
 
-          <q-btn outline icon="badge" label="About" to="/about" size="sm" class="mr-4" color="blue-grey-5" />
-          <q-btn outline icon="newspaper" label="Blog" to="/blog" size="sm" color="blue-grey-5" />
-        </q-toolbar>
-      </q-header>
+        <q-btn outline icon="badge" label="About" to="/about" size="sm" class="mr-4" color="blue-grey-5" />
+        <q-btn outline icon="newspaper" label="Blog" to="/blog" size="sm" color="blue-grey-5" />
+      </q-toolbar>
+    </q-header>
 
-      <q-footer elevated reveal class="bg-grey-5 text-center py-4">
-        <q-toolbar>
-          <q-toolbar-title class="text-base">
-            © 2018-Today / Copyright Marcelo Munhoz. All rights reserved.
-            <p class="text-sm">
-              This site is built with
-              <a href="https://quasar.dev" class="font-weight-bold text-blue-grey-5">Quasar</a>, and hosted on <a href="https://www.netlify.com" class="font-weight-bold text-blue-grey-5">Netlify</a>. The source code is hosted on <a href="https://github.com" class="font-weight-bold text-blue-grey-5">Github</a>.
-            </p>
-          </q-toolbar-title>
-        </q-toolbar>
-      </q-footer>
+    <q-page-container class="">
+      <router-view />
+    </q-page-container>
 
-      <q-page-container class="mb-7">
-        <router-view />
-      </q-page-container>
-    </q-layout>
-  </div>
+    <q-footer elevated class="bg-grey-5 text-center py-2">
+      <q-toolbar>
+        <q-toolbar-title class="text-base">
+          © 2018-Today / Copyright Marcelo Munhoz. All rights reserved.
+          <p class="text-sm">
+            This site is built with
+            <a href="https://quasar.dev" class="font-weight-bold text-blue-grey-5">Quasar</a>, and hosted on <a href="https://www.netlify.com" class="font-weight-bold text-blue-grey-5">Netlify</a>. The source code is hosted on <a href="https://github.com" class="font-weight-bold text-blue-grey-5">Github</a>.
+          </p>
+        </q-toolbar-title>
+      </q-toolbar>
+    </q-footer>
+  </q-layout>
 </template>
+
+<script>
+import { defineComponent } from "vue";
+import imageUrl from "../assets/rebellion-rebel-alliance-logo.png";
+
+const r2d2 = new Audio("/src/assets/r2d2.ogg");
+
+export default defineComponent({
+  name: "MainLayout",
+  data() {
+    return {
+      avatar: "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c",
+    };
+  },
+  methods: {
+    avatarOver() {
+      return (this.avatar = imageUrl), r2d2.play();
+    },
+    avatarLeave() {
+      return (this.avatar = "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c");
+    },
+  },
+});
+</script>

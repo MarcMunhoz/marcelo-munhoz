@@ -13,7 +13,7 @@
     <q-separator />
 
     <section class="mb-5 flex justify-center gap-8">
-      <h1 class="w-full text-[3em] font-bold">Confortável com</h1>
+      <h1 class="w-full text-[3em] font-bold">Conhecimentos</h1>
       <picture v-for="item in confortableWith" :key="item.index">
         <img :src="`https://raw.githubusercontent.com/MarcMunhoz/devicon/master/icons/${item.imagePath}/${item.imageName}.svg`" height="30" width="40" />
         <q-tooltip>{{ item.tooltip }}</q-tooltip>
@@ -25,15 +25,6 @@
     <section class="mb-6">
       <h1 class="text-[3em] font-bold">Projetos (in)úteis</h1>
       <q-chip v-for="project in sortAnything(projectsList, 'projectName')" :key="project.index" :icon="project.projectEmoji" clickable @click="onClickItem(project.projectUrl)" outline color="blue-grey-5" size="xl">{{ project.projectName }}</q-chip>
-    </section>
-
-    <q-separator />
-
-    <section>
-      <h1 class="text-[3em] font-bold">Encontre-me</h1>
-      <div class="row">
-        <q-btn rounded :icon="`${social.iconPrefix}-${social.nameAccount}`" v-for="social in filteredSocialList()" :key="social.index" @click="onClickItem(`${social.urlAccount}${social.userAccount}`)" size="xl" color="blue-grey-5" class="col my-2.5 mx-4" />
-      </div>
     </section>
   </q-page>
 </template>
@@ -75,9 +66,6 @@ export default defineComponent({
       return thing.slice().sort((a, b) => {
         return a[thingProperty].localeCompare(b[thingProperty]);
       });
-    },
-    filteredSocialList() {
-      return this.sortAnything(this.socialNetwork, "nameAccount").filter((social) => social.useItOn.includes("where"));
     },
   },
 });
