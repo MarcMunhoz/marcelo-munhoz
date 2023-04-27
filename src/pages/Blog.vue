@@ -1,5 +1,5 @@
 <template>
-  <q-page> BLOG </q-page>
+  <q-page class="pt-4"> BLOG </q-page>
 </template>
 
 <script>
