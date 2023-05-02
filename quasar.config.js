@@ -10,6 +10,8 @@
 
 const { configure } = require("quasar/wrappers");
 
+require("dotenv").config().parsed;
+
 module.exports = configure(function (/* ctx */) {
   return {
     eslint: {
@@ -62,7 +64,11 @@ module.exports = configure(function (/* ctx */) {
 
       // publicPath: '/',
       // analyze: true,
-      // env: {},
+      env: {
+        CONTENTFUL_SPACE_ID: process.env.CONTENTFUL_SPACE_ID,
+        CONTENFUL_SPACE: process.env.CONTENTFUL_SPACE_NAME,
+        CONTENTFUL_DELIVERY: process.env.CONTENTFUL_DELIVERY_KEY,
+      },
       // rawDefine: {}
       // ignorePublicFolder: true,
       // minify: false,
