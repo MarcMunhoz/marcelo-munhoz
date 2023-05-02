@@ -35,15 +35,13 @@
       </q-toolbar>
     </q-footer>
 
-    <q-btn class="insivible-btn hidden" />
+    <audio class="insivible-btn hidden" preload="auto"></audio>
   </q-layout>
 </template>
 
 <script>
 import { defineComponent } from "vue";
 import imageUrl from "../assets/rebellion-rebel-alliance-logo.png";
-
-const r2d2 = new Audio("/src/assets/r2d2.ogg");
 
 export default defineComponent({
   name: "MainLayout",
@@ -55,18 +53,20 @@ export default defineComponent({
   methods: {
     avatarOver() {
       // Simulating the first document interaction and triggering the Easter egg
-      const phantomBtn = document.querySelector(".insivible-btn");
-      const evtClick = new Event("click");
+      const phantomAudio = document.querySelector(".insivible-btn");
+      phantomAudio.setAttribute("src", "/src/assets/r2d2.ogg");
 
-      phantomBtn.addEventListener(
-        "click",
-        () => {
-          return (this.avatar = imageUrl), r2d2.play();
-        },
-        false
-      );
+      var phantomPromise = document.querySelector(".insivible-btn").play();
 
-      return phantomBtn.dispatchEvent(evtClick);
+      if (phantomPromise !== undefined) {
+        phantomPromise
+          .then((_) => {
+            return (this.avatar = imageUrl), phantomAudio.play();
+          })
+          .catch(() => {
+            return console.log("Interact with the page, mouse over my name and welcome to the Rebel Alliance!");
+          });
+      }
     },
     avatarLeave() {
       return (this.avatar = "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c");
