@@ -34,6 +34,8 @@
         </q-toolbar-title>
       </q-toolbar>
     </q-footer>
+
+    <q-btn class="insivible-btn hidden" />
   </q-layout>
 </template>
 
@@ -52,7 +54,19 @@ export default defineComponent({
   },
   methods: {
     avatarOver() {
-      return (this.avatar = imageUrl), r2d2.play();
+      // Simulating the first document interaction and triggering the Easter egg
+      const phantomBtn = document.querySelector(".insivible-btn");
+      const evtClick = new Event("click");
+
+      phantomBtn.addEventListener(
+        "click",
+        () => {
+          return (this.avatar = imageUrl), r2d2.play();
+        },
+        false
+      );
+
+      return phantomBtn.dispatchEvent(evtClick);
     },
     avatarLeave() {
       return (this.avatar = "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c");
