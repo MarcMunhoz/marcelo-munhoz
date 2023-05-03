@@ -1,14 +1,13 @@
 <template>
-  <q-page class="pt-4">
-    <ul>
-      <li v-for="article in articles" :key="article.id" class="text-lg">{{ article.fields.title }}</li>
-    </ul>
+  <q-page class="q-pa-md row items-start">
+    <BlogIndex :data-articles="articles" />
   </q-page>
 </template>
 
 <script>
 import { defineComponent } from "vue";
 import { createClient } from "contentful";
+import BlogIndex from "../components/BlogIndex.vue";
 
 const client = createClient({
   space: process.env.CONTENTFUL_SPACE_ID,
@@ -20,24 +19,21 @@ export default defineComponent({
   name: "BlogPage",
   created() {
     client
-      .getEntries()
+      .getEntries({ content_type: "article", order: "-fields.createAt" })
       .then((res) => {
-        const articles = res.items;
-
-        articles.forEach((e) => {
-          if (e.sys.contentType.sys.id === "article") {
-            this.articles.push(e);
-          }
+        res.items.forEach((e) => {
+          this.articles.push(e);
         });
-
-        console.log(this.articles);
       })
-      .catch((err) => console.log(err));
+      .catch((err) => console.error(err));
   },
   data() {
     return {
       articles: [],
     };
+  },
+  components: {
+    BlogIndex,
   },
 });
 </script>
