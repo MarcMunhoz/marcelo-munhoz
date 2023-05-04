@@ -1,6 +1,6 @@
 <template>
   <q-page class="q-pa-md row items-start">
-    <BlogIndex :data-articles="articles" />
+    <BlogIndex :data-articles="articles" :total-articles="totalArticles" />
   </q-page>
 </template>
 
@@ -18,19 +18,24 @@ const client = createClient({
 export default defineComponent({
   name: "BlogPage",
   created() {
-    client
-      .getEntries({ content_type: "article", order: "-fields.createAt" })
-      .then((res) => {
-        res.items.forEach((e) => {
-          this.articles.push(e);
-        });
-      })
-      .catch((err) => console.error(err));
+    this.setData();
   },
   data() {
     return {
-      articles: [],
+      articles: Array,
+      totalArticles: Number,
     };
+  },
+  methods: {
+    async setData() {
+      const articlesRaw = await client.getEntries({
+        content_type: "article",
+        order: "-fields.createAt",
+        limit: 3,
+      });
+
+      return (this.articles = articlesRaw.items), (this.totalArticles = articlesRaw.total);
+    },
   },
   components: {
     BlogIndex,
