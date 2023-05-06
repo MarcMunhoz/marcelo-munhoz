@@ -1,11 +1,13 @@
 <template>
-  <q-page class="q-pa-md row items-start">
-    <BlogIndex :data-articles="articles" :total-articles="totalArticles" />
+  <q-page class="q-pa-md row items-center">
+    <BlogIndex :data-articles="articles" />
+
+    <q-pagination v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center lg:mt-0 mt-6" />
   </q-page>
 </template>
 
 <script>
-import { defineComponent } from "vue";
+import { defineComponent, ref } from "vue";
 import { createClient } from "contentful";
 import BlogIndex from "../components/BlogIndex.vue";
 
@@ -23,18 +25,29 @@ export default defineComponent({
   data() {
     return {
       articles: Array,
-      totalArticles: Number,
+      maxPages: Number,
+      currentPage: ref(1),
+      skipArticles: Number,
     };
   },
   methods: {
     async setData() {
-      const articlesRaw = await client.getEntries({
+      const articles = await client.getEntries({
         content_type: "article",
         order: "-fields.createAt",
         limit: 3,
+        skip: this.displayedArticles(),
       });
 
-      return (this.articles = articlesRaw.items), (this.totalArticles = articlesRaw.total);
+      return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total));
+    },
+    calculatePagesCount(totalCount) {
+      const maxArticles = 3;
+
+      return totalCount < maxArticles ? 1 : Math.ceil(totalCount / maxArticles);
+    },
+    displayedArticles() {
+      return this.currentPage > 1 ? (this.skipArticles = 3 * this.currentPage - 3) : (this.skipArticles = 0);
     },
   },
   components: {
