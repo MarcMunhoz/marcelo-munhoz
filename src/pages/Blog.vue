@@ -32,14 +32,21 @@ export default defineComponent({
   },
   methods: {
     async setData() {
-      const articles = await client.getEntries({
-        content_type: "article",
-        order: "-fields.createAt",
-        limit: 3,
-        skip: this.displayedArticles(),
-      });
+      try {
+        const articles = await client.getEntries({
+          content_type: "article",
+          order: "-fields.createAt",
+          limit: 3,
+          skip: this.displayedArticles(),
+        });
 
-      return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total));
+        return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total));
+      } catch (err) {
+        const error = Object.getOwnPropertyDescriptors(err)
+          .message.value.split("\n")[3]
+          .replace(/['",]+/g, "");
+        console.error(`${error} ¯\\_(ツ)_/¯`);
+      }
     },
     calculatePagesCount(totalCount) {
       const maxArticles = 3;
