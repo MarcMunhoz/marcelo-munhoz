@@ -1,26 +1,20 @@
 <template>
   <q-page class="q-pa-md row items-center">
-    <BlogIndex :data-articles="articles" />
+    <BlogIndex :data-articles="articles" v-if="$route.path === '/blog'" />
 
-    <q-pagination v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center lg:mt-0 mt-6" />
+    <q-pagination v-if="$route.path === '/blog'" v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center lg:mt-0 mt-6" />
   </q-page>
 </template>
 
 <script>
 import { defineComponent, ref } from "vue";
-import { createClient } from "contentful";
+import client from "../plugins/contentful";
 import BlogIndex from "../components/BlogIndex.vue";
-
-const client = createClient({
-  space: process.env.CONTENTFUL_SPACE_ID,
-  accessToken: process.env.CONTENTFUL_DELIVERY,
-  environment: "articles",
-});
 
 export default defineComponent({
   name: "BlogPage",
   created() {
-    this.setData();
+    return this.setData();
   },
   data() {
     return {
