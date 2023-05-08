@@ -71,6 +71,14 @@ export default defineComponent({
     avatarLeave() {
       return (this.avatar = "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c");
     },
+    normalize(that) {
+      return that
+        .normalize("NFD")
+        .replace(/\s+/g, "-") // Removes white spaces
+        .replace(/---/g, "-")
+        .replace(/[\u0300-\u036f\,. ]/g, "") // Removes accent
+        .toLowerCase();
+    },
   },
 });
 </script>
