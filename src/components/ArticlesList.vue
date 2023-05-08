@@ -1,7 +1,7 @@
 <template>
   <section class="row gap-4 justify-center w-full">
     <q-card class="w-[350px]" v-for="article in dataArticles" :key="article.sys.id">
-      <router-link :to="{ name: 'artigo', params: { article: article.sys.id } }">
+      <router-link :to="{ name: 'artigo', params: { slug: article.fields.slug, id: article.sys.id } }">
         <img v-if="article.fields.cloudinary" :src="`https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/${article.fields.cloudinary[0].public_id}`" />
         <img v-else src="https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/marcelo-munhoz-website/no-thumbnail.jpg" />
 
@@ -18,15 +18,13 @@
 
 <script>
 import { defineComponent } from "vue";
-import normalize from "../layouts/MainLayout.vue";
 
 export default defineComponent({
-  name: "BlogIndex",
+  name: "ArticleList",
   props: {
     dataArticles: {
       type: Array,
     },
   },
-  mixins: [normalize],
 });
 </script>

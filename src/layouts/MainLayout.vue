@@ -9,7 +9,7 @@
         <q-toolbar-title>
           <span v-if="$route.path !== '/'">
             <span @click="$router.push('/')" @mouseover="avatarOver" @mouseleave="avatarLeave" class="cursor-pointer uppercase">Marcelo Munhoz</span>
-            | <i class="not-italic text-blue-grey-5 capitalize">{{ $route.name }}</i>
+            | <i class="not-italic text-blue-grey-5 capitalize article-name">{{ $route.name }}</i>
           </span>
           <span v-else @mouseover="avatarOver" @mouseleave="avatarLeave" class="uppercase"> Marcelo Munhoz </span>
         </q-toolbar-title>
@@ -70,14 +70,6 @@ export default defineComponent({
     },
     avatarLeave() {
       return (this.avatar = "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c");
-    },
-    normalize(that) {
-      return that
-        .normalize("NFD")
-        .replace(/\s+/g, "-") // Removes white spaces
-        .replace(/---/g, "-")
-        .replace(/[\u0300-\u036f\,. ]/g, "") // Removes accent
-        .toLowerCase();
     },
   },
 });

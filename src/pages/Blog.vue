@@ -1,6 +1,6 @@
 <template>
   <q-page class="q-pa-md row items-center">
-    <BlogIndex :data-articles="articles" v-if="$route.path === '/blog'" />
+    <ArticleList :data-articles="articles" v-if="$route.path === '/blog'" />
 
     <q-pagination v-if="$route.path === '/blog'" v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center lg:mt-0 mt-6" />
   </q-page>
@@ -9,7 +9,7 @@
 <script>
 import { defineComponent, ref } from "vue";
 import client from "../plugins/contentful";
-import BlogIndex from "../components/BlogIndex.vue";
+import ArticleList from "../components/ArticlesList.vue";
 
 export default defineComponent({
   name: "BlogPage",
@@ -52,7 +52,7 @@ export default defineComponent({
     },
   },
   components: {
-    BlogIndex,
+    ArticleList,
   },
 });
 </script>
