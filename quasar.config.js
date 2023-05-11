@@ -32,7 +32,7 @@ module.exports = configure(function (/* ctx */) {
     boot: ["axios"],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#css
-    css: ["app.css"],
+    css: ["app.scss", "tailwind.css"],
 
     // https://github.com/quasarframework/quasar/tree/dev/extras
     extras: [
@@ -52,7 +52,7 @@ module.exports = configure(function (/* ctx */) {
     build: {
       target: {
         browser: ["es2019", "edge88", "firefox78", "chrome87", "safari13.1"],
-        node: "node16",
+        node: "node18",
       },
 
       vueRouterMode: "history", // available values: 'hash', 'history'
