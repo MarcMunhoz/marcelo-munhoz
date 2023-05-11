@@ -1,5 +1,5 @@
 # Development stage
-FROM node:16-alpine as develop
+FROM node:18-alpine as develop
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   version="1.0.0" \
@@ -9,8 +9,8 @@ WORKDIR /app
 
 COPY ["package.*", "./"]
 
-RUN apk add exa \
-  && npm i -g @quasar/cli \
+RUN apk add exa curl \
+  && npm i -g @quasar/cli contentful-cli \
   && npm i \
   && rm -rf /var/cache/apk/* /var/tmp/* /usr/share/man
 
