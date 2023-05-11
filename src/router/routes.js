@@ -6,15 +6,15 @@ const routes = [
     component: () => import("layouts/MainLayout.vue"),
     children: [
       { path: "", component: () => import("pages/IndexPage.vue") },
-      { path: "/about", name: "prefácio", component: () => import("pages/About.vue") },
+      { path: "/about", name: "Prefácio", component: () => import("pages/About.vue") },
       {
         path: "/blog",
-        name: "meus artigos",
+        name: "Meus Artigos",
         component: () => import("pages/Blog.vue"),
       },
       {
         path: "/blog/:slug",
-        name: "artigo",
+        name: "Artigo",
         component: () => import("components/BlogArticle.vue"),
       },
     ],
