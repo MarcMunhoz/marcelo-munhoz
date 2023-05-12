@@ -9,6 +9,12 @@
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
 
+      <div>
+        <s-facebook :share-options="{ url: 'https://www.uol.com.br', quote: 'Quote', hashtag: '#articleTags.sys.id' }" :use-native-behavior="useNativeBehavior">
+          <i class="fa-brands fa-facebook text-[30px]"></i>
+        </s-facebook>
+      </div>
+
       <div class="rendered-text"></div>
 
       <p class="text-right mt-4 italic">Escrito por {{ articleAuthor }}</p>
@@ -20,6 +26,7 @@
 import { defineComponent } from "vue";
 import client from "../plugins/contentful";
 import { marked } from "marked";
+import { SFacebook } from "vue-socials";
 
 export default defineComponent({
   name: "BlogArticle",
@@ -37,8 +44,14 @@ export default defineComponent({
       articleAuthor: {
         type: String,
       },
+      articleTags: {
+        type: Array,
+      },
       progress: true,
     };
+  },
+  components: {
+    SFacebook,
   },
   mounted() {
     return this.asyncArticle();
@@ -66,7 +79,7 @@ export default defineComponent({
         articleBodyDOM.innerHTML = linkToIframe;
 
         // Populates articles main array, update date and author
-        return (this.article = article.items[0].fields), (this.articleUpdateAt = article.items[0].sys.updatedAt), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
+        return (this.article = article.items[0].fields), (this.articleUpdateAt = article.items[0].sys.updatedAt), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.articleTags = article.items[0].metadata.tags), (this.progress = false);
       } catch (err) {
         const error = Object.getOwnPropertyDescriptors(err)
           .message.value.split("\n")[3]
