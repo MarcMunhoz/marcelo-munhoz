@@ -1,8 +1,10 @@
 <template>
-  <q-page class="q-pa-md row items-center">
-    <ArticleList :data-articles="articles" v-if="$route.path === '/blog'" />
+  <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
 
-    <q-pagination v-if="$route.path === '/blog'" v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center lg:mt-0 mt-6" />
+  <q-page class="q-pa-md row items-center">
+    <ArticleList :data-articles="articles" v-if="$route.path === '/blog'" :class="progress && 'hidden'" />
+
+    <q-pagination v-if="$route.path === '/blog'" v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" :class="progress && 'hidden'" class="w-full justify-center lg:mt-0 mt-6" />
   </q-page>
 </template>
 
@@ -22,6 +24,7 @@ export default defineComponent({
       maxPages: Number,
       currentPage: ref(1),
       skipArticles: Number,
+      progress: true,
     };
   },
   methods: {
@@ -34,7 +37,7 @@ export default defineComponent({
           skip: this.displayedArticles(),
         });
 
-        return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total));
+        return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total)), (this.progress = false);
       } catch (err) {
         const error = Object.getOwnPropertyDescriptors(err)
           .message.value.split("\n")[3]
