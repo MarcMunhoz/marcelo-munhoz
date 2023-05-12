@@ -1,6 +1,8 @@
 <template>
   <q-page class="q-pa-md row items-start">
-    <article class="w-full">
+    <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
+
+    <article class="w-full" :class="progress && 'hidden'">
       <cite class="block text-center">Artigo criado em {{ formatDate(article.createAt, "pt-br") }} | Última atualização: {{ formatDate(articleUpdateAt, "pt-br") }}</cite>
 
       <img v-if="articleImg" :src="articleImg" :title="article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
@@ -35,6 +37,7 @@ export default defineComponent({
       articleAuthor: {
         type: String,
       },
+      progress: true,
     };
   },
   mounted() {
@@ -42,27 +45,34 @@ export default defineComponent({
   },
   methods: {
     async asyncArticle() {
-      const article = await client.getEntries({
-        content_type: "article",
-        "fields.slug": this.$route.params.slug,
-      });
+      try {
+        const article = await client.getEntries({
+          content_type: "article",
+          "fields.slug": this.$route.params.slug,
+        });
 
-      // Populates header with article title
-      const headerArticleName = document.querySelector(".article-name");
-      headerArticleName.innerHTML = `${article.items[0].fields.title}`;
+        // Populates header with article title
+        const headerArticleName = document.querySelector(".article-name");
+        headerArticleName.innerHTML = `${article.items[0].fields.title}`;
 
-      // Gets the article main image if its exists
-      article.items[0].fields.cloudinary ? (this.articleImg = article.items[0].fields.cloudinary[0].url) : (this.articleImg = "");
+        // Gets the article main image if its exists
+        article.items[0].fields.cloudinary ? (this.articleImg = article.items[0].fields.cloudinary[0].url) : (this.articleImg = "");
 
-      // Seeks and replaces embed links by iframe
-      const articleBodyDOM = document.querySelector(".rendered-text");
-      const regexLinkVideo = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi;
-      const parsedArticleBody = marked.parse(article.items[0].fields.body);
-      const linkToIframe = parsedArticleBody.replace(regexLinkVideo, '<div id="video-container" class="relative pb-[56.25%] h-0"><iframe src="$2" allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="allowfullscreen" id="video-iframe" class="absolute top-0 left-0 h-full w-full"></iframe></div>');
-      articleBodyDOM.innerHTML = linkToIframe;
+        // Seeks and replaces embed links by iframe
+        const articleBodyDOM = document.querySelector(".rendered-text");
+        const regexLinkVideo = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi;
+        const parsedArticleBody = marked.parse(article.items[0].fields.body);
+        const linkToIframe = parsedArticleBody.replace(regexLinkVideo, '<div id="video-container" class="relative pb-[56.25%] h-0"><iframe src="$2" allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="allowfullscreen" id="video-iframe" class="absolute top-0 left-0 h-full w-full"></iframe></div>');
+        articleBodyDOM.innerHTML = linkToIframe;
 
-      // Populates articles main array, update date and author
-      return (this.article = article.items[0].fields), (this.articleUpdateAt = article.items[0].sys.updatedAt), (this.articleAuthor = article.items[0].fields.author.fields.name);
+        // Populates articles main array, update date and author
+        return (this.article = article.items[0].fields), (this.articleUpdateAt = article.items[0].sys.updatedAt), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
+      } catch (err) {
+        const error = Object.getOwnPropertyDescriptors(err)
+          .message.value.split("\n")[3]
+          .replace(/['",]+/g, "");
+        console.error(`${error} ¯\\_(ツ)_/¯`);
+      }
     },
     formatDate(date, language) {
       const options = {
@@ -78,14 +88,35 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+@mixin headings {
+  .rendered-text:deep {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      @content;
+    }
+  }
+}
+
+@include headings {
+  font-weight: 700;
+  margin: 1em 0;
+}
+
 .rendered-text {
   &:deep {
     font-size: 1.3em;
     font-weight: 300;
 
+    h1 {
+      font-size: 2em;
+    }
+
     h2 {
       font-size: 1.7em;
-      font-weight: 700;
     }
 
     p {
@@ -119,8 +150,8 @@ export default defineComponent({
     }
 
     code {
-      color: $accent;
-      font-weight: 700;
+      background-color: $blue-grey-1;
+      color: $blue-grey-5;
     }
 
     pre {
@@ -128,6 +159,7 @@ export default defineComponent({
       padding: 1em;
 
       code {
+        background-color: unset;
         color: initial;
         font-weight: normal;
       }
