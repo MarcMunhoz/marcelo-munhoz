@@ -1,7 +1,7 @@
 <template>
-  <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
-
   <q-page class="q-pa-md row items-center">
+    <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
+
     <ArticleList :data-articles="articles" v-if="$route.path === '/blog'" :class="progress && 'hidden'" />
 
     <q-pagination v-if="$route.path === '/blog'" v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" :class="progress && 'hidden'" class="w-full justify-center lg:mt-0 mt-6" />
