@@ -3,32 +3,44 @@
     <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
 
     <article class="w-full" :class="progress && 'hidden'">
-      <cite class="block text-center">Artigo criado em {{ formatDate(article.createAt, "pt-br") }} | Última atualização: {{ formatDate(articleUpdateAt, "pt-br") }}</cite>
+      <cite class="block text-center">Artigo criado em {{ formatDate(article.createAt, "pt-br") }}</cite>
 
       <img v-if="articleImg" :src="articleImg" :title="article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
 
-      <div class="social-share flex flex-row justify-end content-center gap-2 pr-3">
-        <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: article.description }" :window-features="{ width: '500', height: '600' }">
-          <i class="fa-solid fa-square-envelope text-[30px]"></i>
-        </s-email>
-        <s-facebook :share-options="{ url: 'https://www.cnet.com', hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }">
-          <i class="fa-brands fa-square-facebook text-[30px]"></i>
-        </s-facebook>
-        <s-linked-in :share-options="{ url: 'https://www.cnet.com' }" :window-features="{ width: '500', height: '600' }">
-          <i class="fa-brands fa-linkedin text-[30px]"></i>
-        </s-linked-in>
-        <s-telegram :share-options="{ url: 'https://www.cnet.com', text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
-          <i class="fa-brands fa-telegram text-[30px]"></i>
-        </s-telegram>
-        <s-twitter :share-options="{ url: 'https://www.cnet.com', hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
-          <i class="fa-brands fa-square-twitter text-[30px]"></i>
-        </s-twitter>
-        <s-whats-app :share-options="{ number: '', text: `http://www.cnet.com - ${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
-          <i class="fa-brands fa-square-whatsapp text-[30px]"></i>
-        </s-whats-app>
-      </div>
+      <section>
+        <ul class="flex flex-row gap-4">
+          <li v-for="tag in articleTags" :key="tag.id" class="text-blue-grey-3 font-bold">#{{ tag }}</li>
+        </ul>
+      </section>
+
+      <section class="flex justify-end">
+        <q-btn color="blue-grey-5" icon="fa-solid fa-share">
+          <q-menu transition-show="flip-right" transition-hide="flip-left" class="min-w-fit">
+            <div class="social-share flex flex-row flex-nowrap content-center gap-3 p-1">
+              <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: `${article.description}\n${$route.fullPath}` }">
+                <i class="fa-solid fa-envelope-open text-[30px]"></i>
+              </s-email>
+              <s-facebook :share-options="{ url: $route.fullPath, hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }">
+                <i class="fa-brands fa-facebook text-[30px]"></i>
+              </s-facebook>
+              <s-linked-in :share-options="{ url: $route.fullPath }" :window-features="{ width: '500', height: '600' }">
+                <i class="fa-brands fa-linkedin-in text-[30px]"></i>
+              </s-linked-in>
+              <s-telegram :share-options="{ url: $route.fullPath, text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+                <i class="fa-brands fa-telegram text-[30px]"></i>
+              </s-telegram>
+              <s-twitter :share-options="{ url: $route.fullPath, hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
+                <i class="fa-brands fa-twitter text-[30px]"></i>
+              </s-twitter>
+              <s-whats-app :share-options="{ number: '', text: `${$route.fullPath} - ${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+                <i class="fa-brands fa-whatsapp text-[30px]"></i>
+              </s-whats-app>
+            </div>
+          </q-menu>
+        </q-btn>
+      </section>
 
       <div class="rendered-text"></div>
 
@@ -52,9 +64,6 @@ export default defineComponent({
       },
       articleImg: {
         type: URL,
-      },
-      articleUpdateAt: {
-        type: String,
       },
       articleAuthor: {
         type: String,
@@ -105,7 +114,7 @@ export default defineComponent({
         });
 
         // Populates articles main array, update date and author
-        return (this.article = article.items[0].fields), (this.articleUpdateAt = article.items[0].sys.updatedAt), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
+        return (this.article = article.items[0].fields), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
       } catch (err) {
         const error = Object.getOwnPropertyDescriptors(err)
           .message.value.split("\n")[3]
