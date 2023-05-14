@@ -9,10 +9,25 @@
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
 
-      <div>
-        <s-facebook :share-options="{ url: 'https://www.uol.com.br', quote: 'Quote', hashtag: '#articleTags.sys.id' }" :use-native-behavior="useNativeBehavior">
-          <i class="fa-brands fa-facebook text-[30px]"></i>
+      <div class="social-share flex flex-row justify-end content-center gap-2 pr-3">
+        <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: article.description }" :window-features="{ width: '500', height: '600' }">
+          <i class="fa-solid fa-square-envelope text-[30px]"></i>
+        </s-email>
+        <s-facebook :share-options="{ url: 'https://www.cnet.com', hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }">
+          <i class="fa-brands fa-square-facebook text-[30px]"></i>
         </s-facebook>
+        <s-linked-in :share-options="{ url: 'https://www.cnet.com' }" :window-features="{ width: '500', height: '600' }">
+          <i class="fa-brands fa-linkedin text-[30px]"></i>
+        </s-linked-in>
+        <s-telegram :share-options="{ url: 'https://www.cnet.com', text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+          <i class="fa-brands fa-telegram text-[30px]"></i>
+        </s-telegram>
+        <s-twitter :share-options="{ url: 'https://www.cnet.com', hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
+          <i class="fa-brands fa-square-twitter text-[30px]"></i>
+        </s-twitter>
+        <s-whats-app :share-options="{ number: '', text: `http://www.cnet.com - ${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+          <i class="fa-brands fa-square-whatsapp text-[30px]"></i>
+        </s-whats-app>
       </div>
 
       <div class="rendered-text"></div>
@@ -26,7 +41,7 @@
 import { defineComponent } from "vue";
 import client from "../plugins/contentful";
 import { marked } from "marked";
-import { SFacebook } from "vue-socials";
+import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 
 export default defineComponent({
   name: "BlogArticle",
@@ -51,7 +66,12 @@ export default defineComponent({
     };
   },
   components: {
+    SEmail,
     SFacebook,
+    SLinkedIn,
+    STelegram,
+    STwitter,
+    SWhatsApp,
   },
   mounted() {
     return this.asyncArticle();
@@ -78,8 +98,14 @@ export default defineComponent({
         const linkToIframe = parsedArticleBody.replace(regexLinkVideo, '<div id="video-container" class="relative pb-[56.25%] h-0"><iframe src="$2" allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="allowfullscreen" id="video-iframe" class="absolute top-0 left-0 h-full w-full"></iframe></div>');
         articleBodyDOM.innerHTML = linkToIframe;
 
+        // Populates the hashtags
+        const hashtags = article.items[0].metadata.tags;
+        this.articleTags = hashtags.map((a) => {
+          return a.sys.id;
+        });
+
         // Populates articles main array, update date and author
-        return (this.article = article.items[0].fields), (this.articleUpdateAt = article.items[0].sys.updatedAt), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.articleTags = article.items[0].metadata.tags), (this.progress = false);
+        return (this.article = article.items[0].fields), (this.articleUpdateAt = article.items[0].sys.updatedAt), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
       } catch (err) {
         const error = Object.getOwnPropertyDescriptors(err)
           .message.value.split("\n")[3]
@@ -117,6 +143,18 @@ export default defineComponent({
 @include headings {
   font-weight: 700;
   margin: 1em 0;
+}
+
+.social-share {
+  &:deep {
+    a {
+      color: $blue-grey-5;
+
+      &:hover {
+        color: $blue-grey-3;
+      }
+    }
+  }
 }
 
 .rendered-text {
