@@ -3,17 +3,11 @@
     <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
 
     <article class="w-full" :class="progress && 'hidden'">
-      <cite class="block text-center">Artigo criado em {{ formatDate(article.createAt, "pt-br") }}</cite>
-
       <img v-if="articleImg" :src="articleImg" :title="article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
 
-      <section>
-        <ul class="flex flex-row gap-4">
-          <li v-for="tag in articleTags" :key="tag.id" class="text-blue-grey-3 font-bold">#{{ tag }}</li>
-        </ul>
-      </section>
+      <cite class="block">Por {{ articleAuthor }}<br />em {{ formatDate(article.createAt, "pt-br") }}</cite>
 
       <section class="flex justify-end">
         <q-btn color="blue-grey-5" icon="fa-solid fa-share">
@@ -44,7 +38,11 @@
 
       <div class="rendered-text"></div>
 
-      <p class="text-right mt-4 italic">Escrito por {{ articleAuthor }}</p>
+      <section class="my-4">
+        <ul class="flex flex-row gap-4 justify-center">
+          <li v-for="tag in articleTags" :key="tag.id" class="bg-blue-grey-1 text-blue-grey-3 font-bold p-1">#{{ tag }}</li>
+        </ul>
+      </section>
     </article>
   </q-page>
 </template>
@@ -125,7 +123,7 @@ export default defineComponent({
     formatDate(date, language) {
       const options = {
         year: "numeric",
-        month: "long",
+        month: "numeric",
         day: "numeric",
       };
 
