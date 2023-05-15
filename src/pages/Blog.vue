@@ -39,10 +39,7 @@ export default defineComponent({
 
         return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total)), (this.progress = false);
       } catch (err) {
-        const error = Object.getOwnPropertyDescriptors(err)
-          .message.value.split("\n")[3]
-          .replace(/['",]+/g, "");
-        console.error(`${error} ¯\\_(ツ)_/¯`);
+        console.error(err);
       }
     },
     calculatePagesCount(totalCount) {

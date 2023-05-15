@@ -7,29 +7,32 @@
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
 
-      <cite class="block">Por {{ articleAuthor }}<br />em {{ formatDate(article.createAt, "pt-br") }}</cite>
+      <cite class="block not-italic"
+        >Por <strong>{{ articleAuthor }}</strong
+        ><br />em {{ formatDate(article.createAt, "pt-br") }}</cite
+      >
 
       <section class="flex justify-end">
-        <q-btn color="blue-grey-5" icon="fa-solid fa-share">
+        <q-btn flat color="blue-grey-5" icon="fa-solid fa-share" size="md">
           <q-menu transition-show="flip-right" transition-hide="flip-left" class="min-w-fit">
-            <div class="social-share flex flex-row flex-nowrap content-center gap-3 p-1">
+            <div class="social-share flex flex-row flex-nowrap gap-4 p-1 pt-1.5">
               <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: `${article.description}\n${$route.fullPath}` }">
-                <i class="fa-solid fa-envelope-open text-[30px]"></i>
+                <i class="fa-solid fa-envelope-open text-[20px]"></i>
               </s-email>
               <s-facebook :share-options="{ url: $route.fullPath, hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }">
-                <i class="fa-brands fa-facebook text-[30px]"></i>
+                <i class="fa-brands fa-facebook text-[20px]"></i>
               </s-facebook>
               <s-linked-in :share-options="{ url: $route.fullPath }" :window-features="{ width: '500', height: '600' }">
-                <i class="fa-brands fa-linkedin-in text-[30px]"></i>
+                <i class="fa-brands fa-linkedin-in text-[20px]"></i>
               </s-linked-in>
               <s-telegram :share-options="{ url: $route.fullPath, text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
-                <i class="fa-brands fa-telegram text-[30px]"></i>
+                <i class="fa-brands fa-telegram text-[20px]"></i>
               </s-telegram>
               <s-twitter :share-options="{ url: $route.fullPath, hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
-                <i class="fa-brands fa-twitter text-[30px]"></i>
+                <i class="fa-brands fa-twitter text-[20px]"></i>
               </s-twitter>
               <s-whats-app :share-options="{ number: '', text: `${$route.fullPath} - ${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
-                <i class="fa-brands fa-whatsapp text-[30px]"></i>
+                <i class="fa-brands fa-whatsapp text-[20px]"></i>
               </s-whats-app>
             </div>
           </q-menu>
@@ -40,7 +43,9 @@
 
       <section class="my-4">
         <ul class="flex flex-row gap-4 justify-center">
-          <li v-for="tag in articleTags" :key="tag.id" class="bg-blue-grey-1 text-blue-grey-3 font-bold p-1">#{{ tag }}</li>
+          <li v-for="tag in articleTags" :key="tag.id" class="cursor-pointer bg-blue-grey-1 text-blue-grey-3 font-bold p-1">
+            <router-link :to="{ name: 'Artigos Tags', params: { tag: tag } }">#{{ tag }}</router-link>
+          </li>
         </ul>
       </section>
     </article>
@@ -57,18 +62,10 @@ export default defineComponent({
   name: "BlogArticle",
   data() {
     return {
-      article: {
-        type: Array,
-      },
-      articleImg: {
-        type: URL,
-      },
-      articleAuthor: {
-        type: String,
-      },
-      articleTags: {
-        type: Array,
-      },
+      article: Array,
+      articleImg: URL,
+      articleAuthor: String,
+      articleTags: Array,
       progress: true,
     };
   },
@@ -92,7 +89,7 @@ export default defineComponent({
         });
 
         // Populates header with article title
-        const headerArticleName = document.querySelector(".article-name");
+        const headerArticleName = document.querySelector(".header-title");
         headerArticleName.innerHTML = `${article.items[0].fields.title}`;
 
         // Gets the article main image if its exists
@@ -114,10 +111,7 @@ export default defineComponent({
         // Populates articles main array, update date and author
         return (this.article = article.items[0].fields), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
       } catch (err) {
-        const error = Object.getOwnPropertyDescriptors(err)
-          .message.value.split("\n")[3]
-          .replace(/['",]+/g, "");
-        console.error(`${error} ¯\\_(ツ)_/¯`);
+        console.error(err);
       }
     },
     formatDate(date, language) {

@@ -9,7 +9,7 @@
         <q-toolbar-title>
           <span v-if="$route.path !== '/'">
             <span @click="$router.push('/')" @mouseover="avatarOver" @mouseleave="avatarLeave" class="cursor-pointer uppercase">Marcelo Munhoz</span>
-            | <i class="not-italic text-blue-grey-5 article-name">{{ $route.name }}</i>
+            | <i class="not-italic text-blue-grey-5 header-title">{{ $route.name }}</i>
           </span>
           <span v-else @mouseover="avatarOver" @mouseleave="avatarLeave" class="uppercase"> Marcelo Munhoz </span>
         </q-toolbar-title>
@@ -64,7 +64,7 @@ export default defineComponent({
             return (this.avatar = imageUrl), phantomAudio.play();
           })
           .catch(() => {
-            return console.log("Interact with the page, mouse over my name and welcome to the Rebel Alliance!");
+            return console.warn("Interact with the page, mouse over my name and welcome to the Rebel Alliance!");
           });
       }
     },
