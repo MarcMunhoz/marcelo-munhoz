@@ -17,6 +17,11 @@ const routes = [
         name: "Artigo",
         component: () => import("components/BlogArticle.vue"),
       },
+      {
+        path: "/blog/tags/:tag",
+        name: "Artigos Tags",
+        component: () => import("components/ArticlesTags.vue"),
+      },
     ],
   },
 
