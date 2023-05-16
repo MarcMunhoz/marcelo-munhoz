@@ -7,10 +7,11 @@
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
 
-      <cite class="block not-italic"
-        >Por <strong>{{ articleAuthor }}</strong
-        ><br />em {{ formatDate(article.createAt, "pt-br") }}</cite
-      >
+      <cite class="block not-italic">
+        Por <strong>{{ articleAuthor }}</strong
+        ><br />
+        em {{ formatDate(article.createAt, "pt-br") }}
+      </cite>
 
       <section class="flex justify-end">
         <q-btn flat color="blue-grey-5" icon="fa-solid fa-share" size="md">
