@@ -130,7 +130,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 @mixin headings {
-  .rendered-text:deep {
+  :deep(.rendered-text) {
     h1,
     h2,
     h3,
@@ -147,81 +147,77 @@ export default defineComponent({
   margin: 1em 0;
 }
 
-.social-share {
-  &:deep {
-    a {
-      color: $blue-grey-5;
+:deep(.social-share) {
+  a {
+    color: $blue-grey-5;
 
-      &:hover {
-        color: $blue-grey-3;
-      }
+    &:hover {
+      color: $blue-grey-3;
     }
   }
 }
 
-.rendered-text {
-  &:deep {
-    font-size: 1.3em;
-    font-weight: 300;
+:deep(.rendered-text) {
+  font-size: 1.3em;
+  font-weight: 300;
 
-    h1 {
-      font-size: 2em;
+  h1 {
+    font-size: 2em;
+  }
+
+  h2 {
+    font-size: 1.7em;
+  }
+
+  p {
+    line-height: 1.2;
+    margin: 1em 0;
+  }
+
+  a {
+    box-shadow: inset 0 -2px 0 $blue-grey-5;
+    color: $blue-grey-5;
+    transition: box-shadow 0.3s ease-out, background-color 0.3s ease-out;
+
+    &:hover {
+      background-color: $blue-grey-5;
+      color: white;
     }
+  }
 
-    h2 {
-      font-size: 1.7em;
+  ul {
+    list-style-type: disc;
+  }
+
+  ul,
+  ol {
+    margin-left: 1rem;
+
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
     }
+  }
 
-    p {
-      line-height: 1.2;
-      margin: 1em 0;
-    }
+  code {
+    background-color: $blue-grey-1;
+    color: $blue-grey-5;
+  }
 
-    a {
-      box-shadow: inset 0 -2px 0 $blue-grey-5;
-      color: $blue-grey-5;
-      transition: box-shadow 0.3s ease-out, background-color 0.3s ease-out;
-
-      &:hover {
-        background-color: $blue-grey-5;
-        color: white;
-      }
-    }
-
-    ul {
-      list-style-type: disc;
-    }
-
-    ul,
-    ol {
-      margin-left: 1rem;
-
-      li {
-        display: list-item;
-        text-align: -webkit-match-parent;
-      }
-    }
+  pre {
+    background-color: $grey-3;
+    padding: 1em;
 
     code {
-      background-color: $blue-grey-1;
-      color: $blue-grey-5;
+      background-color: unset;
+      color: initial;
+      font-weight: normal;
     }
+  }
 
-    pre {
-      background-color: $grey-3;
-      padding: 1em;
-
-      code {
-        background-color: unset;
-        color: initial;
-        font-weight: normal;
-      }
-    }
-
-    img {
-      margin: 1em auto;
-      object-fit: cover;
-    }
+  img {
+    margin: 1em auto;
+    object-fit: cover;
   }
 }
 </style>
