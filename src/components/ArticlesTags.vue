@@ -2,8 +2,9 @@
   <q-page class="q-pa-md row items-center">
     <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
     <section class="row gap-4 justify-center w-full" :class="progress && 'hidden'">
-      <section class="w-full">
-        <ul class="flex flex-row gap-4 justify-center">
+      <section class="tags w-full">
+        <ul class="flex flex-row gap-4 justify-center max-h-[74px] overflow-y-auto overscroll-y-contain">
+          <li class="cursor-pointer font-bold p-1 bg-blue-grey-1 text-blue-grey-3"><router-link :to="{ name: 'Meus Artigos' }">TUDO</router-link></li>
           <li v-for="tag in allTags" :key="tag.id" class="cursor-pointer font-bold p-1" :class="$route.params.tag === tag.sys.id ? 'bg-blue-grey-4 text-blue-grey-1' : 'bg-blue-grey-1 text-blue-grey-3'">
             <router-link :to="{ name: 'Artigos Tags', params: { tag: tag.sys.id } }">#{{ tag.sys.id }}</router-link>
           </li>
@@ -66,13 +67,14 @@ export default defineComponent({
         headerTags.innerHTML = `#${this.currentTag}`;
 
         return (this.articlesTag = articles.items), ((this.maxPages = this.calculatePagesCount(articles.total)), (this.progress = false));
-      } catch (error) {
-        console.error(error);
+      } catch (err) {
+        console.error(err);
       }
     },
     async setTags() {
       try {
         const tags = await client.getTags();
+        const areaTags = document.querySelector(".tags");
 
         return (this.allTags = tags.items);
       } catch (err) {
@@ -82,3 +84,26 @@ export default defineComponent({
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.tags ul {
+  scrollbar-width: thin;
+  scrollbar-color: $blue-grey-3 $blue-grey-1;
+}
+
+/* Chrome, Edge, and Safari */
+*::-webkit-scrollbar {
+  width: 15px;
+}
+
+*::-webkit-scrollbar-track {
+  background: $blue-grey-1;
+  border-radius: 5px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: $blue-grey-3;
+  border-radius: 14px;
+  border: 3px solid $blue-grey-1;
+}
+</style>
