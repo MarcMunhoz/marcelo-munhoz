@@ -149,7 +149,7 @@ export default defineComponent({
   margin: 1em 0;
 }
 
-:deep(.social-share) {
+.social-share {
   a {
     color: $blue-grey-5;
 

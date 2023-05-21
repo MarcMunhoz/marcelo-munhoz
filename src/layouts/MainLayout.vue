@@ -42,6 +42,7 @@
 <script>
 import { defineComponent } from "vue";
 import imageUrl from "../assets/rebellion-rebel-alliance-logo.png";
+import audioFile from "../assets/r2d2.ogg";
 
 export default defineComponent({
   name: "MainLayout",
@@ -54,7 +55,7 @@ export default defineComponent({
     avatarOver() {
       // Simulating the first document interaction and triggering the Easter egg
       const phantomAudio = document.querySelector(".insivible-btn");
-      phantomAudio.setAttribute("src", "/src/assets/r2d2.ogg");
+      phantomAudio.setAttribute("src", audioFile);
 
       var phantomPromise = document.querySelector(".insivible-btn").play();
 
