@@ -90,8 +90,10 @@ export default defineComponent({
         });
 
         // Populates header with article title
+        const articleTitle = article.items[0].fields.title;
         const headerArticleName = document.querySelector(".header-title");
-        headerArticleName.innerHTML = `${article.items[0].fields.title}`;
+        headerArticleName.innerHTML = articleTitle;
+        document.title = `Marcelo Munhoz - ${articleTitle}`;
 
         // Gets the article main image if its exists
         article.items[0].fields.cloudinary ? (this.articleImg = article.items[0].fields.cloudinary[0].url) : (this.articleImg = "");
