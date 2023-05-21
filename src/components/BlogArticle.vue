@@ -9,6 +9,7 @@
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
 
+      <<<<<<< HEAD
       <cite class="block not-italic">
         Por <strong>{{ articleAuthor }}</strong
         ><br />
@@ -41,6 +42,13 @@
           </q-menu>
         </q-btn>
       </section>
+      =======
+      <div>
+        <s-facebook :share-options="{ url: 'https://www.uol.com.br', quote: 'Quote', hashtag: '#articleTags.sys.id' }" :use-native-behavior="useNativeBehavior">
+          <i class="fa-brands fa-facebook text-[30px]"></i>
+        </s-facebook>
+      </div>
+      >>>>>>> 62f322b (Vue socials added. Setup is needed)
 
       <div class="rendered-text"></div>
 
@@ -59,26 +67,52 @@
 import { defineComponent } from "vue";
 import client from "../plugins/contentful";
 import { marked } from "marked";
+<<<<<<< HEAD
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
+=======
+import { SFacebook } from "vue-socials";
+>>>>>>> 62f322b (Vue socials added. Setup is needed)
 
 export default defineComponent({
   name: "BlogArticle",
   data() {
     return {
+<<<<<<< HEAD
       article: Array,
       articleImg: URL,
       articleAuthor: String,
       articleTags: Array,
+=======
+      article: {
+        type: Array,
+      },
+      articleImg: {
+        type: URL,
+      },
+      articleUpdateAt: {
+        type: String,
+      },
+      articleAuthor: {
+        type: String,
+      },
+      articleTags: {
+        type: Array,
+      },
+>>>>>>> 62f322b (Vue socials added. Setup is needed)
       progress: true,
     };
   },
   components: {
+<<<<<<< HEAD
     SEmail,
     SFacebook,
     SLinkedIn,
     STelegram,
     STwitter,
     SWhatsApp,
+=======
+    SFacebook,
+>>>>>>> 62f322b (Vue socials added. Setup is needed)
   },
   mounted() {
     return this.asyncArticle();
