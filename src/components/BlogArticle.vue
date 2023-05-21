@@ -67,52 +67,26 @@
 import { defineComponent } from "vue";
 import client from "../plugins/contentful";
 import { marked } from "marked";
-<<<<<<< HEAD
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
-=======
-import { SFacebook } from "vue-socials";
->>>>>>> 62f322b (Vue socials added. Setup is needed)
 
 export default defineComponent({
   name: "BlogArticle",
   data() {
     return {
-<<<<<<< HEAD
       article: Array,
       articleImg: URL,
       articleAuthor: String,
       articleTags: Array,
-=======
-      article: {
-        type: Array,
-      },
-      articleImg: {
-        type: URL,
-      },
-      articleUpdateAt: {
-        type: String,
-      },
-      articleAuthor: {
-        type: String,
-      },
-      articleTags: {
-        type: Array,
-      },
->>>>>>> 62f322b (Vue socials added. Setup is needed)
       progress: true,
     };
   },
   components: {
-<<<<<<< HEAD
     SEmail,
     SFacebook,
     SLinkedIn,
     STelegram,
     STwitter,
     SWhatsApp,
-=======
-    SFacebook,
->>>>>>> 62f322b (Vue socials added. Setup is needed)
   },
   mounted() {
     return this.asyncArticle();
