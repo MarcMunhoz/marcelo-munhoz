@@ -5,11 +5,7 @@
     <article class="w-full" :class="progress && 'hidden'">
       <img v-if="articleImg" :src="articleImg" :title="article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
 
-      <img v-if="articleImg" :src="articleImg" :title="article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
-
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
-
-      <<<<<<< HEAD
       <cite class="block not-italic">
         Por <strong>{{ articleAuthor }}</strong
         ><br />
@@ -42,13 +38,6 @@
           </q-menu>
         </q-btn>
       </section>
-      =======
-      <div>
-        <s-facebook :share-options="{ url: 'https://www.uol.com.br', quote: 'Quote', hashtag: '#articleTags.sys.id' }" :use-native-behavior="useNativeBehavior">
-          <i class="fa-brands fa-facebook text-[30px]"></i>
-        </s-facebook>
-      </div>
-      >>>>>>> 62f322b (Vue socials added. Setup is needed)
 
       <div class="rendered-text"></div>
 
