@@ -7,8 +7,6 @@ import { defineComponent } from "vue";
 import { useMeta } from "quasar";
 
 const metaData = {
-  titleTemplate: (title) => `Marcelo Munhoz Website - ${title}`,
-
   meta: {
     author: { name: "author", content: "Marcelo Munhoz <me@marcelomunhoz.com>" },
     description: { name: "description", content: "Some brief histories of my past-present development experience. The life, the universe and everything about a tech life" },
@@ -21,6 +19,14 @@ export default defineComponent({
   name: "App",
   setup() {
     useMeta(metaData);
+  },
+  watch: {
+    $route: {
+      immediate: true,
+      handler(to, from) {
+        document.title = `Marcelo Munhoz - ${to.meta.title}` || "Marcelo Munhoz";
+      },
+    },
   },
 });
 </script>
