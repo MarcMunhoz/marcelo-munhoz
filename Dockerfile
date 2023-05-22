@@ -1,22 +1,34 @@
-FROM node:16-alpine3.12
+# Development stage
+FROM node:18-alpine as develop
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   version="1.0.0" \
-  date_created="2021-07-16" \
-  deploy="2021-07-16"
+  date_created="2023-0-20"
 
-ARG APP_PATH=/app
+WORKDIR /app
 
-ENV PORT=4242
+COPY ["package.*", "./"]
 
-COPY ["package.json", "yarn.lock", "./"]
+RUN apk add exa curl \
+  && npm i -g @quasar/cli contentful-cli npm@^9.6.7 \
+  && npm i \
+  && rm -rf /var/cache/apk/* /var/tmp/* /usr/share/man
 
-RUN yarn global add nuxt@2.16.0 \
-  && yarn \
+COPY . .
+
+# Build stage
+FROM develop as build
+
+RUN npm run build \
   && rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/share/man
 
-WORKDIR $APP_PATH
+# Production stage
+FROM nginx:1.21-alpine as production
 
-VOLUME $APP_PATH
+COPY --from=build /app/dist/spa /var/www
 
-ENTRYPOINT ["yarn", "dev"]
+COPY ./nginx.conf /etc/nginx/
+
+EXPOSE 3000
+
+CMD ["nginx", "-g", "daemon off;"]

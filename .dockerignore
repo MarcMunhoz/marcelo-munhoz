@@ -1,5 +1,4 @@
 # Folders
-.forestry
 coverage
 dist
 node_modules
@@ -10,9 +9,16 @@ node_modules
 .gitlab-ci.yml
 
 # Unusefull
-.DS_Store
 netlify.toml
 README.md
+
+# config fles
+.vscode
+.editorconfig
+.eslintignore
+.eslintrc.js
+.gitignore
+.npmrc
 
 # Docker config
 .dockerignore
