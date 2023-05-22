@@ -1,0 +1,15 @@
+# for production
+version: "3.7"
+services:
+  app:
+    image: marcelo-munhoz_prod_img
+    build:
+      context: .
+      target: "production"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ".:/app"
+    container_name: "marcelo-munhoz_prod_ctn"
+    command: /bin/sh -c "nginx -g 'daemon off;'"
+    # entrypoint: [ "sh", "-c", "sleep 2073600" ]
