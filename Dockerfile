@@ -10,7 +10,7 @@ WORKDIR /app
 COPY ["package.*", "./"]
 
 RUN apk add exa curl \
-  && npm i -g @quasar/cli contentful-cli \
+  && npm i -g @quasar/cli contentful-cli npm@^9.6.7 \
   && npm i \
   && rm -rf /var/cache/apk/* /var/tmp/* /usr/share/man
 
