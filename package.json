@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "marcelo-munhoz",
   "version": "1.0.0",
   "description": "Marcelo Munhoz",
@@ -60,5 +61,44 @@
     "start": "nuxt start",
     "generate": "nuxt generate",
     "test": "jest && codecov"
+=======
+  "name": "marcelo-munhoz-website",
+  "version": "0.0.1",
+  "description": "My personal website",
+  "productName": "Marcelo Munhoz Website",
+  "author": "Marcelo Munhoz",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "lint": "eslint --ext .js,.vue ./",
+    "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
+    "test": "echo \"No test specified\" && exit 0",
+    "dev": "quasar dev",
+    "build": "quasar build"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.0.0",
+    "axios": "^1.2.1",
+    "@cloudinary/url-gen": "1.10.0",
+    "@cloudinary/vue": "1.11.2",
+    "pinia": "^2.0.11",
+    "quasar": "^2.6.0",
+    "vue": "^3.0.0",
+    "vue-router": "^4.0.0"
+  },
+  "devDependencies": {
+    "@quasar/app-vite": "^1.0.0",
+    "autoprefixer": "^10.4.2",
+    "dotenv": "^16.0.3",
+    "eslint": "^8.10.0",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-plugin-vue": "^9.0.0",
+    "prettier": "^2.5.1",
+    "tailwindcss": "^3.3.1",
+    "postcss": "^8.4.23"
+  },
+  "engines": {
+    "node": "^16"
+>>>>>>> dabe3a8 (Version 02 - Quasar)
   }
 }
