@@ -1,40 +1,41 @@
-[![Netlify Status](https://api.netlify.com/api/v1/badges/4c287ef7-8060-480b-9aa4-42c4704b1c13/deploy-status)](https://app.netlify.com/sites/marcelomunhoz/deploys)
+# Marcelo Munhoz Website (marcelo-munhoz-website)
 
-# Build Setup (No Docker)
+My personal website
 
-**\* Node 14 is required on hosts without Docker**
-
+## Install the dependencies
 ```bash
-# install dependencies
-$ npm i
-
-# serve with hot reload at localhost:4242
-$ npm run dev
-
-# build for production and launch server
-$ npm run build
-$ npm run start
-
-# generate static project
-$ npm run generate
+yarn
+# or
+npm install
 ```
 
-# Docker
-
-**Development mode:**
-
+### Start the app in development mode (hot-code reloading, error reporting, etc.)
 ```bash
-$ docker build -t marcelo-munhoz .
-
-$ docker run -dp 4242:4242 --name marcelo-munhoz-ctn marcelo-munhoz_img sh -c "npm run dev"
+quasar dev
 ```
 
-# Docker Compose
 
-**Development mode:**
-
+### Lint the files
 ```bash
-$ docker-compose up -d
+yarn lint
+# or
+npm run lint
 ```
 
-For detailed explanation on how things work, check out [Nuxt.js docs](https://nuxtjs.org).
+
+### Format the files
+```bash
+yarn format
+# or
+npm run format
+```
+
+
+
+### Build the app for production
+```bash
+quasar build
+```
+
+### Customize the configuration
+See [Configuring quasar.config.js](https://v2.quasar.dev/quasar-cli-vite/quasar-config-js).
