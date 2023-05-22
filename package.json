@@ -1,70 +1,6 @@
 {
-<<<<<<< HEAD
-  "name": "marcelo-munhoz",
-  "version": "1.0.0",
-  "description": "Marcelo Munhoz",
-  "author": {
-    "name": "Marcelo Munhoz",
-    "email": "me@marcelomunhoz.com"
-  },
-  "dependencies": {
-    "@fortawesome/fontawesome-svg-core": "^6.1.2",
-    "@fortawesome/free-brands-svg-icons": "^6.1.2",
-    "@fortawesome/free-solid-svg-icons": "^6.1.2",
-    "@fortawesome/vue-fontawesome": "^2.0.8",
-    "@nuxt/content": "^1.14.0",
-    "@nuxtjs/axios": "^5.3.6",
-    "@nuxtjs/cloudinary": "^1.0.3-beta-4",
-    "bootstrap": "^5.0.1",
-    "bootstrap-vue": "^2.0.0",
-    "nuxt": "^2.0.0",
-    "nuxt-video-player": "^1.0.17",
-    "nuxtjs-darkmode-js-module": "^1.0.3",
-    "remark-emoji": "^2.2.0",
-    "vue-social-sharing": "^3.0.7",
-    "vuejs-emojis": "^0.0.1",
-    "node-fetch-native":"^1.0.1"
-  },
-  "devDependencies": {
-    "@nuxtjs/dotenv": "^1.4.1",
-    "@nuxtjs/google-analytics": "^2.4.0",
-    "@vue/test-utils": "^1.0.0-beta.27",
-    "babel-jest": "^26.6.3",
-    "codecov": "^4.0.0-0",
-    "jest": "^26.6.3",
-    "sass": "^1.53.0",
-    "sass-loader": "^10.2.0",
-    "vue-jest": "^4.0.0-0"
-  },
-  "resolutions": {
-    "glob-parent": "^5.1.2",
-    "nth-check": "^2.0.1",
-    "terser": "^4.8.1",
-    "parse-path": "^5.0.0",
-    "parse-url": "^8.1.0",
-    "vm2": "^3.9.11",
-    "decode-uri-component": "^0.2.1",
-    "json5": "^1.0.2",
-    "ua-parser-js": "^0.7.33"
-  },
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "jest": {
-    "coverageDirectory": "./coverage/",
-    "collectCoverage": true
-  },
-  "private": true,
-  "scripts": {
-    "dev": "nuxt",
-    "build": "nuxt build",
-    "start": "nuxt start",
-    "generate": "nuxt generate",
-    "test": "jest && codecov"
-=======
   "name": "marcelo-munhoz-website",
   "version": "0.0.1",
-  "description": "My personal website",
   "productName": "Marcelo Munhoz Website",
   "author": "Marcelo Munhoz",
   "private": true,
@@ -80,12 +16,16 @@
     "@cloudinary/url-gen": "1.10.0",
     "@cloudinary/vue": "1.11.2",
     "@quasar/extras": "^1.0.0",
+    "@types/marked": "^4.3.0",
     "axios": "^1.2.1",
     "contentful": "^10.1.4",
+    "marked": "^5.0.1",
     "pinia": "^2.0.11",
     "quasar": "^2.6.0",
+    "sass-loader": "^13.2.2",
     "vue": "^3.0.0",
-    "vue-router": "^4.0.0"
+    "vue-router": "^4.0.0",
+    "vue-socials": "^2.0.3"
   },
   "devDependencies": {
     "@quasar/app-vite": "^1.0.0",
@@ -96,10 +36,23 @@
     "eslint-plugin-vue": "^9.0.0",
     "postcss": "^8.4.23",
     "prettier": "^2.5.1",
+    "sass": "^1.62.1",
     "tailwindcss": "^3.3.1"
   },
+  "resolutions": {
+    "glob-parent": "^5.1.2",
+    "nth-check": "^2.0.1",
+    "terser": "^4.8.1",
+    "parse-path": "^5.0.0",
+    "parse-url": "^8.1.0",
+    "vm2": "^3.9.11",
+    "decode-uri-component": "^0.2.1",
+    "json5": "^1.0.2",
+    "ua-parser-js": "^0.7.33"
+  },
   "engines": {
-    "node": "^16"
->>>>>>> dabe3a8 (Version 02 - Quasar)
-  }
+    "node": "^18",
+    "npm": "^9.6.7"
+  },
+  "engineStrict": true
 }
