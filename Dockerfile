@@ -25,7 +25,7 @@ RUN npm run build \
 # Production stage
 FROM nginx:1.21-alpine as production
 
-COPY --from=build-stage /app/dist/spa /var/www
+COPY --from=build /app/dist/spa /var/www
 
 COPY ./nginx.conf /etc/nginx/
 
