@@ -39,23 +39,6 @@
     "sass": "^1.62.1",
     "tailwindcss": "^3.3.1"
   },
-  "resolutions": {
-    "glob-parent": "^5.1.2",
-    "nth-check": "^2.0.1",
-    "terser": "^4.8.1",
-    "parse-path": "^5.0.0",
-    "parse-url": "^8.1.0",
-    "vm2": "^3.9.11",
-    "decode-uri-component": "^0.2.1",
-    "json5": "^1.0.2",
-    "ua-parser-js": "^0.7.33"
-  },
-  "resolutions": {
-    "glob-parent": "^5.1.2",
-    "nth-check": "^2.0.1",
-    "terser": "^4.8.1",
-    "parse-path": "^5.0.0"
-  },
   "engines": {
     "node": "^18",
     "npm": "^9.6.7"
