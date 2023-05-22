@@ -4,7 +4,11 @@
       <img :src="cloudinaryImg('cover', 1875)" class="w-100 object-cover" />
     </picture>
 
+    <<<<<<< HEAD
     <p class="my-4 text-[4em]">Eu. Nascido em São Paulo, Brasil. Estou com {{ yearCount("1982-05-15") }} anos.</p>
+    =======
+    <p class="my-4 text-[5em]">Eu. Nascido em São Paulo, Brasil. Estou com {{ yearCount("1982-05-15") }} anos.</p>
+    >>>>>>> 49a1f87 (Version 02 - Quasar)
 
     <p class="my-4 text-[3em] font-light">Estou há {{ yearCount("2004-06-04") }} anos trabalhando com web. HTML, CSS, JS e derivados.</p>
 
