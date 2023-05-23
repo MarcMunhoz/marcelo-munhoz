@@ -16,22 +16,22 @@
         <q-btn flat color="blue-grey-5" icon="fa-solid fa-share" size="md">
           <q-menu transition-show="flip-right" transition-hide="flip-left" class="min-w-fit">
             <div class="social-share flex flex-row flex-nowrap gap-4 p-1 pt-1.5">
-              <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: `${article.description}\n${$route.fullPath}` }">
+              <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: `${article.description}\n${getUrlToShare}` }">
                 <i class="fa-solid fa-envelope-open text-[20px]"></i>
               </s-email>
-              <s-facebook :share-options="{ url: $route.fullPath, hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }">
+              <s-facebook :share-options="{ url: getUrlToShare, hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }">
                 <i class="fa-brands fa-facebook text-[20px]"></i>
               </s-facebook>
-              <s-linked-in :share-options="{ url: $route.fullPath }" :window-features="{ width: '500', height: '600' }">
+              <s-linked-in :share-options="{ url: getUrlToShare }" :window-features="{ width: '500', height: '600' }">
                 <i class="fa-brands fa-linkedin-in text-[20px]"></i>
               </s-linked-in>
-              <s-telegram :share-options="{ url: $route.fullPath, text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+              <s-telegram :share-options="{ url: getUrlToShare, text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
                 <i class="fa-brands fa-telegram text-[20px]"></i>
               </s-telegram>
-              <s-twitter :share-options="{ url: $route.fullPath, hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
+              <s-twitter :share-options="{ url: getUrlToShare, hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
                 <i class="fa-brands fa-twitter text-[20px]"></i>
               </s-twitter>
-              <s-whats-app :share-options="{ number: '', text: `${$route.fullPath} - ${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+              <s-whats-app :share-options="{ number: '', text: `${getUrlToShare} - ${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
                 <i class="fa-brands fa-whatsapp text-[20px]"></i>
               </s-whats-app>
             </div>
@@ -124,6 +124,11 @@ export default defineComponent({
       };
 
       return new Date(date).toLocaleString(language, options);
+    },
+  },
+  computed: {
+    getUrlToShare() {
+      return document.baseURI;
     },
   },
 });
