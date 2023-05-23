@@ -1,7 +1,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy-Report-Only= "default-src https:; style-src 'unsafe-inline', data"
+    Content-Security-Policy = "default-src https:; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://res.cloudinary.com https://en.gravatar.com https://raw.githubusercontent.com;"
     Referrer-Policy = "no-referrer-when-downgrade"
     Strict-Transport-Security = "max-age=15552000; includeSubDomains; preload"
     X-Content-Type-Options = "nosniff"
