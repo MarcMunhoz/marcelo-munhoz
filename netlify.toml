@@ -9,5 +9,5 @@
     X-XSS-Protection = "1; mode=block"
 
 [[redirects]]
-  from = "dist/spa"
-  to = "/*"
+  from = "/blog"
+  to = "dist/spa/blog"
