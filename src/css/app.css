@@ -1,9 +1,0 @@
-@import "quasar.variables";
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-body {
-  font-family: "Fira Sans", Arial, Sans-Serif;
-}

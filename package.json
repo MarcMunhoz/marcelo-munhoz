@@ -1,6 +1,6 @@
 {
   "name": "marcelo-munhoz-website",
-  "version": "0.0.1",
+  "version": "2.0.0",
   "productName": "Marcelo Munhoz Website",
   "author": "Marcelo Munhoz",
   "private": true,
@@ -10,8 +10,7 @@
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
     "test": "echo \"No test specified\" && exit 0",
     "dev": "quasar dev",
-    "build": "quasar build",
-    "serve": "quasar serve --hystory"
+    "build": "quasar build"
   },
   "dependencies": {
     "@cloudinary/url-gen": "1.10.0",
