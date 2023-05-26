@@ -7,7 +7,7 @@
         <q-card-section class="text-justify">
           <p>Eu sou uma pessoa simples, porém complexa.</p>
           <p>Sou um apixonado por futebol, mas detesto uma discussão de fã, esse papo de "se foi penalti a favor está certo, caso contrário não foi" é muito entediante pra mim. 🙄</p>
-          <p>¡Hala MADRID y nada más! <img src="https://camo.githubusercontent.com/9af8b4cfe52ad3ba18253dd014331a3058ecc4f15c28296ba53f939ceeb240b4/68747470733a2f2f75706c6f61642e77696b696d656469612e6f72672f77696b6970656469612f73636f2f352f35362f5265616c5f4d61647269645f43462e737667" width="20" data-canonical-src="https://upload.wikimedia.org/wikipedia/sco/5/56/Real_Madrid_CF.svg" class="inline-block w-[20px]" /></p>
+          <p>¡Hala MADRID y nada más! <img src="../assets/real_madrid.svg" class="inline-block w-[20px]" /></p>
           <p>Música: dark wave, synth-eletronic, hip hop, blues, heavy metal</p>
         </q-card-section>
       </q-card-section>
