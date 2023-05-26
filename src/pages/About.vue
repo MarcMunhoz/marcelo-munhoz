@@ -1,12 +1,14 @@
 <template>
   <q-page class="pt-4">
-    <q-card class="my-card" flat bordered>
+    <q-card class="my-card" flat>
       <q-card-section horizontal>
         <q-img class="col-3 rounded-br-lg" :src="cloudinaryImg('me', 500)" />
 
         <q-card-section class="text-justify">
-          Lorem ipsum dolor sit amet consectetur adipisicing elit. Nobis autem assumenda ut repudiandae quibusdam dolore magnam officiis, aliquam aut cupiditate illo iusto distinctio eveniet delectus consequatur fugit debitis saepe ipsam deleniti. Iusto, asperiores molestiae quae accusantium quasi voluptate consectetur quam ducimus, veritatis numquam laboriosam earum rem? Ratione eligendi corrupti maxime ad rerum esse eveniet, repellat facere veniam ex? Culpa dolorem at, delectus perspiciatis, incidunt dignissimos asperiores omnis voluptatibus obcaecati, iure ipsam numquam modi aperiam? Officia aliquam saepe officiis ducimus totam voluptates iusto debitis itaque quasi alias. Quidem neque ipsa nisi, mollitia consequatur ex? Vitae, repellendus qui quod aut dicta sunt incidunt porro
-          voluptates quia, libero quibusdam esse fuga rem! Assumenda deleniti et totam animi debitis distinctio earum nam quisquam nisi asperiores, laboriosam quae deserunt quo sed saepe accusamus sapiente maiores minus provident culpa quas vitae odit? Modi suscipit voluptas perferendis ex blanditiis magnam, voluptatibus tempore odio sapiente, saepe minima exercitationem.
+          <p>Eu sou uma pessoa simples, porém complexa.</p>
+          <p>Sou um apixonado por futebol, mas detesto uma discussão de fã, esse papo de "se foi penalti a favor está certo, caso contrário não foi" é muito entediante pra mim. 🙄</p>
+          <p>¡Hala MADRID y nada más! <img src="https://camo.githubusercontent.com/9af8b4cfe52ad3ba18253dd014331a3058ecc4f15c28296ba53f939ceeb240b4/68747470733a2f2f75706c6f61642e77696b696d656469612e6f72672f77696b6970656469612f73636f2f352f35362f5265616c5f4d61647269645f43462e737667" width="20" title="Real Madrid" class="inline-block" /></p>
+          <p>Música: dark wave, synth-eletronic, hip hop, blues, heavy metal</p>
         </q-card-section>
       </q-card-section>
 
