@@ -130,10 +130,17 @@ export default defineComponent({
     createOgTags(description) {
       // Create an array of og meta tag objects
       const metaTags = [
+        { property: "og:type", content: "article" },
         { property: "og:title", content: document.title },
         { property: "og:url", content: this.getUrlToShare },
         { property: "og:description", content: description },
         { property: "og:image", content: this.articleImg },
+        // <meta data-n-head="ssr" data-hid="og:site_name" property="og:site_name" content="CNET">
+        // <meta data-n-head="ssr" property="og:url" content="https://www.cnet.com/tech/mobile/its-time-to-stop-waiting-for-apples-next-iphone-moment/" data-hid="og:url">
+        // <meta data-n-head="ssr" property="og:image" content="https://www.cnet.com/a/img/resize/8081a2b6717522108932a0060a9d7007036c46ec/hub/2022/01/08/195600fd-1c6f-4dbe-84fa-b1c1218fcde5/gettyimages-72955624.jpg?auto=webp&amp;fit=crop&amp;height=675&amp;width=1200" data-hid="og:image">
+        // <meta data-n-head="ssr" property="og:type" content="article" data-hid="og:type">
+        // <meta data-n-head="ssr" property="og:description" content="Commentary: The iPhone took off because it came at the right time -- a moment that may be impossible to re-create." data-hid="og:description">
+        // <meta data-n-head="ssr" property="og:title" content="It's Time to Stop Waiting for Apple's Next iPhone Moment" data-hid="og:title">
       ];
 
       // Get the <head> element
@@ -162,6 +169,7 @@ export default defineComponent({
   },
   computed: {
     getUrlToShare() {
+      // return "https://www.cnet.com/tech/mobile/its-time-to-stop-waiting-for-apples-next-iphone-moment/";
       return document.baseURI;
     },
   },
