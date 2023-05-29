@@ -110,6 +110,8 @@ export default defineComponent({
           return a.sys.id;
         });
 
+        this.createOgTags(article.items[0].fields.description);
+
         // Populates articles main array, update date and author
         return (this.article = article.items[0].fields), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
       } catch (err) {
@@ -124,6 +126,38 @@ export default defineComponent({
       };
 
       return new Date(date).toLocaleString(language, options);
+    },
+    createOgTags(description) {
+      // Create an array of og meta tag objects
+      const metaTags = [
+        { property: "og:title", content: document.title },
+        { property: "og:url", content: this.getUrlToShare },
+        { property: "og:description", content: description },
+        { property: "og:image", content: this.articleImg },
+      ];
+
+      // Get the <head> element
+      const headElement = document.head;
+
+      // Remove old meta tags
+      const existingMetaTags = headElement.querySelectorAll("meta");
+      existingMetaTags.forEach((metaTag) => {
+        const property = metaTag.getAttribute("property");
+
+        // Check if the meta tag should be removed based on specific criteria
+        if (property && property.startsWith("og:")) {
+          headElement.removeChild(metaTag);
+        }
+      });
+
+      // Create and append the meta tags to the <head> element
+      metaTags.forEach((meta) => {
+        const metaElement = document.createElement("meta");
+        Object.entries(meta).forEach(([key, value]) => {
+          metaElement.setAttribute(key, value);
+        });
+        headElement.appendChild(metaElement);
+      });
     },
   },
   computed: {
