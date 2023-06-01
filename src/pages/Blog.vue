@@ -32,7 +32,7 @@ export default defineComponent({
       try {
         const articles = await client.getEntries({
           content_type: "article",
-          order: "-fields.createAt",
+          order: "-sys.createdAt,-fields.createAt",
           limit: 3,
           skip: this.displayedArticles(),
         });
