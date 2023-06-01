@@ -63,6 +63,7 @@ export default defineComponent({
   data() {
     return {
       article: Array,
+      createAt: Date,
       articleImg: URL,
       articleAuthor: String,
       articleTags: Array,
@@ -87,6 +88,8 @@ export default defineComponent({
           content_type: "article",
           "fields.slug": this.$route.params.slug,
         });
+
+        this.createAt = article.items[0].sys.createdAt;
 
         // Populates header with article title
         const articleTitle = article.items[0].fields.title;
@@ -125,7 +128,10 @@ export default defineComponent({
         day: "numeric",
       };
 
-      return new Date(date).toLocaleString(language, options);
+      // If there isn't custom createAt returns the raw date
+      const finalCreateDate = date !== undefined ? date : this.createAt;
+
+      return new Date(finalCreateDate).toLocaleString(language, options);
     },
     createOgTags(description) {
       // Create an array of og meta tag objects
@@ -253,6 +259,7 @@ export default defineComponent({
       background-color: unset;
       color: initial;
       font-weight: normal;
+      white-space: pre-wrap;
     }
   }
 
