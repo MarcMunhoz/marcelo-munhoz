@@ -31,7 +31,7 @@
 
 <script>
 import { defineComponent, ref } from "vue";
-import client from "src/plugins/contentful";
+import client from "../utils/contentful";
 import displayedArticles from "../pages/Blog.vue";
 import calculatePagesCount from "../pages/Blog.vue";
 

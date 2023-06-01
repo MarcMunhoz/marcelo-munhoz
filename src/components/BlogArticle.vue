@@ -54,7 +54,7 @@
 
 <script>
 import { defineComponent } from "vue";
-import client from "../plugins/contentful";
+import client from "../utils/contentful";
 import { marked } from "marked";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 
