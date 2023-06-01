@@ -10,7 +10,7 @@
 
 <script>
 import { defineComponent, ref } from "vue";
-import client from "../plugins/contentful";
+import client from "../utils/contentful";
 import ArticleList from "../components/ArticlesList.vue";
 
 export default defineComponent({
