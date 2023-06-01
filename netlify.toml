@@ -2,7 +2,7 @@
   for = "/*"
   [headers.values]
     Content-Security-Policy = "default-src https:; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://res.cloudinary.com https://en.gravatar.com https://raw.githubusercontent.com;"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+    Referrer-Policy = "no-referrer-when-downgrade"
     Strict-Transport-Security = "max-age=15552000; includeSubDomains; preload"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "SAMEORIGIN"
