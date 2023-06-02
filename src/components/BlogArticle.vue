@@ -152,9 +152,10 @@ export default defineComponent({
         const property = metaTag.getAttribute("property");
 
         // Check if the meta tag should be removed based on specific criteria
-        if (property && property.startsWith("og:")) {
-          headElement.removeChild(metaTag);
-        }
+        const bodyDescription = document.querySelector("meta[name='description']");
+
+        property && property.startsWith("og:") && headElement.removeChild(metaTag);
+        bodyDescription && headElement.removeChild(bodyDescription);
       });
 
       // Create and append the meta tags to the <head> element
@@ -162,9 +163,10 @@ export default defineComponent({
         const metaElement = document.createElement("meta");
         Object.entries(meta).forEach(([key, value]) => {
           metaElement.setAttribute("data-n-head", "ssr");
+          metaElement.setAttribute("data-hid", meta.property);
           metaElement.setAttribute(key, value);
         });
-        headElement.appendChild(metaElement);
+        headElement.prepend(metaElement);
       });
     },
   },
