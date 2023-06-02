@@ -161,6 +161,7 @@ export default defineComponent({
       metaTags.forEach((meta) => {
         const metaElement = document.createElement("meta");
         Object.entries(meta).forEach(([key, value]) => {
+          metaElement.setAttribute("data-n-head", "ssr");
           metaElement.setAttribute(key, value);
         });
         headElement.appendChild(metaElement);
@@ -169,6 +170,7 @@ export default defineComponent({
   },
   computed: {
     getUrlToShare() {
+      // return "https://www.cnet.com";
       return document.baseURI;
     },
   },
