@@ -113,8 +113,6 @@ export default defineComponent({
           return a.sys.id;
         });
 
-        this.createOgTags(article.items[0].fields.description);
-
         // Populates articles main array, update date and author
         return (this.article = article.items[0].fields), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
       } catch (err) {
@@ -133,46 +131,9 @@ export default defineComponent({
 
       return new Date(finalCreateDate).toLocaleString(language, options);
     },
-    createOgTags(description) {
-      // Create an array of og meta tag objects
-      const metaTags = [
-        { property: "og:type", content: "article" },
-        { property: "og:title", content: document.title },
-        { property: "og:url", content: this.getUrlToShare },
-        { property: "og:description", content: description },
-        { property: "og:image", content: this.articleImg },
-      ];
-
-      // Get the <head> element
-      const headElement = document.head;
-
-      // Remove old meta tags
-      const existingMetaTags = headElement.querySelectorAll("meta");
-      existingMetaTags.forEach((metaTag) => {
-        const property = metaTag.getAttribute("property");
-
-        // Check if the meta tag should be removed based on specific criteria
-        const bodyDescription = document.querySelector("meta[name='description']");
-
-        property && property.startsWith("og:") && headElement.removeChild(metaTag);
-        bodyDescription && headElement.removeChild(bodyDescription);
-      });
-
-      // Create and append the meta tags to the <head> element
-      metaTags.forEach((meta) => {
-        const metaElement = document.createElement("meta");
-        Object.entries(meta).forEach(([key, value]) => {
-          metaElement.setAttribute("data-n-head", "ssr");
-          metaElement.setAttribute("data-hid", meta.property);
-          metaElement.setAttribute(key, value);
-        });
-        headElement.prepend(metaElement);
-      });
-    },
   },
   computed: {
     getUrlToShare() {
-      // return "https://www.cnet.com";
       return document.baseURI;
     },
   },
