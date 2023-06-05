@@ -57,6 +57,7 @@ import { defineComponent } from "vue";
 import client from "../utils/contentful";
 import { marked } from "marked";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
+import { createMetaMixin } from "quasar";
 
 export default defineComponent({
   name: "BlogArticle",
@@ -78,6 +79,61 @@ export default defineComponent({
     STwitter,
     SWhatsApp,
   },
+  mixins: [
+    createMetaMixin(function () {
+      return {
+        title: `Marcelo Munhoz - ${this.article.title}`,
+        meta: {
+          description: {
+            name: "description",
+            content: this.article.description,
+          },
+          // Open Graph / Facebook
+          ogType: {
+            property: "og:type",
+            content: "article",
+          },
+          ogUrl: {
+            property: "og:url",
+            content: this.getUrlToShare,
+          },
+          ogTitle: {
+            property: "og:title",
+            content: `Marcelo Munhoz - ${this.article.title}`,
+          },
+          ogDescription: {
+            property: "og:description",
+            content: this.article.description,
+          },
+          ogImage: {
+            property: "og:image",
+            content: this.articleImg,
+          },
+          // Twitter
+          twitterCard: {
+            property: "twitter:card",
+            content: "summary_large_image",
+          },
+          twitteUrl: {
+            property: "twitter:url",
+            content: this.getUrlToShare,
+          },
+          twitteTitle: {
+            property: "twitter:title",
+            content: `Marcelo Munhoz - ${this.article.title}`,
+          },
+          twitteDescription: {
+            property: "twitter:description",
+            content: this.article.description,
+          },
+          twitteImage: {
+            property: "twitter:image",
+            content: this.articleImg,
+          },
+        },
+      };
+    }),
+  ],
   mounted() {
     return this.asyncArticle();
   },
@@ -113,8 +169,6 @@ export default defineComponent({
           return a.sys.id;
         });
 
-        this.createOgTags(article.items[0].fields.description);
-
         // Populates articles main array, update date and author
         return (this.article = article.items[0].fields), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
       } catch (err) {
@@ -132,39 +186,6 @@ export default defineComponent({
       const finalCreateDate = date !== undefined ? date : this.createAt;
 
       return new Date(finalCreateDate).toLocaleString(language, options);
-    },
-    createOgTags(description) {
-      // Create an array of og meta tag objects
-      const metaTags = [
-        { property: "og:type", content: "article" },
-        { property: "og:title", content: document.title },
-        { property: "og:url", content: this.getUrlToShare },
-        { property: "og:description", content: description },
-        { property: "og:image", content: this.articleImg },
-      ];
-
-      // Get the <head> element
-      const headElement = document.head;
-
-      // Remove old meta tags
-      const existingMetaTags = headElement.querySelectorAll("meta");
-      existingMetaTags.forEach((metaTag) => {
-        const property = metaTag.getAttribute("property");
-
-        // Check if the meta tag should be removed based on specific criteria
-        if (property && property.startsWith("og:")) {
-          headElement.removeChild(metaTag);
-        }
-      });
-
-      // Create and append the meta tags to the <head> element
-      metaTags.forEach((meta) => {
-        const metaElement = document.createElement("meta");
-        Object.entries(meta).forEach(([key, value]) => {
-          metaElement.setAttribute(key, value);
-        });
-        headElement.appendChild(metaElement);
-      });
     },
   },
   computed: {
