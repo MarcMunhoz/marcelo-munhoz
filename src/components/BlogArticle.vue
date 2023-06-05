@@ -57,6 +57,7 @@ import { defineComponent } from "vue";
 import client from "../utils/contentful";
 import { marked } from "marked";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
+import { createMetaMixin } from "quasar";
 
 export default defineComponent({
   name: "BlogArticle",
@@ -78,6 +79,61 @@ export default defineComponent({
     STwitter,
     SWhatsApp,
   },
+  mixins: [
+    createMetaMixin(function () {
+      return {
+        title: `Marcelo Munhoz - ${this.article.title}`,
+        meta: {
+          description: {
+            name: "description",
+            content: this.article.description,
+          },
+          // Open Graph / Facebook
+          ogType: {
+            property: "og:type",
+            content: "article",
+          },
+          ogUrl: {
+            property: "og:url",
+            content: this.getUrlToShare,
+          },
+          ogTitle: {
+            property: "og:title",
+            content: `Marcelo Munhoz - ${this.article.title}`,
+          },
+          ogDescription: {
+            property: "og:description",
+            content: this.article.description,
+          },
+          ogImage: {
+            property: "og:image",
+            content: this.articleImg,
+          },
+          // Twitter
+          twitterCard: {
+            property: "twitter:card",
+            content: "summary_large_image",
+          },
+          twitteUrl: {
+            property: "twitter:url",
+            content: this.getUrlToShare,
+          },
+          twitteTitle: {
+            property: "twitter:title",
+            content: `Marcelo Munhoz - ${this.article.title}`,
+          },
+          twitteDescription: {
+            property: "twitter:description",
+            content: this.article.description,
+          },
+          twitteImage: {
+            property: "twitter:image",
+            content: this.articleImg,
+          },
+        },
+      };
+    }),
+  ],
   mounted() {
     return this.asyncArticle();
   },
