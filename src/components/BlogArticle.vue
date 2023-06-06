@@ -19,13 +19,13 @@
               <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: `${article.description}\n${getUrlToShare}` }">
                 <i class="fa-solid fa-envelope-open text-[20px]"></i>
               </s-email>
-              <s-facebook :share-options="{ url: getUrlToShare, hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }">
+              <s-facebook :share-options="{ url: getUrlToShare, hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }" :use-native-behavior="true">
                 <i class="fa-brands fa-facebook text-[20px]"></i>
               </s-facebook>
-              <s-linked-in :share-options="{ url: getUrlToShare }" :window-features="{ width: '500', height: '600' }">
+              <s-linked-in :share-options="{ url: getUrlToShare }" :window-features="{ width: '500', height: '600' }" :use-native-behavior="true">
                 <i class="fa-brands fa-linkedin-in text-[20px]"></i>
               </s-linked-in>
-              <s-telegram :share-options="{ url: getUrlToShare, text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+              <s-telegram :share-options="{ url: getUrlToShare, text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }" :use-native-behavior="true">
                 <i class="fa-brands fa-telegram text-[20px]"></i>
               </s-telegram>
               <s-twitter :share-options="{ url: getUrlToShare, hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
