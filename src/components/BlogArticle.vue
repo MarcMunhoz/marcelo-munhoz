@@ -56,6 +56,8 @@
 import { defineComponent } from "vue";
 import client from "../utils/contentful";
 import { marked } from "marked";
+import { mangle } from "marked-mangle";
+import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 
@@ -154,12 +156,19 @@ export default defineComponent({
         document.title = `Marcelo Munhoz - ${articleTitle}`;
 
         // Gets the article main image if its exists
-        article.items[0].fields.cloudinary ? (this.articleImg = article.items[0].fields.cloudinary[0].url) : (this.articleImg = "");
+        article.items[0].fields.cloudinary ? (this.articleImg = article.items[0].fields.cloudinary[0].url.replace(/http/g, "https")) : (this.articleImg = "");
 
         // Seeks and replaces embed links by iframe
         const articleBodyDOM = document.querySelector(".rendered-text");
         const regexLinkVideo = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi;
+
+        marked.use(mangle());
+        const gfmOptions = {
+          prefix: "marked-",
+        };
+        marked.use(gfmHeadingId(gfmOptions));
         const parsedArticleBody = marked.parse(article.items[0].fields.body);
+
         const linkToIframe = parsedArticleBody.replace(regexLinkVideo, '<div id="video-container" class="relative pb-[56.25%] h-0"><iframe src="$2" allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="allowfullscreen" id="video-iframe" class="absolute top-0 left-0 h-full w-full"></iframe></div>');
         articleBodyDOM.innerHTML = linkToIframe;
 
