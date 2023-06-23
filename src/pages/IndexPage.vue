@@ -24,7 +24,10 @@
 
     <section class="mb-6">
       <h1 class="text-[3em] font-bold">Projetos (in)úteis</h1>
-      <q-chip v-for="project in sortAnything(projectsList, 'projectName')" :key="project.index" :icon="project.projectEmoji" clickable @click="onClickItem(project.projectUrl)" outline color="blue-grey-5" size="xl">{{ project.projectName }}</q-chip>
+      <q-chip v-for="project in sortAnything(projectsList, 'projectName')" :key="project.index" :icon="project.projectEmoji" clickable @click="onClickItem(project.projectUrl)" outline color="blue-grey-5" size="xl">
+      {{ project.projectName }}
+      <q-tooltip v-if="project.projectTooltip">{{ project.projectTooltip }}</q-tooltip>
+      </q-chip>
     </section>
   </q-page>
 </template>
