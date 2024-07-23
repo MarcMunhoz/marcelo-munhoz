@@ -1,5 +1,4 @@
 # for local development
-version: "3.7"
 services:
   app:
     image: marcelo-munhoz_img

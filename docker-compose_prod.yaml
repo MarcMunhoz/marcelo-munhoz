@@ -1,5 +1,4 @@
 # for production
-version: "3.7"
 services:
   app:
     image: marcelo-munhoz_prod_img
