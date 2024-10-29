@@ -4,7 +4,18 @@
 
     <ArticleList :data-articles="articles" v-if="$route.path === '/blog'" :class="progress && 'hidden'" />
 
-    <q-pagination v-if="$route.path === '/blog'" v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" :class="progress && 'hidden'" class="w-full justify-center lg:mt-0 mt-6" />
+    <q-pagination
+      v-if="$route.path === '/blog'"
+      v-model="currentPage"
+      :max="maxPages"
+      @click="setData"
+      direction-links
+      flat
+      color="blue-grey-3"
+      active-color="blue-grey-5"
+      :class="progress && 'hidden'"
+      class="w-full justify-center lg:mt-0 mt-6"
+    />
   </q-page>
 </template>
 
@@ -20,8 +31,8 @@ export default defineComponent({
   },
   data() {
     return {
-      articles: Array,
-      maxPages: Number,
+      articles: [],
+      maxPages: 0,
       currentPage: ref(1),
       skipArticles: Number,
       progress: true,
