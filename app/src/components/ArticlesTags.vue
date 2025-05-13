@@ -5,14 +5,19 @@
       <section class="tags w-full">
         <ul class="flex flex-row gap-4 justify-center max-h-[74px] overflow-y-auto overscroll-y-contain">
           <li class="cursor-pointer font-bold p-1 bg-blue-grey-1 text-blue-grey-3"><router-link :to="{ name: 'Meus Artigos' }">TUDO</router-link></li>
-          <li v-for="tag in allTags" :key="tag.id" class="cursor-pointer font-bold p-1" :class="$route.params.tag === tag.sys.id ? 'bg-blue-grey-4 text-blue-grey-1' : 'bg-blue-grey-1 text-blue-grey-3'">
+          <li
+            v-for="tag in allTags"
+            :key="tag.id"
+            class="cursor-pointer font-bold p-1"
+            :class="$route.params.tag === tag.sys.id ? 'bg-blue-grey-4 text-blue-grey-1' : 'bg-blue-grey-1 text-blue-grey-3'"
+          >
             <router-link :to="{ name: 'Artigos Tags', params: { tag: tag.sys.id } }">#{{ tag.sys.id }}</router-link>
           </li>
         </ul>
       </section>
 
       <q-card class="w-[350px]" v-for="article in articlesTag" :key="article.id">
-        <router-link :to="{ name: 'Artigo', params: { slug: article.fields.slug, id: article.sys.id } }">
+        <router-link :to="{ name: 'Artigo', params: { slug: article.fields.slug } }">
           <img v-if="article.fields.cloudinary" :src="`https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/${article.fields.cloudinary[0].public_id}`" />
           <img v-else src="https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/marcelo-munhoz-website/no-thumbnail.jpg" />
 
@@ -38,14 +43,23 @@ import calculatePagesCount from "../pages/Blog.vue";
 export default defineComponent({
   name: "ArticlesTags",
   created() {
-    return (this.currentTag = this.$router.currentRoute.value.params.tag), this.setTags(), this.setData();
+    const tag = this.$router.currentRoute.value.params.tag;
+
+    if (tag) {
+      this.currentTag = tag;
+    } else {
+      this.currentTag = null;
+    }
+
+    this.setTags();
+    this.setData();
   },
   data() {
     return {
       articlesTag: Array,
       allTags: Array,
       currentTag: String,
-      maxPages: Number,
+      maxPages: 0,
       currentPage: ref(1),
       skipArticles: Number,
       progress: true,

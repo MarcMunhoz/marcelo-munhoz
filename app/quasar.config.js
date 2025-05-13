@@ -10,6 +10,9 @@
 
 import { configure } from "quasar/wrappers";
 import dotenv from "dotenv";
+import os from "os";
+
+const isWSL = os.release().toLowerCase().includes("microsoft");
 
 export default configure(function (ctx) {
   dotenv.config();
@@ -89,6 +92,9 @@ export default configure(function (ctx) {
       // https: true
       port: 4242,
       open: false, // opens browser window automatically
+      watch: {
+        usePolling: isWSL ? { usePolling: true, interval: 100 } : {},
+      },
     },
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#framework
