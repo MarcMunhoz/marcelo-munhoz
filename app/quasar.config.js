@@ -8,11 +8,15 @@
 // Configuration for your app
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-js
 
-const { configure } = require("quasar/wrappers");
+import { configure } from "quasar/wrappers";
+import dotenv from "dotenv";
+import os from "os";
 
-require("dotenv").config().parsed;
+const isWSL = os.release().toLowerCase().includes("microsoft");
 
-module.exports = configure(function (ctx) {
+export default configure(function (ctx) {
+  dotenv.config();
+
   return {
     eslint: {
       // fix: true,
@@ -88,6 +92,9 @@ module.exports = configure(function (ctx) {
       // https: true
       port: 4242,
       open: false, // opens browser window automatically
+      watch: {
+        usePolling: isWSL ? { usePolling: true, interval: 100 } : {},
+      },
     },
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#framework
