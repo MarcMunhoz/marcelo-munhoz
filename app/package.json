@@ -43,10 +43,5 @@
   },
   "overrides": {
     "vite": "^6.3.5"
-  },
-  "engines": {
-    "node": "^22.15.0",
-    "npm": "^9.9.4"
-  },
-  "engineStrict": true
+  }
 }
