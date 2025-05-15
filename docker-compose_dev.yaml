@@ -7,8 +7,12 @@ services:
       target: "develop"
     ports:
       - "4242:4242"
+      - "3200:3200"
+      - "3000:3000"
     volumes:
       - "./app:/app"
     container_name: "marcelo-munhoz_ctn"
+    environment:
+      - NODE_ENV=development
     command: /bin/sh -c "npm i && npm run dev"
     # entrypoint: [ "sh", "-c", "sleep 2073600" ]

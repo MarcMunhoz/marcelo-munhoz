@@ -21,7 +21,6 @@
 
 <script>
 import { defineComponent, ref } from "vue";
-import client from "../utils/contentful";
 import ArticleList from "../components/ArticlesList.vue";
 
 export default defineComponent({
@@ -40,22 +39,21 @@ export default defineComponent({
   },
   methods: {
     async setData() {
+      this.progress = true;
       try {
-        const articles = await client.getEntries({
-          content_type: "article",
-          order: "-sys.createdAt,-fields.createAt",
-          limit: 3,
-          skip: this.displayedArticles(),
-        });
+        const res = await fetch(`/api/contentful/entries?page=${this.currentPage}`);
 
-        return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total)), (this.progress = false);
+        const data = await res.json();
+        this.articles = data.items;
+        this.maxPages = this.calculatePagesCount(data.total);
       } catch (err) {
-        console.error(err);
+        console.error("Erro ao carregar artigos:", err);
+      } finally {
+        this.progress = false;
       }
     },
     calculatePagesCount(totalCount) {
       const maxArticles = 3;
-
       return totalCount < maxArticles ? 1 : Math.ceil(totalCount / maxArticles);
     },
     displayedArticles() {
