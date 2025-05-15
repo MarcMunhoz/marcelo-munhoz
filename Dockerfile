@@ -1,5 +1,5 @@
 # Development stage
-FROM node:18-alpine as develop
+FROM node:22-alpine AS develop
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   version="1.0.0" \
@@ -7,7 +7,7 @@ LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
 
 WORKDIR /app
 
-COPY ["package.*", "./"]
+COPY ["./app/package.*", "./"]
 
 RUN apk add exa curl \
   && npm i -g @quasar/cli contentful-cli npm@^9.6.7 \
@@ -17,13 +17,13 @@ RUN apk add exa curl \
 COPY . .
 
 # Build stage
-FROM develop as build
+FROM develop AS build
 
 RUN npm run build \
   && rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/share/man
 
 # Production stage
-FROM nginx:1.21-alpine as production
+FROM nginx:1.28-alpine AS production
 
 COPY --from=build /app/dist/spa /var/www
 
