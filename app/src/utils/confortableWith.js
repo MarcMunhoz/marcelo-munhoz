@@ -25,6 +25,11 @@ const confortableWith = [
     tooltip: "Plain Javascript",
   },
   {
+    imagePath: "tailwindcss",
+    imageName: "tailwindcss-original",
+    tooltip: "TailwindCSS",
+  },
+  {
     imagePath: "less",
     imageName: "less-plain-wordmark",
     tooltip: "LessCSS",
@@ -78,6 +83,16 @@ const confortableWith = [
     imagePath: "gimp",
     imageName: "gimp-original",
     tooltip: "Gimp",
+  },
+  {
+    imagePath: "netlify",
+    imageName: "netlify-original",
+    tooltip: "Netlify",
+  },
+  {
+    imagePath: "wordpress",
+    imageName: "wordpress-original",
+    tooltip: "Wordpress",
   },
 ];
 
