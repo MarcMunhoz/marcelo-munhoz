@@ -12,6 +12,8 @@ services:
     volumes:
       - "./app:/app"
     container_name: "marcelo-munhoz_ctn"
+    env_file:
+      - ./app/.env
     environment:
       - NODE_ENV=development
     command: /bin/sh -c "npm i && npm run dev"

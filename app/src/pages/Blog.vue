@@ -8,7 +8,7 @@
       v-if="$route.path === '/blog'"
       v-model="currentPage"
       :max="maxPages"
-      @click="setData"
+      @update:model-value="setData"
       direction-links
       flat
       color="blue-grey-3"
@@ -32,8 +32,8 @@ export default defineComponent({
     return {
       articles: [],
       maxPages: 0,
-      currentPage: ref(1),
-      skipArticles: Number,
+      currentPage: 1,
+      skipArticles: 0,
       progress: true,
     };
   },

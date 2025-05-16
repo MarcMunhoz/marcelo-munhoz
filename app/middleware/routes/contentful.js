@@ -1,12 +1,13 @@
+import pkg from "contentful";
+const { createClient } = pkg;
 import express from "express";
-import { createClient } from "contentful";
 
 const router = express.Router();
 
 const client = createClient({
   space: process.env.CONTENTFUL_SPACE_ID,
-  accessToken: process.env.CONTENTFUL_DELIVERY,
-  environment: "master", // ou outro, se usar múltiplos ambientes
+  accessToken: process.env.CONTENTFUL_DELIVERY_KEY,
+  environment: "master",
 });
 
 router.get("/entries", async (req, res) => {
@@ -58,6 +59,27 @@ router.get("/tagged", async (req, res) => {
   } catch (err) {
     console.error("Erro ao buscar artigos por tag:", err.message);
     res.status(500).json({ error: "Erro ao buscar artigos por tag" });
+  }
+});
+
+router.get("/article/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const entries = await client.getEntries({
+      content_type: "article",
+      "fields.slug": slug,
+      limit: 1,
+    });
+
+    if (entries.items.length === 0) {
+      return res.status(404).json({ error: "Artigo não encontrado" });
+    }
+
+    res.json(entries.items[0]);
+  } catch (err) {
+    console.error("Erro ao buscar artigo pelo slug:", err.message);
+    res.status(500).json({ error: "Erro ao buscar artigo" });
   }
 });
 

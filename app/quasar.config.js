@@ -91,6 +91,13 @@ export default configure(function (ctx) {
     devServer: {
       // https: true
       port: 4242,
+      proxy: {
+        "/api": {
+          target: "http://localhost:3000",
+          changeOrigin: true,
+          pathRewrite: { "^/api": "/api" },
+        },
+      },
       open: false, // opens browser window automatically
       watch: {
         usePolling: isWSL ? { usePolling: true, interval: 100 } : {},
