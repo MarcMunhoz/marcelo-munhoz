@@ -15,7 +15,7 @@ RUN apk add exa curl \
   && npm i \
   && rm -rf /var/cache/apk/* /var/tmp/* /usr/share/man
 
-COPY . .
+COPY ./app .
 
 # Develop stage
 FROM base AS develop
