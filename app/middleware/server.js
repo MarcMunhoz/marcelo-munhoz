@@ -1,16 +1,24 @@
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import contentfulRoutes from "./routes/contentful.js";
-import cors from "cors";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const app = express();
-app.use(cors());
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const port = process.env.PORT || 3000;
 
+// 👉 Serve frontend if a build exists (production)
+const distPath = path.resolve(__dirname, "../dist");
+app.use(express.static(distPath));
+
+// 👉 API
 app.use("/api/contentful", contentfulRoutes);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Express middleware running on port ${PORT}`);
+// 👉 SPA fallback
+app.get("*", (_, res) => {
+  res.sendFile(path.resolve(distPath, "index.html"));
+});
+
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
 });

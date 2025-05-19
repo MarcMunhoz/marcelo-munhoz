@@ -10,7 +10,8 @@
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
     "test": "echo \"No test specified\" && exit 0",
     "dev": "concurrently \"quasar dev\" \"node middleware/server.js\"",
-    "build": "quasar build"
+    "build": "quasar build",
+    "start": "node middleware/server.js"
   },
   "dependencies": {
     "@cloudinary/url-gen": "1.10.0",

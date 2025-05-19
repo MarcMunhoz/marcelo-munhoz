@@ -29,7 +29,7 @@ const routes = [
     ],
   },
   {
-    path: "/:catchAll(.*)*",
+    path: "/:catchAll(.*)",
     component: () => import("pages/ErrorNotFound.vue"),
   },
 ];
