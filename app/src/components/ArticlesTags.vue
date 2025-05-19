@@ -30,7 +30,7 @@
         </router-link>
       </q-card>
     </section>
-    <q-pagination v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center mt-6" />
+    <q-pagination v-model="currentPage" :max="maxPages" @update:model-value="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center mt-6" />
   </q-page>
 </template>
 

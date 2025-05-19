@@ -139,25 +139,25 @@ export default configure(function (ctx) {
     // },
 
     // https://v2.quasar.dev/quasar-cli/developing-ssr/configuring-ssr
-    ssr: {
-      // ssrPwaHtmlFilename: 'offline.html', // do NOT use index.html as name!
-      // will mess up SSR
+    // ssr: {
+    //   // ssrPwaHtmlFilename: 'offline.html', // do NOT use index.html as name!
+    //   // will mess up SSR
 
-      // extendSSRWebserverConf (esbuildConf) {},
-      // extendPackageJson (json) {},
+    //   // extendSSRWebserverConf (esbuildConf) {},
+    //   // extendPackageJson (json) {},
 
-      pwa: false,
+    //   pwa: false,
 
-      // manualStoreHydration: true,
-      // manualPostHydrationTrigger: true,
+    //   // manualStoreHydration: true,
+    //   // manualPostHydrationTrigger: true,
 
-      prodPort: 3000, // The default port that the production server should use
-      // (gets superseded if process.env.PORT is specified at runtime)
+    //   prodPort: 3000, // The default port that the production server should use
+    //   // (gets superseded if process.env.PORT is specified at runtime)
 
-      middlewares: [
-        "render", // keep this as last one
-      ],
-    },
+    //   middlewares: [
+    //     "render", // keep this as last one
+    //   ],
+    // },
 
     // https://v2.quasar.dev/quasar-cli/developing-pwa/configuring-pwa
     pwa: {

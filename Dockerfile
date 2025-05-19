@@ -1,9 +1,10 @@
 # Development stage
-FROM node:22-alpine AS develop
+FROM node:22-alpine AS base
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   version="1.0.0" \
-  date_created="2023-0-20"
+  date_created="2023-0-20" \
+  modified="2025-19-05"
 
 WORKDIR /app
 
@@ -16,21 +17,13 @@ RUN apk add exa curl \
 
 COPY . .
 
+# Develop stage
+FROM base AS develop
 EXPOSE 3200 3000
-
-# Build stage
-FROM develop AS build
-
-RUN npm run build \
-  && rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/share/man
+CMD [ "npm", "run", "dev" ]
 
 # Production stage
-FROM nginx:1.28-alpine AS production
-
-COPY --from=build /app/dist/spa /var/www
-
-COPY ./nginx.conf /etc/nginx/
-
+FROM base AS production
+RUN npm run build
 EXPOSE 3000
-
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "start"]
