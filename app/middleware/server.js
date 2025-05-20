@@ -15,7 +15,7 @@ app.use(express.static(distPath));
 app.use("/api/contentful", contentfulRoutes);
 
 // 👉 SPA fallback
-app.get("*", (_, res) => {
+app.get("/{*any}", (_, res) => {
   res.sendFile(path.resolve(distPath, "index.html"));
 });
 
