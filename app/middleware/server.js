@@ -19,7 +19,7 @@ app.get("/healthz", (_, res) => {
 });
 
 // 👉 Serve frontend if a build exists (production)
-const distPath = path.resolve(__dirname, "../dist/spa");
+const distPath = path.resolve(__dirname, "../dist");
 app.use(express.static(distPath));
 
 // 👉 API
