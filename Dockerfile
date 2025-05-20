@@ -10,8 +10,8 @@ WORKDIR /app
 
 COPY ["./app/package.*", "./"]
 
-RUN apk add exa curl \
-  && npm i -g @quasar/cli contentful-cli \
+RUN apk add exa \
+  && npm i -g @quasar/cli contentful-cli npm@^11.4.0 \
   && npm i \
   && rm -rf /var/cache/apk/* /var/tmp/* /usr/share/man
 
@@ -19,7 +19,7 @@ COPY ./app .
 
 # Develop stage
 FROM base AS develop
-EXPOSE 3200 3000
+EXPOSE 4242 3000
 CMD [ "npm", "run", "dev" ]
 
 # Production stage
