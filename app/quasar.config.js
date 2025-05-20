@@ -56,7 +56,7 @@ export default configure(function (ctx) {
     build: {
       target: {
         browser: ["es2019", "edge88", "firefox78", "chrome87", "safari13.1"],
-        node: "node18",
+        node: "node22",
       },
 
       vueRouterMode: "history", // available values: 'hash', 'history'
@@ -77,7 +77,7 @@ export default configure(function (ctx) {
       // ignorePublicFolder: true,
       // minify: false,
       // polyfillModulePreload: true,
-      // distDir
+      distDir: "dist",
 
       // extendViteConf (viteConf) {},
       // viteVuePluginOptions: {},
