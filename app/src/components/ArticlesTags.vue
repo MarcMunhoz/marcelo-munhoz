@@ -30,15 +30,14 @@
         </router-link>
       </q-card>
     </section>
-    <q-pagination v-model="currentPage" :max="maxPages" @click="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center mt-6" />
+    <q-pagination v-model="currentPage" :max="maxPages" @update:model-value="setData" direction-links flat color="blue-grey-3" active-color="blue-grey-5" class="w-full justify-center mt-6" />
   </q-page>
 </template>
 
 <script>
 import { defineComponent, ref } from "vue";
-import client from "../utils/contentful";
-import displayedArticles from "../pages/Blog.vue";
-import calculatePagesCount from "../pages/Blog.vue";
+
+const API = import.meta.env.VITE_API_URL || "";
 
 export default defineComponent({
   name: "ArticlesTags",
@@ -65,35 +64,43 @@ export default defineComponent({
       progress: true,
     };
   },
-  mixins: [displayedArticles, calculatePagesCount],
   methods: {
     async setData() {
+      this.progress = true;
+
       try {
-        const articles = await client.getEntries({
-          "metadata.tags.sys.id[all]": this.currentTag,
-          content_type: "article",
-          order: "-fields.createAt",
-          limit: 3,
-          skip: this.displayedArticles(),
-        });
+        const res = await fetch(`${API}/api/contentful/tagged?page=${this.currentPage}&tag=${this.currentTag}`);
+        const data = await res.json();
+
+        this.articlesTag = data.items;
+        this.maxPages = this.calculatePagesCount(data.total);
 
         const headerTags = document.querySelector(".header-title");
         headerTags.innerHTML = `#${this.currentTag}`;
-
-        return (this.articlesTag = articles.items), ((this.maxPages = this.calculatePagesCount(articles.total)), (this.progress = false));
       } catch (err) {
-        console.error(err);
+        console.error("Erro ao carregar artigos com tag:", err);
+      } finally {
+        this.progress = false;
       }
     },
+
     async setTags() {
       try {
-        const tags = await client.getTags();
-        const areaTags = document.querySelector(".tags");
-
-        return (this.allTags = tags.items);
+        const res = await fetch(`${API}/api/contentful/tags`);
+        const data = await res.json();
+        this.allTags = data.items;
       } catch (err) {
-        return console.error(err);
+        console.error("Erro ao carregar tags:", err);
       }
+    },
+
+    calculatePagesCount(totalCount) {
+      const maxArticles = 3;
+      return totalCount < maxArticles ? 1 : Math.ceil(totalCount / maxArticles);
+    },
+
+    displayedArticles() {
+      return this.currentPage > 1 ? (this.skipArticles = 3 * this.currentPage - 3) : (this.skipArticles = 0);
     },
   },
 });
