@@ -36,8 +36,8 @@
 
 <script>
 import { defineComponent, ref } from "vue";
-import displayedArticles from "../pages/Blog.vue";
-import calculatePagesCount from "../pages/Blog.vue";
+
+const API = import.meta.env.VITE_API_URL || "";
 
 export default defineComponent({
   name: "ArticlesTags",
@@ -69,7 +69,7 @@ export default defineComponent({
       this.progress = true;
 
       try {
-        const res = await fetch(`/api/contentful/tagged?page=${this.currentPage}&tag=${this.currentTag}`);
+        const res = await fetch(`${API}/api/contentful/tagged?page=${this.currentPage}&tag=${this.currentTag}`);
         const data = await res.json();
 
         this.articlesTag = data.items;

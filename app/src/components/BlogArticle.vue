@@ -95,6 +95,8 @@ import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 
+const API = import.meta.env.VITE_API_URL || "";
+
 export default defineComponent({
   name: "BlogArticle",
   data() {
@@ -174,7 +176,7 @@ export default defineComponent({
   methods: {
     async loadArticle() {
       try {
-        const res = await fetch(`/api/contentful/article/${this.$route.params.slug}`);
+        const res = await fetch(`${API}/api/contentful/article/${this.$route.params.slug}`);
         const article = await res.json();
 
         this.createAt = article.sys.createdAt;
