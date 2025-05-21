@@ -1,11 +1,13 @@
 <template>
   <q-page class="q-pa-md row items-start">
-    <q-circular-progress v-if="progress === true" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
+    <q-circular-progress v-if="progress" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
 
     <article class="w-full" :class="progress && 'hidden'">
       <img v-if="articleImg" :src="articleImg" :title="article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
 
-      <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">{{ article.description }}</div>
+      <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">
+        {{ article.description }}
+      </div>
       <cite class="block not-italic">
         Por <strong>{{ articleAuthor }}</strong
         ><br />
@@ -16,22 +18,55 @@
         <q-btn flat color="blue-grey-5" icon="fa-solid fa-share" size="md">
           <q-menu transition-show="flip-right" transition-hide="flip-left" class="min-w-fit">
             <div class="social-share flex flex-row flex-nowrap gap-4 p-1 pt-1.5">
-              <s-email :share-options="{ mail: '', subject: `Marcelo Munhoz - ${article.title}`, body: `${article.description}\n${getUrlToShare}` }">
+              <s-email
+                :share-options="{
+                  mail: '',
+                  subject: `Marcelo Munhoz - ${article.title}`,
+                  body: `${article.description}\n${getUrlToShare}`,
+                }"
+              >
                 <i class="fa-solid fa-envelope-open text-[20px]"></i>
               </s-email>
-              <s-facebook :share-options="{ url: getUrlToShare, hashtag: `#${articleTags[0]}` }" :window-features="{ width: '500', height: '600' }" :use-native-behavior="true">
+              <s-facebook
+                :share-options="{
+                  url: getUrlToShare,
+                  hashtag: `#${articleTags[0]}`,
+                }"
+                :window-features="{ width: '500', height: '600' }"
+                :use-native-behavior="true"
+              >
                 <i class="fa-brands fa-facebook text-[20px]"></i>
               </s-facebook>
               <s-linked-in :share-options="{ url: getUrlToShare }" :window-features="{ width: '500', height: '600' }" :use-native-behavior="true">
                 <i class="fa-brands fa-linkedin-in text-[20px]"></i>
               </s-linked-in>
-              <s-telegram :share-options="{ url: getUrlToShare, text: `${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }" :use-native-behavior="true">
+              <s-telegram
+                :share-options="{
+                  url: getUrlToShare,
+                  text: `${article.title} #${articleTags[0]}`,
+                }"
+                :window-features="{ width: '700', height: '600' }"
+                :use-native-behavior="true"
+              >
                 <i class="fa-brands fa-telegram text-[20px]"></i>
               </s-telegram>
-              <s-twitter :share-options="{ url: getUrlToShare, hashtags: articleTags, text: article.description }" :window-features="{ width: '500', height: '600' }">
+              <s-twitter
+                :share-options="{
+                  url: getUrlToShare,
+                  hashtags: articleTags,
+                  text: article.description,
+                }"
+                :window-features="{ width: '500', height: '600' }"
+              >
                 <i class="fa-brands fa-twitter text-[20px]"></i>
               </s-twitter>
-              <s-whats-app :share-options="{ number: '', text: `${getUrlToShare} - ${article.title} #${articleTags[0]}` }" :window-features="{ width: '700', height: '600' }">
+              <s-whats-app
+                :share-options="{
+                  number: '',
+                  text: `${getUrlToShare} - ${article.title} #${articleTags[0]}`,
+                }"
+                :window-features="{ width: '700', height: '600' }"
+              >
                 <i class="fa-brands fa-whatsapp text-[20px]"></i>
               </s-whats-app>
             </div>
@@ -43,7 +78,7 @@
 
       <section class="my-4">
         <ul class="flex flex-row gap-4 justify-center">
-          <li v-for="tag in articleTags" :key="tag.id" class="cursor-pointer bg-blue-grey-1 text-blue-grey-3 font-bold p-1">
+          <li v-for="tag in articleTags" :key="tag" class="cursor-pointer bg-blue-grey-1 text-blue-grey-3 font-bold p-1">
             <router-link :to="{ name: 'Artigos Tags', params: { tag: tag } }">#{{ tag }}</router-link>
           </li>
         </ul>
@@ -54,22 +89,23 @@
 
 <script>
 import { defineComponent } from "vue";
-import client from "../utils/contentful";
 import { marked } from "marked";
 import { mangle } from "marked-mangle";
 import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 
+const API = import.meta.env.VITE_API_URL || "";
+
 export default defineComponent({
   name: "BlogArticle",
   data() {
     return {
-      article: Array,
-      createAt: Date,
-      articleImg: URL,
-      articleAuthor: String,
-      articleTags: Array,
+      article: {},
+      articleImg: "",
+      articleAuthor: "",
+      articleTags: [],
+      createAt: null,
       progress: true,
     };
   },
@@ -90,7 +126,6 @@ export default defineComponent({
             name: "description",
             content: this.article.description,
           },
-          // Open Graph / Facebook
           ogType: {
             property: "og:type",
             content: "article",
@@ -111,7 +146,6 @@ export default defineComponent({
             property: "og:image",
             content: this.articleImg,
           },
-          // Twitter
           twitterCard: {
             property: "twitter:card",
             content: "summary_large_image",
@@ -136,65 +170,57 @@ export default defineComponent({
       };
     }),
   ],
-  mounted() {
-    return this.asyncArticle();
+  async mounted() {
+    await this.loadArticle();
   },
   methods: {
-    async asyncArticle() {
+    async loadArticle() {
       try {
-        const article = await client.getEntries({
-          content_type: "article",
-          "fields.slug": this.$route.params.slug,
-        });
+        const res = await fetch(`${API}/api/contentful/article/${this.$route.params.slug}`);
+        const article = await res.json();
 
-        this.createAt = article.items[0].sys.createdAt;
+        this.createAt = article.sys.createdAt;
+        this.article = article.fields;
+        this.articleAuthor = article.fields.author.fields.name;
+        this.articleImg = article.fields.cloudinary ? article.fields.cloudinary[0].url.replace("http://", "https://") : "";
 
-        // Populates header with article title
-        const articleTitle = article.items[0].fields.title;
-        const headerArticleName = document.querySelector(".header-title");
-        headerArticleName.innerHTML = articleTitle;
-        document.title = `Marcelo Munhoz - ${articleTitle}`;
-
-        // Gets the article main image if its exists
-        article.items[0].fields.cloudinary ? (this.articleImg = article.items[0].fields.cloudinary[0].url.replace(/http/g, "https")) : (this.articleImg = "");
-
-        // Seeks and replaces embed links by iframe
-        const articleBodyDOM = document.querySelector(".rendered-text");
-        const regexLinkVideo = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi;
+        const rawBody = article.fields.body;
 
         marked.use(mangle());
-        const gfmOptions = {
-          prefix: "marked-",
-        };
-        marked.use(gfmHeadingId(gfmOptions));
-        const parsedArticleBody = marked.parse(article.items[0].fields.body);
+        marked.use(gfmHeadingId({ prefix: "marked-" }));
 
-        const linkToIframe = parsedArticleBody.replace(regexLinkVideo, '<div id="video-container" class="relative pb-[56.25%] h-0"><iframe src="$2" allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="allowfullscreen" id="video-iframe" class="absolute top-0 left-0 h-full w-full"></iframe></div>');
-        articleBodyDOM.innerHTML = linkToIframe;
+        const parsedArticleBody = marked.parse(rawBody);
 
-        // Populates the hashtags
-        const hashtags = article.items[0].metadata.tags;
-        this.articleTags = hashtags.map((a) => {
-          return a.sys.id;
-        });
+        const linkToIframe = parsedArticleBody.replace(
+          /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi,
+          `<div id="video-container" class="relative pb-[56.25%] h-0">
+            <iframe src="$2" allowfullscreen class="absolute top-0 left-0 h-full w-full"></iframe>
+          </div>`
+        );
 
-        // Populates articles main array, update date and author
-        return (this.article = article.items[0].fields), (this.articleAuthor = article.items[0].fields.author.fields.name), (this.progress = false);
+        document.querySelector(".rendered-text").innerHTML = linkToIframe;
+
+        const hashtags = article.metadata?.tags || [];
+        this.articleTags = hashtags.map((tag) => tag.sys.id);
+
+        const headerArticleName = document.querySelector(".header-title");
+        if (headerArticleName) {
+          headerArticleName.innerHTML = this.article.title;
+        }
+
+        document.title = `Marcelo Munhoz - ${this.article.title}`;
+        this.progress = false;
       } catch (err) {
-        console.error(err);
+        console.error("Erro ao carregar artigo:", err);
       }
     },
     formatDate(date, language) {
-      const options = {
+      const finalDate = date || this.createAt;
+      return new Date(finalDate).toLocaleDateString(language, {
         year: "numeric",
         month: "numeric",
         day: "numeric",
-      };
-
-      // If there isn't custom createAt returns the raw date
-      const finalCreateDate = date !== undefined ? date : this.createAt;
-
-      return new Date(finalCreateDate).toLocaleString(language, options);
+      });
     },
   },
   computed: {
