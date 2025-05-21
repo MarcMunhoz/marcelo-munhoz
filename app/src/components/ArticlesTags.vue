@@ -86,7 +86,7 @@ export default defineComponent({
 
     async setTags() {
       try {
-        const res = await fetch("/api/contentful/tags");
+        const res = await fetch(`${API}/api/contentful/tags`);
         const data = await res.json();
         this.allTags = data.items;
       } catch (err) {
