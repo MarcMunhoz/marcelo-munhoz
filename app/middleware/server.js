@@ -1,17 +1,25 @@
 import express from "express";
-import path from "path";
 import dotenv from "dotenv";
 import cors from "cors";
-import { fileURLToPath } from "url";
 import contentfulRoutes from "./routes/contentful.js";
 
 dotenv.config();
 
 const app = express();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || 3000;
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
 
-app.use(cors());
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow Postman or Allowed list
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error("Not allowed by CORS"));
+    },
+  })
+);
 
 // Keeps banckend alive
 app.get("/healthz", (_, res) => {
