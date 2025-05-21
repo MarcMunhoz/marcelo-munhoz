@@ -15,7 +15,7 @@
     <section class="mb-5 flex justify-center gap-8">
       <h1 class="w-full text-[3em] font-bold">Conhecimentos</h1>
       <picture v-for="item in confortableWith" :key="item.index">
-        <img :src="`https://raw.githubusercontent.com/MarcMunhoz/devicon/master/icons/${item.imagePath}/${item.imageName}.svg`" height="30" width="40" />
+        <img :src="`https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${item.imagePath}/${item.imageName}.svg`" height="30" width="40" />
         <q-tooltip>{{ item.tooltip }}</q-tooltip>
       </picture>
     </section>
@@ -24,9 +24,18 @@
 
     <section class="mb-6">
       <h1 class="text-[3em] font-bold">Projetos (in)úteis</h1>
-      <q-chip v-for="project in sortAnything(projectsList, 'projectName')" :key="project.index" :icon="project.projectEmoji" clickable @click="onClickItem(project.projectUrl)" outline color="blue-grey-5" size="xl">
-      {{ project.projectName }}
-      <q-tooltip v-if="project.projectTooltip">{{ project.projectTooltip }}</q-tooltip>
+      <q-chip
+        v-for="project in sortAnything(projectsList, 'projectName')"
+        :key="project.index"
+        :icon="project.projectEmoji"
+        clickable
+        @click="onClickItem(project.projectUrl)"
+        outline
+        color="blue-grey-5"
+        size="xl"
+      >
+        {{ project.projectName }}
+        <q-tooltip v-if="project.projectTooltip">{{ project.projectTooltip }}</q-tooltip>
       </q-chip>
     </section>
   </q-page>
