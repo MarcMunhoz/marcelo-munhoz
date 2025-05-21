@@ -33,7 +33,7 @@ export default configure(function (ctx) {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli/boot-files
-    boot: ["axios", ctx.mode.capacitor ? "google-analytics" : ""],
+    boot: [ctx.mode.capacitor ? "google-analytics" : ""],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#css
     css: ["app.scss", "tailwind.css"],
@@ -56,7 +56,7 @@ export default configure(function (ctx) {
     build: {
       target: {
         browser: ["es2019", "edge88", "firefox78", "chrome87", "safari13.1"],
-        node: "node18",
+        node: "node22",
       },
 
       vueRouterMode: "history", // available values: 'hash', 'history'
@@ -77,7 +77,7 @@ export default configure(function (ctx) {
       // ignorePublicFolder: true,
       // minify: false,
       // polyfillModulePreload: true,
-      // distDir
+      distDir: "dist",
 
       // extendViteConf (viteConf) {},
       // viteVuePluginOptions: {},
@@ -91,6 +91,13 @@ export default configure(function (ctx) {
     devServer: {
       // https: true
       port: 4242,
+      proxy: {
+        "/api": {
+          target: "http://localhost:3000",
+          changeOrigin: true,
+          pathRewrite: { "^/api": "/api" },
+        },
+      },
       open: false, // opens browser window automatically
       watch: {
         usePolling: isWSL ? { usePolling: true, interval: 100 } : {},
@@ -132,25 +139,25 @@ export default configure(function (ctx) {
     // },
 
     // https://v2.quasar.dev/quasar-cli/developing-ssr/configuring-ssr
-    ssr: {
-      // ssrPwaHtmlFilename: 'offline.html', // do NOT use index.html as name!
-      // will mess up SSR
+    // ssr: {
+    //   // ssrPwaHtmlFilename: 'offline.html', // do NOT use index.html as name!
+    //   // will mess up SSR
 
-      // extendSSRWebserverConf (esbuildConf) {},
-      // extendPackageJson (json) {},
+    //   // extendSSRWebserverConf (esbuildConf) {},
+    //   // extendPackageJson (json) {},
 
-      pwa: false,
+    //   pwa: false,
 
-      // manualStoreHydration: true,
-      // manualPostHydrationTrigger: true,
+    //   // manualStoreHydration: true,
+    //   // manualPostHydrationTrigger: true,
 
-      prodPort: 3000, // The default port that the production server should use
-      // (gets superseded if process.env.PORT is specified at runtime)
+    //   prodPort: 3000, // The default port that the production server should use
+    //   // (gets superseded if process.env.PORT is specified at runtime)
 
-      middlewares: [
-        "render", // keep this as last one
-      ],
-    },
+    //   middlewares: [
+    //     "render", // keep this as last one
+    //   ],
+    // },
 
     // https://v2.quasar.dev/quasar-cli/developing-pwa/configuring-pwa
     pwa: {

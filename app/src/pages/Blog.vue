@@ -8,7 +8,7 @@
       v-if="$route.path === '/blog'"
       v-model="currentPage"
       :max="maxPages"
-      @click="setData"
+      @update:model-value="setData"
       direction-links
       flat
       color="blue-grey-3"
@@ -21,8 +21,9 @@
 
 <script>
 import { defineComponent, ref } from "vue";
-import client from "../utils/contentful";
 import ArticleList from "../components/ArticlesList.vue";
+
+const API = import.meta.env.VITE_API_URL || "";
 
 export default defineComponent({
   name: "BlogPage",
@@ -33,29 +34,28 @@ export default defineComponent({
     return {
       articles: [],
       maxPages: 0,
-      currentPage: ref(1),
-      skipArticles: Number,
+      currentPage: 1,
+      skipArticles: 0,
       progress: true,
     };
   },
   methods: {
     async setData() {
+      this.progress = true;
       try {
-        const articles = await client.getEntries({
-          content_type: "article",
-          order: "-sys.createdAt,-fields.createAt",
-          limit: 3,
-          skip: this.displayedArticles(),
-        });
+        const res = await fetch(`${API}/api/contentful/entries?page=${this.currentPage}`);
 
-        return (this.articles = articles.items), (this.maxPages = this.calculatePagesCount(articles.total)), (this.progress = false);
+        const data = await res.json();
+        this.articles = data.items;
+        this.maxPages = this.calculatePagesCount(data.total);
       } catch (err) {
-        console.error(err);
+        console.error("Erro ao carregar artigos:", err);
+      } finally {
+        this.progress = false;
       }
     },
     calculatePagesCount(totalCount) {
       const maxArticles = 3;
-
       return totalCount < maxArticles ? 1 : Math.ceil(totalCount / maxArticles);
     },
     displayedArticles() {
