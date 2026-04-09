@@ -37,7 +37,7 @@
 <script>
 import { defineComponent, ref } from "vue";
 
-const API = import.meta.env.VITE_API_URL || "";
+const API = import.meta.env.DEV ? "" : import.meta.env.VITE_API_URL || "";
 
 export default defineComponent({
   name: "ArticlesTags",

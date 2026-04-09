@@ -1,6 +1,6 @@
 {
   "name": "marcelo-munhoz-website",
-  "version": "2.1.0",
+  "version": "2.1.2",
   "productName": "Marcelo Munhoz Website",
   "author": "Marcelo Munhoz",
   "private": true,
@@ -46,5 +46,8 @@
   },
   "overrides": {
     "vite": "^6.3.5"
+  },
+  "engines": {
+    "node": ">=22.22.0"
   }
 }
