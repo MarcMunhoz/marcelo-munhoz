@@ -1,5 +1,5 @@
 # Development stage
-FROM node:22-alpine AS base
+FROM node:22.22-alpine AS base
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   version="1.0.0" \
@@ -8,12 +8,11 @@ LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
 
 WORKDIR /app
 
-COPY ["./app/package.*", "./"]
+COPY ["./app/package*.json", "./"]
 
-RUN apk add exa \
-  && npm i -g @quasar/cli contentful-cli npm@^11.4.0 \
-  && npm i \
-  && rm -rf /var/cache/apk/* /var/tmp/* /usr/share/man
+RUN apk add --no-cache eza \
+  && npm i -g @quasar/cli contentful-cli \
+  && npm install
 
 COPY ./app .
 
