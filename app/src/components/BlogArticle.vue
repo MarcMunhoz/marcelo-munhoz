@@ -95,7 +95,7 @@ import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 
-const API = import.meta.env.VITE_API_URL || "";
+const API = import.meta.env.DEV ? "" : import.meta.env.VITE_API_URL || "";
 
 export default defineComponent({
   name: "BlogArticle",
