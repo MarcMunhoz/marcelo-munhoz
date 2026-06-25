@@ -1,5 +1,4 @@
-import pkg from "contentful";
-const { createClient } = pkg;
+import { createClient } from "contentful";
 import express from "express";
 
 const router = express.Router();
