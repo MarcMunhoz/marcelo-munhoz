@@ -38,9 +38,16 @@ describe("routing configuration", () => {
   });
 
   it("uses a static Contentful SDK import for Function bundling", () => {
-    const proxySource = read("../middleware/contentfulProxy.js");
+    const proxySource = read("../netlify/functions/contentfulProxyCore.js");
 
     assert.match(proxySource, /import\s+\{\s*createClient\s*\}\s+from\s+"contentful"/);
     assert.doesNotMatch(proxySource, /import\(["']contentful["']\)/);
+  });
+
+  it("keeps the Netlify Function dependency graph inside the functions directory", () => {
+    const functionSource = read("../netlify/functions/contentful.js");
+
+    assert.match(functionSource, /from "\.\/contentfulProxyCore\.js"/);
+    assert.doesNotMatch(functionSource, /\.\.\/\.\.\//);
   });
 });
