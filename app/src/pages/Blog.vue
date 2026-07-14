@@ -22,8 +22,7 @@
 <script>
 import { defineComponent, ref } from "vue";
 import ArticleList from "../components/ArticlesList.vue";
-
-const API = import.meta.env.DEV ? "" : import.meta.env.VITE_API_URL || "";
+import { buildApiUrl } from "../utils/apiBase.js";
 
 export default defineComponent({
   name: "BlogPage",
@@ -43,7 +42,7 @@ export default defineComponent({
     async setData() {
       this.progress = true;
       try {
-        const res = await fetch(`${API}/api/contentful/entries?page=${this.currentPage}`);
+        const res = await fetch(buildApiUrl(`/api/contentful/entries?page=${this.currentPage}`));
 
         const data = await res.json();
         this.articles = data.items;
