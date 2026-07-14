@@ -19,7 +19,6 @@
     "@quasar/extras": "^1.18.0",
     "@types/marked": "^5.0.2",
     "axios": "^1.18.1",
-    "contentful": "^11.12.5",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "marked": "^18.0.5",

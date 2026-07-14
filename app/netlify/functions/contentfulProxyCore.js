@@ -1,6 +1,5 @@
-import { createClient } from "contentful";
-
 const ARTICLE_LIMIT = 3;
+const CONTENTFUL_HOST = "https://cdn.contentful.com";
 
 const jsonResponse = (statusCode, payload) => ({
   statusCode,
@@ -27,20 +26,104 @@ const pageFromQuery = (query = {}) => {
 
 const skipFromPage = (page) => (page - 1) * ARTICLE_LIMIT;
 
-const createRuntimeClient = (env) => {
+const isContentfulLink = (value) => value?.sys?.type === "Link" && value.sys.linkType && value.sys.id;
+
+const buildIncludesMap = (includes = {}) => {
+  const map = new Map();
+
+  for (const [linkType, entries] of Object.entries(includes)) {
+    for (const entry of entries || []) {
+      if (entry?.sys?.id) {
+        map.set(`${linkType}:${entry.sys.id}`, entry);
+      }
+    }
+  }
+
+  return map;
+};
+
+const resolveLinks = (value, includesMap, seen = new Set()) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveLinks(item, includesMap, seen));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  if (isContentfulLink(value)) {
+    const key = `${value.sys.linkType}:${value.sys.id}`;
+    const linkedEntry = includesMap.get(key);
+
+    if (!linkedEntry || seen.has(key)) {
+      return value;
+    }
+
+    return resolveLinks(linkedEntry, includesMap, new Set([...seen, key]));
+  }
+
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolveLinks(item, includesMap, seen)]));
+};
+
+const resolveResponseLinks = (payload) => {
+  const includesMap = buildIncludesMap(payload.includes);
+
+  if (includesMap.size === 0) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    items: resolveLinks(payload.items || [], includesMap),
+    includes: resolveLinks(payload.includes, includesMap),
+  };
+};
+
+const contentfulRequest = async ({ env, fetchImpl, resource, query = {} }) => {
+  const url = new URL(`${CONTENTFUL_HOST}/spaces/${env.CONTENTFUL_SPACE_ID}/environments/master/${resource}`);
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  const response = await fetchImpl(url, {
+    headers: {
+      authorization: `Bearer ${env.CONTENTFUL_DELIVERY_KEY}`,
+    },
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(`Contentful Delivery API returned ${response.status}`);
+  }
+
+  return resource === "entries" ? resolveResponseLinks(payload) : payload;
+};
+
+const createRuntimeClient = (env, fetchImpl) => {
   if (!env.CONTENTFUL_SPACE_ID || !env.CONTENTFUL_DELIVERY_KEY) {
     return null;
   }
 
-  return createClient({
-    space: env.CONTENTFUL_SPACE_ID,
-    accessToken: env.CONTENTFUL_DELIVERY_KEY,
-    environment: "master",
-  });
+  if (typeof fetchImpl !== "function") {
+    return null;
+  }
+
+  return {
+    getEntries(query) {
+      return contentfulRequest({ env, fetchImpl, resource: "entries", query });
+    },
+    getTags() {
+      return contentfulRequest({ env, fetchImpl, resource: "tags" });
+    },
+  };
 };
 
-export const createContentfulHandler = ({ client, env = process.env, logger = console } = {}) => {
-  const getClient = () => client || createRuntimeClient(env);
+export const createContentfulHandler = ({ client, env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) => {
+  const getClient = () => client || createRuntimeClient(env, fetchImpl);
 
   const runWithClient = async (operation, fallbackError) => {
     const contentfulClient = getClient();
