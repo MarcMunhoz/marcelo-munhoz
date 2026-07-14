@@ -1,4 +1,4 @@
-import { contentfulHandler } from "../../middleware/contentfulProxy.js";
+import { contentfulHandler } from "./contentfulProxyCore.js";
 
 const queryFromEvent = (event) => event.queryStringParameters || {};
 
