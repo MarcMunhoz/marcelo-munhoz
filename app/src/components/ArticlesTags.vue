@@ -36,8 +36,7 @@
 
 <script>
 import { defineComponent, ref } from "vue";
-
-const API = import.meta.env.DEV ? "" : import.meta.env.VITE_API_URL || "";
+import { buildApiUrl } from "../utils/apiBase.js";
 
 export default defineComponent({
   name: "ArticlesTags",
@@ -69,7 +68,7 @@ export default defineComponent({
       this.progress = true;
 
       try {
-        const res = await fetch(`${API}/api/contentful/tagged?page=${this.currentPage}&tag=${this.currentTag}`);
+        const res = await fetch(buildApiUrl(`/api/contentful/tagged?page=${this.currentPage}&tag=${this.currentTag}`));
         const data = await res.json();
 
         this.articlesTag = data.items;
@@ -86,7 +85,7 @@ export default defineComponent({
 
     async setTags() {
       try {
-        const res = await fetch(`${API}/api/contentful/tags`);
+        const res = await fetch(buildApiUrl("/api/contentful/tags"));
         const data = await res.json();
         this.allTags = data.items;
       } catch (err) {

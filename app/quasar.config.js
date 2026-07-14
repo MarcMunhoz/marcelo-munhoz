@@ -66,11 +66,7 @@ export default configure(function (ctx) {
 
       // publicPath: '/',
       // analyze: true,
-      env: {
-        CONTENTFUL_SPACE_ID: process.env.CONTENTFUL_SPACE_ID,
-        CONTENFUL_SPACE: process.env.CONTENTFUL_SPACE_NAME,
-        CONTENTFUL_DELIVERY: process.env.CONTENTFUL_DELIVERY_KEY,
-      },
+      env: {},
       // rawDefine: {}
       // ignorePublicFolder: true,
       // minify: false,
