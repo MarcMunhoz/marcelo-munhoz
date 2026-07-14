@@ -119,6 +119,58 @@ describe("contentful proxy handler", () => {
     assert.deepEqual(messages, ["Contentful runtime configuration is missing"]);
   });
 
+  it("fetches entries from the Contentful Delivery API and resolves included links", async () => {
+    const calls = [];
+    const handler = createContentfulHandler({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_DELIVERY_KEY: "delivery-key",
+      },
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        return {
+          ok: true,
+          async json() {
+            return {
+              items: [
+                {
+                  sys: { id: "article-1", type: "Entry" },
+                  fields: {
+                    author: { sys: { type: "Link", linkType: "Entry", id: "author-1" } },
+                  },
+                },
+              ],
+              includes: {
+                Entry: [
+                  {
+                    sys: { id: "author-1", type: "Entry" },
+                    fields: { name: "Marcelo Munhoz" },
+                  },
+                ],
+              },
+              total: 1,
+            };
+          },
+        };
+      },
+    });
+
+    const response = await handler({ path: "/entries", query: { page: "2" } });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body).items[0].fields.author.fields, { name: "Marcelo Munhoz" });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.headers.authorization, "Bearer delivery-key");
+
+    const url = new URL(calls[0].url);
+    assert.equal(url.origin, "https://cdn.contentful.com");
+    assert.equal(url.pathname, "/spaces/space-id/environments/master/entries");
+    assert.equal(url.searchParams.get("content_type"), "article");
+    assert.equal(url.searchParams.get("limit"), "3");
+    assert.equal(url.searchParams.get("skip"), "3");
+  });
+
   it("normalizes upstream errors without leaking diagnostics", async () => {
     const messages = [];
     const handler = createContentfulHandler({
