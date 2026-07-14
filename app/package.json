@@ -1,6 +1,6 @@
 {
   "name": "marcelo-munhoz-website",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "productName": "Marcelo Munhoz Website",
   "author": "Marcelo Munhoz",
   "private": true,
@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
-    "test": "echo \"No test specified\" && exit 0",
+    "test": "node --test",
     "dev": "concurrently \"quasar dev\" \"node middleware/server.js\"",
     "build": "quasar build",
     "start": "node middleware/server.js"
@@ -19,7 +19,6 @@
     "@quasar/extras": "^1.18.0",
     "@types/marked": "^5.0.2",
     "axios": "^1.18.1",
-    "contentful": "^11.12.5",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "marked": "^18.0.5",

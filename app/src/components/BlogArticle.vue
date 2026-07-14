@@ -94,8 +94,7 @@ import { mangle } from "marked-mangle";
 import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
-
-const API = import.meta.env.DEV ? "" : import.meta.env.VITE_API_URL || "";
+import { buildApiUrl } from "../utils/apiBase.js";
 
 export default defineComponent({
   name: "BlogArticle",
@@ -176,7 +175,7 @@ export default defineComponent({
   methods: {
     async loadArticle() {
       try {
-        const res = await fetch(`${API}/api/contentful/article/${this.$route.params.slug}`);
+        const res = await fetch(buildApiUrl(`/api/contentful/article/${this.$route.params.slug}`));
         const article = await res.json();
 
         this.createAt = article.sys.createdAt;

@@ -22,8 +22,7 @@
 <script>
 import { defineComponent, ref } from "vue";
 import ArticleList from "../components/ArticlesList.vue";
-
-const API = import.meta.env.DEV ? "" : import.meta.env.VITE_API_URL || "";
+import { buildApiUrl } from "../utils/apiBase.js";
 
 export default defineComponent({
   name: "BlogPage",
@@ -43,20 +42,26 @@ export default defineComponent({
     async setData() {
       this.progress = true;
       try {
-        const res = await fetch(`${API}/api/contentful/entries?page=${this.currentPage}`);
+        const res = await fetch(buildApiUrl(`/api/contentful/entries?page=${this.currentPage}`));
+        if (!res.ok) {
+          throw new Error(`Blog API returned ${res.status}`);
+        }
 
         const data = await res.json();
-        this.articles = data.items;
+        this.articles = data.items || [];
         this.maxPages = this.calculatePagesCount(data.total);
       } catch (err) {
         console.error("Erro ao carregar artigos:", err);
+        this.articles = [];
+        this.maxPages = 1;
       } finally {
         this.progress = false;
       }
     },
     calculatePagesCount(totalCount) {
       const maxArticles = 3;
-      return totalCount < maxArticles ? 1 : Math.ceil(totalCount / maxArticles);
+      const normalizedTotal = Number.isFinite(Number(totalCount)) ? Number(totalCount) : 0;
+      return normalizedTotal < maxArticles ? 1 : Math.ceil(normalizedTotal / maxArticles);
     },
     displayedArticles() {
       return this.currentPage > 1 ? (this.skipArticles = 3 * this.currentPage - 3) : (this.skipArticles = 0);
