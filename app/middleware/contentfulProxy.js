@@ -1,3 +1,5 @@
+import { createClient } from "contentful";
+
 const ARTICLE_LIMIT = 3;
 
 const jsonResponse = (statusCode, payload) => ({
@@ -25,12 +27,10 @@ const pageFromQuery = (query = {}) => {
 
 const skipFromPage = (page) => (page - 1) * ARTICLE_LIMIT;
 
-const createRuntimeClient = async (env) => {
+const createRuntimeClient = (env) => {
   if (!env.CONTENTFUL_SPACE_ID || !env.CONTENTFUL_DELIVERY_KEY) {
     return null;
   }
-
-  const { createClient } = await import("contentful");
 
   return createClient({
     space: env.CONTENTFUL_SPACE_ID,
@@ -43,7 +43,7 @@ export const createContentfulHandler = ({ client, env = process.env, logger = co
   const getClient = () => client || createRuntimeClient(env);
 
   const runWithClient = async (operation, fallbackError) => {
-    const contentfulClient = await getClient();
+    const contentfulClient = getClient();
 
     if (!contentfulClient) {
       logger.error("Contentful runtime configuration is missing");
@@ -94,7 +94,7 @@ export const createContentfulHandler = ({ client, env = process.env, logger = co
     }
 
     if (routePath.startsWith("/article/")) {
-      const contentfulClient = await getClient();
+      const contentfulClient = getClient();
 
       if (!contentfulClient) {
         logger.error("Contentful runtime configuration is missing");

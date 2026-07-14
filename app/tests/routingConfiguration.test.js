@@ -36,4 +36,11 @@ describe("routing configuration", () => {
 
     assert.doesNotMatch(quasarConfig, /CONTENTFUL_DELIVERY_KEY|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE_ID/);
   });
+
+  it("uses a static Contentful SDK import for Function bundling", () => {
+    const proxySource = read("../middleware/contentfulProxy.js");
+
+    assert.match(proxySource, /import\s+\{\s*createClient\s*\}\s+from\s+"contentful"/);
+    assert.doesNotMatch(proxySource, /import\(["']contentful["']\)/);
+  });
 });

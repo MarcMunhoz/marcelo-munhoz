@@ -69,15 +69,21 @@ export default defineComponent({
 
       try {
         const res = await fetch(buildApiUrl(`/api/contentful/tagged?page=${this.currentPage}&tag=${this.currentTag}`));
+        if (!res.ok) {
+          throw new Error(`Blog API returned ${res.status}`);
+        }
+
         const data = await res.json();
 
-        this.articlesTag = data.items;
+        this.articlesTag = data.items || [];
         this.maxPages = this.calculatePagesCount(data.total);
 
         const headerTags = document.querySelector(".header-title");
         headerTags.innerHTML = `#${this.currentTag}`;
       } catch (err) {
         console.error("Erro ao carregar artigos com tag:", err);
+        this.articlesTag = [];
+        this.maxPages = 1;
       } finally {
         this.progress = false;
       }
@@ -86,16 +92,22 @@ export default defineComponent({
     async setTags() {
       try {
         const res = await fetch(buildApiUrl("/api/contentful/tags"));
+        if (!res.ok) {
+          throw new Error(`Blog API returned ${res.status}`);
+        }
+
         const data = await res.json();
-        this.allTags = data.items;
+        this.allTags = data.items || [];
       } catch (err) {
         console.error("Erro ao carregar tags:", err);
+        this.allTags = [];
       }
     },
 
     calculatePagesCount(totalCount) {
       const maxArticles = 3;
-      return totalCount < maxArticles ? 1 : Math.ceil(totalCount / maxArticles);
+      const normalizedTotal = Number.isFinite(Number(totalCount)) ? Number(totalCount) : 0;
+      return normalizedTotal < maxArticles ? 1 : Math.ceil(normalizedTotal / maxArticles);
     },
 
     displayedArticles() {
