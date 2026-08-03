@@ -4,14 +4,14 @@ The Contentful blog API now has a shared proxy handler used by the local Express
 
 ## Validation Commands
 
-All package-manager, test, lint, and build validation was run in containers. A clean temporary copy at `<local-path> excluded `.env`, `.env.*`, `node_modules`, `dist`, and `.quasar` before dependency installation and build validation.
+All package-manager, test, lint, and build validation was run in containers. A clean temporary application copy excluded `.env`, `.env.*`, `node_modules`, `dist`, and `.quasar` before dependency installation and build validation.
 
-- `docker run --rm -v <local-path> -w /app node:22.22-alpine npm ci`
-- `docker run --rm -v <local-path> -w /app node:22.22-alpine npm test`
-- `docker run --rm -v <local-path> -w /app node:22.22-alpine npm run lint`
-- `docker run --rm -v <local-path> -w /app node:22.22-alpine npm run build`
-- `find <local-path> -maxdepth 2 \( -name '.env' -o -name '.env.*' \) -print`
-- `rg "CONTENTFUL|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE|VITE_API_URL" <local-path>
+- `docker run --rm -v <sanitized-app-copy>:/app -w /app node:22.22-alpine npm ci`
+- `docker run --rm -v <sanitized-app-copy>:/app -w /app node:22.22-alpine npm test`
+- `docker run --rm -v <sanitized-app-copy>:/app -w /app node:22.22-alpine npm run lint`
+- `docker run --rm -v <sanitized-app-copy>:/app -w /app node:22.22-alpine npm run build`
+- `find <sanitized-app-copy> -maxdepth 2 \( -name '.env' -o -name '.env.*' \) -print`
+- `rg "CONTENTFUL|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE|VITE_API_URL" <sanitized-app-copy>/dist`
 - `openspec validate migrate-contentful-proxy-to-netlify-functions --strict`
 
 ## Security Checks
