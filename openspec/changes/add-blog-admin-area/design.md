@@ -157,10 +157,19 @@ Expected behavior:
 - The optional `alt` field is edited separately as article accessibility metadata.
 - Cloudinary credentials stay server-side and are never placed in `VITE_*` variables.
 
+Implementation decision:
+
+- Use backend-mediated Cloudinary operations for the first version.
+- List existing images through a narrow server-side media route scoped to the configured Cloudinary folder.
+- Upload images by sending a browser-selected Data URI to the admin backend; the backend signs and sends the upload request to Cloudinary.
+- Store the returned asset metadata in the Contentful Article `thumbnail` field and keep `alt` as a separate Article field.
+- Use sanitized server-only runtime variables for Cloudinary cloud name, API key, API secret, and folder.
+
 Alternatives considered:
 
 - Keep manual Cloudinary fields in the editor: lowest implementation cost, but poor author experience and error-prone.
 - Use Contentful Assets instead of Cloudinary: simpler CMS integration, but changes the site's current image hosting model.
+- Use signed direct browser upload: reduces backend transfer work, but exposes short-lived signatures in the browser and requires more client-side upload complexity.
 
 ### Defer Page-View Metrics Integration
 
@@ -199,8 +208,5 @@ Alternatives considered:
 
 ## Open Questions
 
-- What exact Contentful field IDs are used by the live `article` content type for `thumbnail` and `alt`, and do existing public components need compatibility shims for older `cloudinary` data?
-- Which Cloudinary upload mode should be used first: signed upload directly from the browser, or upload streamed through a backend Function?
-- Should writers select only from the configured Cloudinary folder, or also upload new images into that folder?
 - Should the first version allow writers to select only their own owner-managed author profile, or should owners assign the author during review?
 - What confirmation text should the owner UI require before permanent deletion?

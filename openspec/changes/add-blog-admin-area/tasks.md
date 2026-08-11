@@ -25,25 +25,25 @@
 
 ## 4. Dashboard And Writer Workflows
 
-- [ ] 4.1 Replace the direct editor-first `/admin` screen with a CMS-style dashboard shell containing sidebar navigation, topbar, status cards, article table, and role-aware actions.
-- [ ] 4.2 Add article status data loading for published, draft/unpublished, and review-request counts using deterministic mocked tests first.
-- [ ] 4.3 Add article list/table UI with filters for status, tags, date, author, and search.
-- [ ] 4.4 Add create/edit article screens using the real Article field set: create date, title, slug, description, body, thumbnail, alt, author, and Contentful tags.
-- [ ] 4.5 Remove manually editable version and review-notes fields from the writer editor; keep version as hidden state for concurrency.
-- [ ] 4.6 Add writer draft creation and editing behavior for permitted drafts or submissions.
-- [ ] 4.7 Add submit-for-review behavior that records workflow state and makes drafts visible in the owner review workflow.
-- [ ] 4.8 Add unpublication request behavior that records a request without unpublishing the article.
-- [ ] 4.9 Handle save success, validation errors, authorization failures, media failures, and version conflicts in the writer UI.
+- [x] 4.1 Replace the direct editor-first `/admin` screen with a CMS-style dashboard shell containing sidebar navigation, topbar, status cards, article table, and role-aware actions.
+- [x] 4.2 Add article status data loading for published, draft/unpublished, and review-request counts using deterministic mocked tests first.
+- [x] 4.3 Add article list/table UI with filters for status, tags, date, author, and search.
+- [x] 4.4 Add create/edit article screens using the real Article field set: create date, title, slug, description, body, thumbnail, alt, author, and Contentful tags.
+- [x] 4.5 Remove manually editable version and review-notes fields from the writer editor; keep version as hidden state for concurrency.
+- [x] 4.6 Add writer draft creation and editing behavior for permitted drafts or submissions.
+- [x] 4.7 Add submit-for-review behavior that records workflow state and makes drafts visible in the owner review workflow.
+- [x] 4.8 Add unpublication request behavior that records a request without unpublishing the article.
+- [x] 4.9 Handle save success, validation errors, authorization failures, media failures, and version conflicts in the writer UI.
 
 ## 5. Cloudinary Media Workflow
 
-- [ ] 5.1 Confirm the live Contentful Article field ID and payload shape for thumbnail and alt text without reading secrets.
-- [ ] 5.2 Decide whether the first Cloudinary implementation uses signed direct browser upload or backend-streamed upload.
-- [ ] 5.3 Add a narrow server-side Cloudinary media facade for upload/selection metadata using mocked tests.
-- [ ] 5.4 Add admin media API routes that authorize writer/owner sessions before Cloudinary operations.
-- [ ] 5.5 Add a media picker/upload UI scoped to the configured Cloudinary folder.
-- [ ] 5.6 Save returned Cloudinary metadata into the Article thumbnail field and alt text into the Article alt field.
-- [ ] 5.7 Ensure Cloudinary credentials are read only from server-side runtime configuration and never from browser-supplied parameters.
+- [x] 5.1 Confirm the live Contentful Article field ID and payload shape for thumbnail and alt text without reading secrets.
+- [x] 5.2 Decide whether the first Cloudinary implementation uses signed direct browser upload or backend-streamed upload.
+- [x] 5.3 Add a narrow server-side Cloudinary media facade for upload/selection metadata using mocked tests.
+- [x] 5.4 Add admin media API routes that authorize writer/owner sessions before Cloudinary operations.
+- [x] 5.5 Add a media picker/upload UI scoped to the configured Cloudinary folder.
+- [x] 5.6 Save returned Cloudinary metadata into the Article thumbnail field and alt text into the Article alt field.
+- [x] 5.7 Ensure Cloudinary credentials are read only from server-side runtime configuration and never from browser-supplied parameters.
 
 ## 6. Owner Workflows
 

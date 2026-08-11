@@ -167,6 +167,10 @@ Expected media flow:
 - The returned Cloudinary metadata is stored in the Article thumbnail field.
 - The public blog continues rendering images from Cloudinary.
 
-Open implementation choice:
+Resolved implementation details:
 
-- Use signed direct browser upload with a backend signature endpoint, or stream upload through the backend Function.
+- The Article media fields are treated as `thumbnail` for Cloudinary metadata and `alt` for accessibility text, matching the provided Contentful model references.
+- Existing public rendering keeps compatibility with legacy `cloudinary` data while preferring `thumbnail`.
+- The first Cloudinary upload mode is backend-mediated: the browser sends a selected image as a Data URI to the admin backend, and the backend signs the upload request using server-side Cloudinary credentials.
+- Existing image selection uses a server-side Cloudinary Admin API request scoped to the configured folder.
+- Required runtime configuration remains server-side and should use sanitized placeholder names in documentation: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, and optional `CLOUDINARY_UPLOAD_FOLDER`.
