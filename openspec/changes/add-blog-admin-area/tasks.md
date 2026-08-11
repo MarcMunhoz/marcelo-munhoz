@@ -1,27 +1,27 @@
 ## 1. Discovery And Baseline
 
-- [ ] 1.1 Confirm current public blog read behavior in the existing Contentful Delivery API proxy, Netlify redirects, local middleware wrapper, and blog fetch call sites.
-- [ ] 1.2 Confirm the current Contentful article content model fields needed for list cards, article detail, author, tags, images, slug, description, and body rendering without reading secrets.
-- [ ] 1.3 Select a free-compatible authentication approach for `/admin` and document how writer and owner identities are represented server-side.
-- [ ] 1.4 Decide where writer ownership, submission status, and unpublication requests are stored while keeping the project on free plans.
-- [ ] 1.5 Define the first-version article editor field set and validation rules.
+- [x] 1.1 Confirm current public blog read behavior in the existing Contentful Delivery API proxy, Netlify redirects, local middleware wrapper, and blog fetch call sites.
+- [x] 1.2 Confirm the current Contentful article content model fields needed for list cards, article detail, author, tags, images, slug, description, and body rendering without reading secrets.
+- [x] 1.3 Select a free-compatible authentication approach for `/admin` and document how writer and owner identities are represented server-side.
+- [x] 1.4 Decide where writer ownership, submission status, and unpublication requests are stored while keeping the project on free plans.
+- [x] 1.5 Define the first-version article editor field set and validation rules.
 
 ## 2. Admin API Architecture
 
-- [ ] 2.1 Add a server-side admin API surface separate from the existing public `/api/contentful/*` read proxy.
-- [ ] 2.2 Add local middleware routing for the admin API without changing the existing local public blog proxy behavior.
-- [ ] 2.3 Add Netlify Function routing for admin API requests before the SPA fallback.
-- [ ] 2.4 Implement server-side authentication extraction for admin API requests.
-- [ ] 2.5 Implement server-side writer and owner authorization helpers used by every admin mutation.
-- [ ] 2.6 Normalize admin API errors into user-safe JSON responses without exposing credentials, stack traces, or raw upstream diagnostics.
+- [x] 2.1 Add a server-side admin API surface separate from the existing public `/api/contentful/*` read proxy.
+- [x] 2.2 Add local middleware routing for the admin API without changing the existing local public blog proxy behavior.
+- [x] 2.3 Add Netlify Function routing for admin API requests before the SPA fallback.
+- [x] 2.4 Implement server-side authentication extraction for admin API requests.
+- [x] 2.5 Implement server-side writer and owner authorization helpers used by every admin mutation.
+- [x] 2.6 Normalize admin API errors into user-safe JSON responses without exposing credentials, stack traces, or raw upstream diagnostics.
 
 ## 3. Contentful Management Facade
 
-- [ ] 3.1 Add a narrow server-side Contentful Management API facade for article draft creation, article updates, publish, unpublish, archive, and permanent deletion.
-- [ ] 3.2 Ensure the facade reads management credentials only from server-side runtime configuration.
-- [ ] 3.3 Ensure the facade does not accept browser-supplied Contentful credentials or arbitrary upstream query/mutation parameters.
-- [ ] 3.4 Implement optimistic concurrency handling for Contentful version conflicts.
-- [ ] 3.5 Implement missing-configuration and upstream-failure handling without leaking sensitive details.
+- [x] 3.1 Add a narrow server-side Contentful Management API facade for article draft creation, article updates, publish, unpublish, archive, and permanent deletion.
+- [x] 3.2 Ensure the facade reads management credentials only from server-side runtime configuration.
+- [x] 3.3 Ensure the facade does not accept browser-supplied Contentful credentials or arbitrary upstream query/mutation parameters.
+- [x] 3.4 Implement optimistic concurrency handling for Contentful version conflicts.
+- [x] 3.5 Implement missing-configuration and upstream-failure handling without leaking sensitive details.
 
 ## 4. Writer Workflows
 

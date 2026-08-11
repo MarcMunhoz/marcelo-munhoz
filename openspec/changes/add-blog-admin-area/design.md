@@ -62,6 +62,20 @@ Alternatives considered:
 - Invite writers as Contentful Editors: convenient, but they may gain destructive permissions outside the custom admin UI.
 - Require paid custom Contentful roles: better permission fit, but violates the goal of staying on free plans.
 
+### Use Netlify Identity For Admin Authentication
+
+Use Netlify Identity as the first implementation's authentication provider. Configure registration as invite-only and represent admin authorization with server-verified roles:
+
+- `writer`: create and edit permitted drafts or submissions, submit articles for owner review, and request unpublication.
+- `owner`: perform all writer workflows plus publish, unpublish, archive, and permanently delete.
+
+Rationale: Netlify Identity is available on the Free plan, integrates with Netlify Functions, supports JWT-backed roles, and avoids a separate paid authentication provider.
+
+Alternatives considered:
+
+- Contentful OAuth: aligns with Contentful user accounts, but Free plan roles are too coarse for the target writer/owner split.
+- A separate auth provider: viable later, but adds another system and may complicate the 100% free constraint.
+
 ### Keep Owner Actions Explicit And Server-Enforced
 
 The admin backend must identify owner sessions separately from writer sessions. Owner-only routes perform publication, unpublication, archiving, and permanent deletion. Permanent deletion requires an article to be selected explicitly and should be implemented with confirmation-oriented UI and tests.
@@ -84,13 +98,24 @@ Alternatives considered:
 - Add a separate paid database or queue: operationally clean, but outside the current cost goal.
 - Depend on Contentful custom roles: unavailable on the target plan.
 
+### Store Editorial Workflow Records Separately From Public Article Fields
+
+Store article content in Contentful `article` entries and store writer ownership, submission status, and unpublication requests in a separate editorial workflow content type, tentatively `blogEditorialRequest`.
+
+Rationale: the current public blog proxy returns complete article fields for published entries. Adding private writer identity or workflow state directly to published article entries could expose that data through public responses. Separate workflow records can remain admin-only and unpublished while still using Contentful as the free-plan-compatible storage location.
+
+Alternatives considered:
+
+- Store workflow fields directly on `article`: simpler, but risks leaking private workflow metadata unless the public proxy is changed to whitelist fields.
+- Add a separate database: clearer separation, but outside the current free-plan target.
+
 ## Risks / Trade-offs
 
 - Free-plan Contentful roles are coarse -> Keep guest writer permissions in the app and do not grant broad Contentful Editor access for normal guest authoring.
 - App-level authorization can drift from Contentful reality -> Restrict server routes to narrow operations and cover each role/action combination with tests.
 - Management token leakage would be high impact -> Keep it out of build config, responses, browser-visible logs, GitHub artifacts, and OpenSpec artifacts; scan built assets during validation.
 - Multiple writers editing the same article can cause version conflicts -> Use Contentful version headers or equivalent optimistic concurrency behavior and return conflict-safe user errors.
-- Draft ownership may be hard to infer from Contentful alone -> Define explicit metadata for writer ownership or submission attribution before implementation.
+- Draft ownership may be hard to infer from Contentful alone -> Store writer ownership in separate admin-only editorial workflow records keyed by the authenticated identity subject.
 - Staying 100% free may limit collaboration features -> Keep first version focused on draft submission and owner review rather than full multi-user CMS parity.
 - Live Contentful behavior is external and mutable -> Use mocks/fixtures for routine tests and document optional live smoke checks separately.
 
@@ -106,8 +131,6 @@ Alternatives considered:
 
 ## Open Questions
 
-- Which free-compatible authentication provider will protect `/admin` and provide stable user identities?
-- How will owner identity be configured in the runtime without exposing local or personal identifiers in public artifacts?
-- Should writer ownership be stored as Contentful metadata, article fields, or a separate Contentful entry type?
-- Which article fields are required in the first editor experience?
-- Should unpublication requests be stored on the article entry or as separate review-request entries?
+- What exact Contentful validations already exist on the live `article` content type, and do they need to be mirrored in the custom editor?
+- Should the first version allow writers to select only their own owner-managed author profile, or should owners assign the author during review?
+- What confirmation text should the owner UI require before permanent deletion?
