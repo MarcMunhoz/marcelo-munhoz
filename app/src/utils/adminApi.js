@@ -82,6 +82,13 @@ export const createArticleDraft = ({ article, session, fetchImpl }) =>
     fetchImpl,
   });
 
+export const listAdminArticles = ({ session, fetchImpl } = {}) =>
+  adminRequest({
+    path: ADMIN_ARTICLES_PATH.replace("/api/admin/contentful", ""),
+    session,
+    fetchImpl,
+  });
+
 export const updateArticleDraft = ({ articleId, article, session, fetchImpl }) =>
   adminRequest({
     path: `/articles/${encodeURIComponent(articleId)}`,

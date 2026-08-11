@@ -7,6 +7,7 @@ import {
   archiveArticle,
   createArticleDraft,
   deleteArticle,
+  listAdminArticles,
   publishArticle,
   requestArticleUnpublication,
   submitArticleForReview,
@@ -18,9 +19,12 @@ import {
   articleToForm,
   buildArticlePayload,
   canConfirmArticleDeletion,
+  canPrepareReviewAction,
+  canRequestUnpublicationAction,
   filterAdminArticles,
   ownerReviewQueues,
   removeArticleById,
+  reconcileAdminDashboardData,
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../src/utils/adminDashboard.js";
@@ -133,6 +137,59 @@ describe("admin frontend writer workflow", () => {
       ]
     );
     assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
+  });
+
+  it("loads admin articles from the server-side admin read route", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            articles: [
+              {
+                id: "article-1",
+                title: "Loaded article",
+                status: "published",
+                tags: ["contentful"],
+                createAt: "2026-08-11",
+                author: "Marcelo Munhoz",
+                version: 4,
+              },
+            ],
+            summary: { published: 1, drafts: 0, review: 0, archived: 0, total: 1 },
+            reviewRequests: [],
+          };
+        },
+      };
+    };
+
+    const dashboard = await listAdminArticles({ session: { token: "writer-token" }, fetchImpl });
+
+    assert.deepEqual(dashboard.articles, [
+      {
+        id: "article-1",
+        title: "Loaded article",
+        status: "published",
+        tags: ["contentful"],
+        createAt: "2026-08-11",
+        author: "Marcelo Munhoz",
+        version: 4,
+      },
+    ]);
+    assert.equal(calls[0].url, "/api/admin/contentful/articles");
+    assert.equal(calls[0].options.method, "GET");
+    assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
+  });
+
+  it("normalizes empty admin dashboard responses into stable frontend state", () => {
+    assert.deepEqual(reconcileAdminDashboardData({}), {
+      articles: [],
+      summary: { published: 0, drafts: 0, review: 0, archived: 0, total: 0 },
+      reviewRequests: [],
+    });
   });
 
   it("sends a development-only preview role header instead of bearer auth for local preview sessions", async () => {
@@ -311,6 +368,16 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canConfirmArticleDeletion(null, "Permanent Delete Target"), false);
   });
 
+  it("shows row lifecycle actions only for article states supported by backend routes", () => {
+    assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft" }), true);
+    assert.equal(canPrepareReviewAction({ id: "published-1", status: "published" }), false);
+    assert.equal(canPrepareReviewAction({ id: "", status: "draft" }), false);
+
+    assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }), true);
+    assert.equal(canRequestUnpublicationAction({ id: "draft-1", status: "draft" }), false);
+    assert.equal(canRequestUnpublicationAction({ id: "review-1", status: "review" }), false);
+  });
+
   it("resolves Contentful thumbnail images with legacy Cloudinary fallback", () => {
     assert.equal(
       articleCardImageUrl({ thumbnail: { public_id: "marcelo-munhoz-website/new-image" } }),
@@ -360,6 +427,21 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /handleMediaFile/);
     assert.match(page, /admin-sidebar/);
     assert.match(page, /article-table/);
+    assert.doesNotMatch(page, /label="Media" disable/);
+    assert.doesNotMatch(page, /label="Settings" disable/);
+    assert.match(page, /loadArticleDashboard/);
+    assert.doesNotMatch(page, /this\.articles = sampleAdminArticles/);
+  });
+
+  it("keeps admin layout responsive without relying on a horizontally oversized table shell", () => {
+    const page = read("../src/pages/Admin.vue");
+
+    assert.match(page, /\.admin-workspace[\s\S]*min-width:\s*0/);
+    assert.match(page, /\.admin-topbar[\s\S]*flex-wrap:\s*wrap/);
+    assert.match(page, /\.status-grid[\s\S]*auto-fit/);
+    assert.match(page, /\.admin-main-grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    assert.match(page, /@media \(max-width:\s*900px\)/);
+    assert.match(page, /\.article-table[\s\S]*overflow-x:\s*auto/);
   });
 
   it("handles save, validation, authorization, media, and conflict states in the writer UI", () => {

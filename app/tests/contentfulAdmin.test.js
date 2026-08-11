@@ -5,8 +5,10 @@ import {
   CloudinaryMediaConfigurationError,
   CloudinaryMediaRequestError,
   ContentfulAdminConfigurationError,
+  ContentfulManagementRequestError,
   ContentfulVersionConflictError,
   createContentfulAdminHandler,
+  createContentfulManagementFacade,
   devPreviewSessionFromHeaders,
 } from "../middleware/contentfulAdmin.js";
 
@@ -172,6 +174,264 @@ describe("contentful admin handler", () => {
     }
   });
 
+  it("loads admin article dashboard data through Contentful Management reads", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url: String(url), options });
+
+      if (!String(url).includes("content_type=")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              items: [
+                {
+                  sys: { id: "article-1", version: 7, publishedVersion: 5, updatedAt: "2026-08-11T10:00:00Z", contentType: { sys: { id: "article" } } },
+                  metadata: { tags: [{ sys: { id: "contentful" } }] },
+                  fields: {
+                    title: { "pt-BR": "Published article" },
+                    slug: { "pt-BR": "published-article" },
+                    description: { "pt-BR": "Published description" },
+                    body: { "pt-BR": "# Published" },
+                    createAt: { "pt-BR": "2026-08-11" },
+                    author: { "pt-BR": { sys: { id: "author-1" }, fields: { name: { "pt-BR": "Marcelo Munhoz" } } } },
+                    thumbnail: { "pt-BR": { public_id: "folder/published", secure_url: "https://example.test/published.jpg" } },
+                    alt: { "pt-BR": "Published image" },
+                  },
+                },
+                {
+                  sys: { id: "article-2", version: 3, updatedAt: "2026-08-10T10:00:00Z", contentType: { sys: { id: "article" } } },
+                  metadata: { tags: [] },
+                  fields: {
+                    title: { "pt-BR": "Writer draft" },
+                    slug: { "pt-BR": "writer-draft" },
+                    createAt: { "pt-BR": "2026-08-10" },
+                    author: { "pt-BR": { sys: { type: "Link", linkType: "Entry", id: "author-2" } } },
+                  },
+                },
+                {
+                  sys: { id: "request-1", version: 2, contentType: { sys: { id: "blogEditorialRequest" } } },
+                  fields: {
+                    requestType: { "pt-BR": "publication" },
+                    status: { "pt-BR": "readyForReview" },
+                    article: { "pt-BR": { sys: { id: "article-2" } } },
+                    writerSubject: { "pt-BR": "writer-123" },
+                    writerName: { "pt-BR": "Guest Writer" },
+                    createdAt: { "pt-BR": "2026-08-10T11:00:00Z" },
+                  },
+                },
+                {
+                  sys: { id: "ignored-1", version: 1, contentType: { sys: { id: "author" } } },
+                  fields: { name: { "pt-BR": "Ignored Author" } },
+                },
+              ],
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected Contentful URL: ${url}`);
+    };
+
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const dashboard = await facade.listAdminArticles({ session: createSession(["owner"]) });
+
+    assert.deepEqual(
+      dashboard.articles.map((article) => ({
+        id: article.id,
+        title: article.title,
+        status: article.status,
+        author: article.author,
+        authorEntryId: article.authorEntryId,
+        tags: article.tags,
+        requestId: article.requestId,
+      })),
+      [
+        {
+          id: "article-1",
+          title: "Published article",
+          status: "published",
+          author: "Marcelo Munhoz",
+          authorEntryId: "author-1",
+          tags: ["contentful"],
+          requestId: undefined,
+        },
+        {
+          id: "article-2",
+          title: "Writer draft",
+          status: "review",
+          author: "author-2",
+          authorEntryId: "author-2",
+          tags: [],
+          requestId: "request-1",
+        },
+      ]
+    );
+    assert.deepEqual(dashboard.summary, { published: 1, drafts: 0, review: 1, archived: 0, total: 2 });
+    assert.deepEqual(dashboard.reviewRequests, [
+      {
+        id: "request-1",
+        articleId: "article-2",
+        requestType: "publication",
+        status: "readyForReview",
+        writerSubject: "writer-123",
+        writerName: "Guest Writer",
+        createdAt: "2026-08-10T11:00:00Z",
+        version: 2,
+      },
+    ]);
+    assert.match(calls[0].url, /\/entries\?/);
+    assert.match(calls[0].url, /limit=100/);
+    assert.doesNotMatch(calls[0].url, /content_type=|include=|order=/);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.headers.authorization, "Bearer management-token");
+  });
+
+  it("authorizes admin article read routes before loading Contentful data", async () => {
+    let operationRan = false;
+    const handler = createContentfulAdminHandler({
+      getSession() {
+        return createSession(["writer"]);
+      },
+      operations: {
+        async listAdminArticles({ session }) {
+          operationRan = true;
+          return { articles: [], summary: { total: 0 }, requestedBy: session.subject };
+        },
+      },
+    });
+
+    const response = await handler({ method: "GET", path: "/articles" });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(parse(response), { articles: [], summary: { total: 0 }, requestedBy: "user-123" });
+    assert.equal(operationRan, true);
+  });
+
+  it("filters writer dashboard reads to published articles and that writer's workflow records", async () => {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(String(url));
+
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            items: [
+              {
+                sys: { id: "published-1", version: 5, publishedVersion: 4, contentType: { sys: { id: "article" } } },
+                fields: { title: { "pt-BR": "Published" } },
+              },
+              {
+                sys: { id: "own-review-1", version: 3, contentType: { sys: { id: "article" } } },
+                fields: { title: { "pt-BR": "Own review" } },
+              },
+              {
+                sys: { id: "other-review-1", version: 3, contentType: { sys: { id: "article" } } },
+                fields: { title: { "pt-BR": "Other review" } },
+              },
+              {
+                sys: { id: "unowned-draft-1", version: 2, contentType: { sys: { id: "article" } } },
+                fields: { title: { "pt-BR": "Unowned draft" } },
+              },
+              {
+                sys: { id: "request-own", version: 1, contentType: { sys: { id: "blogEditorialRequest" } } },
+                fields: {
+                  requestType: { "pt-BR": "publication" },
+                  status: { "pt-BR": "readyForReview" },
+                  article: { "pt-BR": { sys: { id: "own-review-1" } } },
+                  writerSubject: { "pt-BR": "writer-123" },
+                },
+              },
+              {
+                sys: { id: "request-other", version: 1, contentType: { sys: { id: "blogEditorialRequest" } } },
+                fields: {
+                  requestType: { "pt-BR": "publication" },
+                  status: { "pt-BR": "readyForReview" },
+                  article: { "pt-BR": { sys: { id: "other-review-1" } } },
+                  writerSubject: { "pt-BR": "writer-999" },
+                },
+              },
+            ],
+          };
+        },
+      };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const dashboard = await facade.listAdminArticles({ session: { subject: "writer-123", roles: ["writer"] } });
+
+    assert.deepEqual(
+      dashboard.articles.map((article) => [article.id, article.status, article.requestId]),
+      [
+        ["published-1", "published", undefined],
+        ["own-review-1", "review", "request-own"],
+      ]
+    );
+    assert.deepEqual(
+      dashboard.reviewRequests.map((request) => request.id),
+      ["request-own"]
+    );
+    assert.deepEqual(dashboard.summary, { published: 1, drafts: 0, review: 1, archived: 0, total: 2 });
+    assert.equal(calls.length, 1);
+    assert.doesNotMatch(calls[0], /content_type=|include=|order=/);
+  });
+
+  it("keeps dashboard article reads available when editorial workflow records are absent from the entry collection", async () => {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(String(url));
+
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            items: [
+              {
+                sys: { id: "article-1", version: 3, publishedVersion: 2, contentType: { sys: { id: "article" } } },
+                fields: { title: { "pt-BR": "Published" } },
+              },
+            ],
+          };
+        },
+      };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const dashboard = await facade.listAdminArticles({ session: createSession(["owner"]) });
+
+    assert.deepEqual(dashboard.articles.map((article) => [article.id, article.status]), [["article-1", "published"]]);
+    assert.deepEqual(dashboard.reviewRequests, []);
+    assert.deepEqual(dashboard.summary, { published: 1, drafts: 0, review: 0, archived: 0, total: 1 });
+    assert.equal(calls.length, 1);
+    assert.doesNotMatch(calls[0], /content_type=|include=|order=/);
+  });
+
   it("allows writer sessions to record submit-for-review workflow requests", async () => {
     const handler = createContentfulAdminHandler({
       getSession() {
@@ -291,5 +551,38 @@ describe("contentful admin handler", () => {
       assert.deepEqual(parse(response), expectedBody);
       assert.doesNotMatch(response.body, /CONTENTFUL|CLOUDINARY|key|secret|token|stack|raw/i);
     }
+  });
+
+  it("includes safe upstream status details for local admin debugging without leaking diagnostics", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession() {
+        return createSession(["writer"]);
+      },
+      env: { NODE_ENV: "development" },
+      operations: {
+        async createArticleDraft() {
+          throw new ContentfulManagementRequestError(400, {
+            sys: { id: "BadRequest" },
+            message: "The query you sent was invalid.",
+            requestId: "do-not-expose",
+            token: "do-not-expose",
+          });
+        },
+      },
+    });
+
+    const response = await handler({ method: "POST", path: "/articles", body: "{}" });
+
+    assert.equal(response.statusCode, 500);
+    assert.deepEqual(parse(response), {
+      error: "Admin request failed",
+      details: {
+        upstream: "contentful",
+        upstreamStatus: 400,
+        id: "BadRequest",
+        message: "The query you sent was invalid.",
+      },
+    });
+    assert.doesNotMatch(response.body, /do-not-expose|token|secret|api\.contentful\.com|stack|requestId/i);
   });
 });

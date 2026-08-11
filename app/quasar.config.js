@@ -86,6 +86,10 @@ export default configure(function (ctx) {
       // https: true
       port: 4242,
       proxy: {
+        "/api/admin/contentful": {
+          target: "http://localhost:3000",
+          changeOrigin: true,
+        },
         "/api": {
           target: "http://localhost:3000",
           changeOrigin: true,

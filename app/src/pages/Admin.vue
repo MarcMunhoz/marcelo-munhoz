@@ -11,8 +11,6 @@
         <q-btn flat no-caps align="left" icon="article" label="Articles" :class="{ active: activeSection === 'articles' }" @click="activeSection = 'articles'" />
         <q-btn flat no-caps align="left" icon="drafts" label="Drafts" :class="{ active: filters.status === 'draft' }" @click="setStatusFilter('draft')" />
         <q-btn flat no-caps align="left" icon="rate_review" label="Review" :class="{ active: filters.status === 'review' }" @click="setStatusFilter('review')" />
-        <q-btn flat no-caps align="left" icon="perm_media" label="Media" disable />
-        <q-btn flat no-caps align="left" icon="settings" label="Settings" disable />
       </aside>
 
       <section class="admin-workspace">
@@ -82,6 +80,8 @@
                 <q-btn unelevated color="blue-grey-8" icon="add" label="New article" @click="startNewArticle" />
               </div>
 
+              <q-banner v-if="dashboardError" class="feedback-error dashboard-feedback" rounded>{{ dashboardError }}</q-banner>
+
               <div class="article-filters">
                 <q-select v-model="filters.status" dense outlined clearable emit-value map-options label="Status" :options="statusOptions" />
                 <q-input v-model="filters.tag" dense outlined clearable label="Tag" />
@@ -95,6 +95,7 @@
                 row-key="id"
                 :rows="filteredArticles"
                 :columns="articleColumns"
+                :loading="loadingAction === 'articles'"
                 :pagination="{ rowsPerPage: 6 }"
                 no-data-label="No articles match the current filters"
               >
@@ -115,10 +116,10 @@
                     <q-btn dense flat round color="blue-grey-7" icon="edit" @click="editArticle(props.row)">
                       <q-tooltip>Edit article</q-tooltip>
                     </q-btn>
-                    <q-btn dense flat round color="blue-grey-7" icon="rate_review" :disable="props.row.status === 'published'" @click="editArticle(props.row)">
-                      <q-tooltip>Prepare for review</q-tooltip>
+                    <q-btn v-if="canPrepareReviewAction(props.row)" dense flat round color="blue-grey-7" icon="rate_review" @click="editArticle(props.row)">
+                      <q-tooltip>Edit draft before review</q-tooltip>
                     </q-btn>
-                    <q-btn dense flat round color="amber-9" icon="visibility_off" :disable="!props.row.id" @click="requestUnpublicationFromRow(props.row)">
+                    <q-btn v-if="canRequestUnpublicationAction(props.row)" dense flat round color="amber-9" icon="visibility_off" @click="requestUnpublicationFromRow(props.row)">
                       <q-tooltip>Request unpublication</q-tooltip>
                     </q-btn>
                   </q-td>
@@ -291,6 +292,7 @@ import {
   archiveArticle,
   createArticleDraft,
   deleteArticle,
+  listAdminArticles,
   listMediaAssets,
   publishArticle,
   requestArticleUnpublication,
@@ -305,12 +307,14 @@ import {
   applyArticleResponseToForm,
   articleToForm,
   buildArticlePayload,
+  canPrepareReviewAction,
   canConfirmArticleDeletion,
+  canRequestUnpublicationAction,
   createEmptyArticleForm,
   filterAdminArticles,
   ownerReviewQueues,
   removeArticleById,
-  sampleAdminArticles,
+  reconcileAdminDashboardData,
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
@@ -323,6 +327,8 @@ export default defineComponent({
       session: null,
       activeSection: "dashboard",
       articles: [],
+      adminSummary: summarizeArticleStatuses([]),
+      reviewRequests: [],
       articleForm: createEmptyArticleForm(),
       filters: {
         search: "",
@@ -342,6 +348,7 @@ export default defineComponent({
       statusMessage: "",
       feedbackMessage: "",
       feedbackTone: "info",
+      dashboardError: "",
       loadingAction: "",
       articleColumns: [
         { name: "title", label: "Title", field: "title", align: "left", sortable: true },
@@ -373,7 +380,7 @@ export default defineComponent({
       }
 
       if (this.session.preview) {
-        return "Writer preview";
+        return isOwnerSession(this.session) ? "Owner preview" : "Writer preview";
       }
 
       return isOwnerSession(this.session) ? "Owner" : "Writer";
@@ -382,7 +389,7 @@ export default defineComponent({
       return isOwnerSession(this.session);
     },
     dashboardSummary() {
-      return summarizeArticleStatuses(this.articles);
+      return this.adminSummary || summarizeArticleStatuses(this.articles);
     },
     ownerQueues() {
       return ownerReviewQueues(this.articles);
@@ -409,8 +416,27 @@ export default defineComponent({
     openLogin() {
       openAdminLogin();
     },
-    loadArticleDashboard() {
-      this.articles = sampleAdminArticles;
+    async loadArticleDashboard() {
+      if (!this.canWrite) {
+        return;
+      }
+
+      this.dashboardError = "";
+      this.loadingAction = "articles";
+
+      try {
+        const dashboard = reconcileAdminDashboardData(await listAdminArticles({ session: this.session }));
+        this.articles = dashboard.articles;
+        this.adminSummary = dashboard.summary;
+        this.reviewRequests = dashboard.reviewRequests;
+      } catch (error) {
+        this.articles = [];
+        this.adminSummary = summarizeArticleStatuses([]);
+        this.reviewRequests = [];
+        this.dashboardError = adminUserMessage(error);
+      } finally {
+        this.loadingAction = "";
+      }
     },
     setStatusFilter(status) {
       this.filters.status = this.filters.status === status ? "" : status;
@@ -481,6 +507,8 @@ export default defineComponent({
     articlePayload() {
       return buildArticlePayload(this.articleForm);
     },
+    canPrepareReviewAction,
+    canRequestUnpublicationAction,
     async openMediaLibrary() {
       this.mediaDialogOpen = true;
       this.mediaError = "";
@@ -551,6 +579,7 @@ export default defineComponent({
           : await createArticleDraft({ article: payload, session: this.session });
 
         this.applyArticleResponse(response);
+        await this.loadArticleDashboard();
         this.statusMessage = "Draft saved";
         this.showFeedback("Draft saved.", "success");
       } catch (error) {
@@ -569,6 +598,7 @@ export default defineComponent({
           notes: "",
           session: this.session,
         });
+        await this.loadArticleDashboard();
         this.showFeedback("Submitted for owner review.", "success");
       } catch (error) {
         this.handleAdminError(error);
@@ -590,6 +620,7 @@ export default defineComponent({
           notes: "",
           session: this.session,
         });
+        await this.loadArticleDashboard();
         this.showFeedback("Unpublication request sent.", "success");
       } catch (error) {
         this.handleAdminError(error);
@@ -618,6 +649,7 @@ export default defineComponent({
           session: this.session,
         });
         afterSuccess?.();
+        await this.loadArticleDashboard();
         this.showFeedback(successMessage, "success");
       } catch (error) {
         this.handleAdminError(error);
@@ -687,12 +719,14 @@ export default defineComponent({
   background: #f2f4f3;
   color: #263238;
   min-height: inherit;
+  overflow-x: hidden;
 }
 
 .admin-shell {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   min-height: calc(100vh - 98px);
+  width: 100%;
 }
 
 .admin-sidebar {
@@ -726,6 +760,8 @@ export default defineComponent({
 }
 
 .admin-workspace {
+  min-width: 0;
+  overflow-x: hidden;
   padding: 22px;
 }
 
@@ -742,6 +778,7 @@ export default defineComponent({
 
 .admin-topbar {
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   margin-bottom: 20px;
 
@@ -754,10 +791,15 @@ export default defineComponent({
 
 .admin-topbar-actions {
   align-items: center;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .admin-search {
-  min-width: 260px;
+  flex: 1 1 240px;
+  min-width: min(260px, 100%);
 }
 
 .admin-kicker {
@@ -797,7 +839,7 @@ export default defineComponent({
 .status-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   margin-bottom: 18px;
 }
 
@@ -835,12 +877,13 @@ export default defineComponent({
 .admin-main-grid {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .article-queue-panel,
 .owner-review-panel,
 .editor-panel {
+  min-width: 0;
   padding: 16px;
 }
 
@@ -851,7 +894,7 @@ export default defineComponent({
 .owner-queue-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .owner-queue {
@@ -911,12 +954,17 @@ export default defineComponent({
 
 .article-filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin-bottom: 12px;
 }
 
 .article-table {
   border: 1px solid #e0e6e8;
+  overflow-x: auto;
+}
+
+.dashboard-feedback {
+  margin-bottom: 12px;
 }
 
 .tag-list {
@@ -955,7 +1003,7 @@ export default defineComponent({
 .media-actions {
   display: grid;
   gap: 10px;
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
 }
 
 .media-upload {
@@ -1042,6 +1090,36 @@ export default defineComponent({
 .feedback-info {
   background: #eef3f5;
   color: #455a64;
+}
+
+@media (max-width: 900px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .admin-brand {
+    grid-column: 1 / -1;
+  }
+
+  .admin-workspace {
+    padding: 16px;
+  }
+
+  .owner-queue-row,
+  .form-row,
+  .media-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-heading,
+  .admin-topbar-actions {
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 1100px) {

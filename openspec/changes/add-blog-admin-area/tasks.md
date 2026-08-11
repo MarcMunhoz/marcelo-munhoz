@@ -78,15 +78,15 @@
 
 ## 9. Live Admin Data And UX Completion
 
-- [ ] 9.1 Add a server-side admin read facade for real Contentful article listing, status metadata, and workflow records without exposing arbitrary Contentful queries.
-- [ ] 9.2 Add authenticated admin API read routes for dashboard/article data that require server-side writer or owner authorization before calling Contentful.
-- [ ] 9.3 Replace frontend `sampleAdminArticles` dashboard/list/review data with API-loaded admin data while keeping deterministic mock fixtures only in tests.
-- [ ] 9.4 Wire dashboard counts, article table rows, and owner review queues to real article and editorial request state.
-- [ ] 9.5 Ensure article-row actions use real entry/request identifiers and either perform the supported backend action or are hidden/disabled with a clear pending state.
-- [ ] 9.6 Fix admin layout responsiveness, horizontal overflow, and disabled navigation states so unfinished sections are intentionally hidden or clearly unavailable.
-- [ ] 9.7 Keep the local preview role switch dev-only and verify production admin reads/mutations still require Netlify Identity authorization.
-- [ ] 9.8 Add or update frontend and backend tests for real admin data loading, empty/error states, role filtering, and dev-only preview behavior.
-- [ ] 9.9 Re-run the project test suite, lint, build validation, and `openspec validate add-blog-admin-area --strict`.
+- [x] 9.1 Add a server-side admin read facade for real Contentful article listing, status metadata, and workflow records without exposing arbitrary Contentful queries.
+- [x] 9.2 Add authenticated admin API read routes for dashboard/article data that require server-side writer or owner authorization before calling Contentful.
+- [x] 9.3 Replace frontend `sampleAdminArticles` dashboard/list/review data with API-loaded admin data while keeping deterministic mock fixtures only in tests.
+- [x] 9.4 Wire dashboard counts, article table rows, and owner review queues to real article and editorial request state.
+- [x] 9.5 Ensure article-row actions use real entry/request identifiers and either perform the supported backend action or are hidden/disabled with a clear pending state.
+- [x] 9.6 Fix admin layout responsiveness, horizontal overflow, and disabled navigation states so unfinished sections are intentionally hidden or clearly unavailable.
+- [x] 9.7 Keep the local preview role switch dev-only and verify production admin reads/mutations still require Netlify Identity authorization.
+- [x] 9.8 Add or update frontend and backend tests for real admin data loading, empty/error states, role filtering, and dev-only preview behavior.
+- [x] 9.9 Re-run the project test suite, lint, build validation, and `openspec validate add-blog-admin-area --strict`.
 
 ## 10. Documentation And Rollout
 

@@ -15,53 +15,6 @@ export const createEmptyArticleForm = () => ({
   version: null,
 });
 
-export const sampleAdminArticles = [
-  {
-    id: "article-admin-dashboard",
-    title: "Building the blog admin dashboard",
-    slug: "building-the-blog-admin-dashboard",
-    status: "draft",
-    tags: ["admin", "vue"],
-    createAt: "2026-08-11",
-    author: "Marcelo Munhoz",
-    version: 3,
-    views: null,
-  },
-  {
-    id: "article-contentful-flow",
-    title: "Contentful publishing flow",
-    slug: "contentful-publishing-flow",
-    status: "review",
-    tags: ["contentful"],
-    createAt: "2026-08-10",
-    author: "Guest Writer",
-    version: 5,
-    views: null,
-  },
-  {
-    id: "article-public-blog",
-    title: "Public blog rendering",
-    slug: "public-blog-rendering",
-    status: "published",
-    tags: ["blog"],
-    createAt: "2026-08-08",
-    author: "Marcelo Munhoz",
-    version: 12,
-    views: null,
-  },
-  {
-    id: "article-cloudinary-media",
-    title: "Cloudinary media workflow",
-    slug: "cloudinary-media-workflow",
-    status: "unpublicationRequested",
-    tags: ["media", "cloudinary"],
-    createAt: "2026-08-07",
-    author: "Guest Writer",
-    version: 2,
-    views: null,
-  },
-];
-
 export const summarizeArticleStatuses = (articles = []) =>
   articles.reduce(
     (summary, article) => {
@@ -82,6 +35,16 @@ export const summarizeArticleStatuses = (articles = []) =>
     },
     { published: 0, drafts: 0, review: 0, archived: 0, total: 0 }
   );
+
+export const reconcileAdminDashboardData = (payload = {}) => {
+  const articles = Array.isArray(payload.articles) ? payload.articles : [];
+
+  return {
+    articles,
+    summary: payload.summary || summarizeArticleStatuses(articles),
+    reviewRequests: Array.isArray(payload.reviewRequests) ? payload.reviewRequests : [],
+  };
+};
 
 export const filterAdminArticles = (articles = [], filters = {}) => {
   const search = normalize(filters.search);
@@ -141,6 +104,10 @@ export const updateArticleStatusById = (articles = [], articleId, status) =>
 export const removeArticleById = (articles = [], articleId) => articles.filter((article) => article.id !== articleId);
 
 export const canConfirmArticleDeletion = (article, confirmation) => Boolean(article?.title && confirmation === article.title);
+
+export const canPrepareReviewAction = (article = {}) => Boolean(article.id && normalize(article.status) !== "published");
+
+export const canRequestUnpublicationAction = (article = {}) => Boolean(article.id && normalize(article.status) === "published");
 
 export const buildArticlePayload = (form = {}) => {
   const thumbnail = form.thumbnail || (form.thumbnailPublicId || form.thumbnailUrl

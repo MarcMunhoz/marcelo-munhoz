@@ -101,9 +101,12 @@ export class ContentfulVersionConflictError extends Error {
 }
 
 export class ContentfulManagementRequestError extends Error {
-  constructor(statusCode) {
+  constructor(statusCode, payload = {}) {
     super(`Contentful Management API returned ${statusCode}`);
     this.name = "ContentfulManagementRequestError";
+    this.upstreamStatusCode = statusCode;
+    this.upstreamErrorId = typeof payload?.sys?.id === "string" ? payload.sys.id.slice(0, 80) : undefined;
+    this.upstreamMessage = typeof payload?.message === "string" ? payload.message.slice(0, 240) : undefined;
     this.statusCode = 500;
     this.publicError = "Admin request failed";
   }
@@ -140,6 +143,25 @@ const logAdminError = (logger, message) => {
   logger?.error?.(message);
 };
 
+const localErrorDetails = (error, env = {}) => {
+  if (env.NODE_ENV === "production") {
+    return {};
+  }
+
+  if (error?.name === "ContentfulManagementRequestError" && error.upstreamStatusCode) {
+    return {
+      details: {
+        upstream: "contentful",
+        upstreamStatus: error.upstreamStatusCode,
+        ...(error.upstreamErrorId ? { id: error.upstreamErrorId } : {}),
+        ...(error.upstreamMessage ? { message: error.upstreamMessage } : {}),
+      },
+    };
+  }
+
+  return {};
+};
+
 const notImplementedOperation = (operation) => async () => {
   throw new ContentfulAdminNotImplementedError(operation);
 };
@@ -159,6 +181,20 @@ const definedEntries = (entries) => Object.fromEntries(entries.filter(([, value]
 const tagsFromIds = (tags = []) => tags.map((id) => contentfulLink("Tag", id));
 
 const thumbnailFromData = (data = {}) => data.thumbnail || (Array.isArray(data.cloudinary) ? data.cloudinary[0] : undefined);
+
+const firstLocalizedValue = (fields = {}, fieldId, locale) => {
+  const value = fields[fieldId];
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, locale)) {
+    return value[locale];
+  }
+
+  return Object.values(value)[0];
+};
 
 const articleFieldsFromData = (data = {}, locale) =>
   definedEntries([
@@ -280,6 +316,121 @@ const normalizeCloudinaryAsset = (asset = {}) => ({
   created_at: asset.created_at,
 });
 
+const normalizedTags = (metadata = {}) => (metadata.tags || []).map((tag) => tag?.sys?.id).filter(Boolean);
+
+const contentTypeIdFromEntry = (entry = {}) => entry.sys?.contentType?.sys?.id || "";
+
+const normalizedEntryStatus = (sys = {}) => {
+  if (sys.archivedVersion) {
+    return "archived";
+  }
+
+  if (sys.publishedVersion) {
+    return "published";
+  }
+
+  return "draft";
+};
+
+const normalizedAuthor = (author) => {
+  const fields = author?.fields || {};
+  const name = firstLocalizedValue(fields, "name", DEFAULT_CONTENTFUL_LOCALE);
+
+  return {
+    author: name || author?.sys?.id || "",
+    authorEntryId: author?.sys?.id || "",
+  };
+};
+
+const normalizedArticle = (entry = {}, locale) => {
+  const fields = entry.fields || {};
+  const authorData = normalizedAuthor(firstLocalizedValue(fields, "author", locale));
+
+  return {
+    id: entry.sys?.id || "",
+    title: firstLocalizedValue(fields, "title", locale) || "",
+    slug: firstLocalizedValue(fields, "slug", locale) || "",
+    description: firstLocalizedValue(fields, "description", locale) || "",
+    body: firstLocalizedValue(fields, "body", locale) || "",
+    createAt: firstLocalizedValue(fields, "createAt", locale) || entry.sys?.createdAt || "",
+    thumbnail: firstLocalizedValue(fields, "thumbnail", locale) || firstLocalizedValue(fields, "cloudinary", locale)?.[0],
+    alt: firstLocalizedValue(fields, "alt", locale) || "",
+    ...authorData,
+    tags: normalizedTags(entry.metadata),
+    status: normalizedEntryStatus(entry.sys),
+    version: entry.sys?.version || null,
+    updatedAt: entry.sys?.updatedAt || "",
+  };
+};
+
+const normalizedEditorialRequest = (entry = {}, locale) => {
+  const fields = entry.fields || {};
+
+  return {
+    id: entry.sys?.id || "",
+    articleId: firstLocalizedValue(fields, "article", locale)?.sys?.id || "",
+    requestType: firstLocalizedValue(fields, "requestType", locale) || "",
+    status: firstLocalizedValue(fields, "status", locale) || "",
+    writerSubject: firstLocalizedValue(fields, "writerSubject", locale) || "",
+    writerName: firstLocalizedValue(fields, "writerName", locale) || "",
+    createdAt: firstLocalizedValue(fields, "createdAt", locale) || entry.sys?.createdAt || "",
+    version: entry.sys?.version || null,
+  };
+};
+
+const openReviewRequest = (request = {}) => request.status === "readyForReview";
+
+const statusFromRequest = (request = {}) => {
+  if (!openReviewRequest(request)) {
+    return null;
+  }
+
+  if (request.requestType === "publication") {
+    return "review";
+  }
+
+  if (request.requestType === "unpublication") {
+    return "unpublicationRequested";
+  }
+
+  return null;
+};
+
+const summarizeAdminArticles = (articles = []) =>
+  articles.reduce(
+    (summary, article) => {
+      if (article.status === "published") {
+        summary.published += 1;
+      } else if (article.status === "draft" || article.status === "unpublished" || article.status === "unpublicationRequested") {
+        summary.drafts += 1;
+      } else if (article.status === "review") {
+        summary.review += 1;
+      } else if (article.status === "archived") {
+        summary.archived += 1;
+      }
+
+      summary.total += 1;
+      return summary;
+    },
+    { published: 0, drafts: 0, review: 0, archived: 0, total: 0 }
+  );
+
+const requestByArticleId = (requests = []) => {
+  const index = new Map();
+
+  for (const request of requests) {
+    if (!request.articleId || !openReviewRequest(request)) {
+      continue;
+    }
+
+    if (!index.has(request.articleId)) {
+      index.set(request.articleId, request);
+    }
+  }
+
+  return index;
+};
+
 export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = globalThis.fetch, nowTimestamp = () => Math.floor(Date.now() / 1000) } = {}) => {
   const readCloudinaryJson = async (response) => {
     const payload = await readJson(response);
@@ -371,7 +522,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
     }
 
     if (!response.ok) {
-      throw new ContentfulManagementRequestError(response.status);
+      throw new ContentfulManagementRequestError(response.status, payload);
     }
 
     return payload;
@@ -391,6 +542,40 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         },
         body: articlePayloadFromData(data, config.locale),
       });
+    },
+    async listAdminArticles({ session } = {}) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const entryParams = new URLSearchParams({
+        limit: "100",
+      });
+      const entryPayload = await request({ method: "GET", path: `/entries?${entryParams}` });
+      const entries = entryPayload.items || [];
+      const articleEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "article");
+      const workflowEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "blogEditorialRequest");
+      const allReviewRequests = workflowEntries.map((entry) => normalizedEditorialRequest(entry, config.locale));
+      const reviewRequests = allReviewRequests.filter((request) => isOwner(session) || request.writerSubject === session?.subject);
+      const requestsByArticle = requestByArticleId(reviewRequests);
+      const articles = articleEntries
+        .map((entry) => {
+          const article = normalizedArticle(entry, config.locale);
+          const request = requestsByArticle.get(article.id);
+          const requestStatus = statusFromRequest(request);
+
+          return {
+            ...article,
+            ...(requestStatus ? { status: requestStatus } : {}),
+            ...(request?.id ? { requestId: request.id } : {}),
+            ...(request?.writerSubject ? { writerSubject: request.writerSubject } : {}),
+            ...(request?.writerName ? { writerName: request.writerName } : {}),
+          };
+        })
+        .filter((article) => isOwner(session) || article.status === "published" || article.writerSubject === session?.subject);
+
+      return {
+        articles,
+        summary: summarizeAdminArticles(articles),
+        reviewRequests,
+      };
     },
     async updateArticleDraft({ articleId, data }) {
       return request({
@@ -517,7 +702,7 @@ export const createContentfulAdminHandler = ({
           logAdminError(logger, "Contentful admin request failed");
         }
 
-        return jsonResponse(error.statusCode, { error: error.publicError });
+        return jsonResponse(error.statusCode, { error: error.publicError, ...localErrorDetails(error, env) });
       }
 
       logAdminError(logger, "Contentful admin request failed");
@@ -543,6 +728,15 @@ export const createContentfulAdminHandler = ({
         role: "writer",
         operation: adminOperations.createArticleDraft,
         payload: { data },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/articles") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.listAdminArticles,
+        payload: { query },
       });
     }
 

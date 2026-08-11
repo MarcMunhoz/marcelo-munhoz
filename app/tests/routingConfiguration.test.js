@@ -53,6 +53,14 @@ describe("routing configuration", () => {
     assert.match(serverSource, /app\.use\("\/api\/contentful", contentfulRoutes\)/);
   });
 
+  it("proxies local admin API calls from the Quasar dev server to the local middleware server", () => {
+    const quasarConfig = read("../quasar.config.js");
+
+    assert.match(quasarConfig, /devServer:\s*\{/);
+    assert.match(quasarConfig, /"\/api\/admin\/contentful"/);
+    assert.match(quasarConfig, /target:\s*"http:\/\/localhost:3000"/);
+  });
+
   it("does not inject Contentful credentials into the frontend build config", () => {
     const quasarConfig = read("../quasar.config.js");
 
