@@ -18,8 +18,7 @@
 
       <q-card class="w-[350px]" v-for="article in articlesTag" :key="article.id">
         <router-link :to="{ name: 'Artigo', params: { slug: article.fields.slug } }">
-          <img v-if="article.fields.cloudinary" :src="`https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/${article.fields.cloudinary[0].public_id}`" />
-          <img v-else src="https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/marcelo-munhoz-website/no-thumbnail.jpg" />
+          <img :src="articleCardImageUrl(article.fields)" :alt="article.fields.alt || article.fields.title" />
 
           <q-card-section>
             <div class="text-h6">{{ article.fields.title }}</div>
@@ -37,6 +36,7 @@
 <script>
 import { defineComponent, ref } from "vue";
 import { buildApiUrl } from "../utils/apiBase.js";
+import { articleCardImageUrl } from "../utils/contentfulImages.js";
 
 export default defineComponent({
   name: "ArticlesTags",
@@ -64,6 +64,7 @@ export default defineComponent({
     };
   },
   methods: {
+    articleCardImageUrl,
     async setData() {
       this.progress = true;
 

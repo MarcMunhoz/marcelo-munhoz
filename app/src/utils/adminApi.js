@@ -1,6 +1,7 @@
 import { buildApiUrl } from "./apiBase.js";
 
 const ADMIN_ARTICLES_PATH = "/api/admin/contentful/articles";
+const ADMIN_MEDIA_PATH = "/media/assets";
 
 const parseJson = async (response) => {
   try {
@@ -75,6 +76,22 @@ export const requestArticleUnpublication = ({ articleId, version, notes, session
     path: `/articles/${encodeURIComponent(articleId)}/unpublication-requests`,
     method: "POST",
     body: { version, notes },
+    session,
+    fetchImpl,
+  });
+
+export const listMediaAssets = ({ session, maxResults = 24, fetchImpl } = {}) =>
+  adminRequest({
+    path: `${ADMIN_MEDIA_PATH}?max_results=${encodeURIComponent(maxResults)}`,
+    session,
+    fetchImpl,
+  });
+
+export const uploadMediaAsset = ({ file, filename, session, fetchImpl }) =>
+  adminRequest({
+    path: "/media/upload",
+    method: "POST",
+    body: { file, filename },
     session,
     fetchImpl,
   });

@@ -1,10 +1,13 @@
 export {
   canWriteDrafts,
+  CloudinaryMediaConfigurationError,
+  CloudinaryMediaRequestError,
   ContentfulAdminConfigurationError,
   ContentfulAdminNotImplementedError,
   contentfulAdminHandler,
   ContentfulManagementRequestError,
   ContentfulVersionConflictError,
+  createCloudinaryMediaFacade,
   createContentfulAdminHandler,
   createContentfulManagementFacade,
   hasRole,

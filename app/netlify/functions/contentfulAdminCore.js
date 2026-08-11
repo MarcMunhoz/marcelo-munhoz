@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const jsonResponse = (statusCode, payload) => ({
   statusCode,
   headers: {
@@ -8,8 +10,10 @@ const jsonResponse = (statusCode, payload) => ({
 
 const CONTENTFUL_MANAGEMENT_HOST = "https://api.contentful.com";
 const CONTENTFUL_MANAGEMENT_CONTENT_TYPE = "application/vnd.contentful.management.v1+json";
+const CLOUDINARY_API_HOST = "https://api.cloudinary.com";
 const DEFAULT_CONTENTFUL_ENVIRONMENT = "master";
 const DEFAULT_CONTENTFUL_LOCALE = "en-US";
+const DEFAULT_CLOUDINARY_FOLDER = "marcelo-munhoz-website";
 
 const normalizePath = (path = "") => {
   const cleanPath = path.split("?")[0] || "/";
@@ -95,6 +99,24 @@ export class ContentfulAdminNotImplementedError extends Error {
   }
 }
 
+export class CloudinaryMediaConfigurationError extends Error {
+  constructor() {
+    super("Cloudinary media runtime configuration is missing");
+    this.name = "CloudinaryMediaConfigurationError";
+    this.statusCode = 500;
+    this.publicError = "Media configuration error";
+  }
+}
+
+export class CloudinaryMediaRequestError extends Error {
+  constructor(statusCode) {
+    super(`Cloudinary API returned ${statusCode}`);
+    this.name = "CloudinaryMediaRequestError";
+    this.statusCode = 500;
+    this.publicError = "Media request failed";
+  }
+}
+
 const notImplementedOperation = (operation) => async () => {
   throw new ContentfulAdminNotImplementedError(operation);
 };
@@ -113,6 +135,8 @@ const definedEntries = (entries) => Object.fromEntries(entries.filter(([, value]
 
 const tagsFromIds = (tags = []) => tags.map((id) => contentfulLink("Tag", id));
 
+const thumbnailFromData = (data = {}) => data.thumbnail || (Array.isArray(data.cloudinary) ? data.cloudinary[0] : undefined);
+
 const articleFieldsFromData = (data = {}, locale) =>
   definedEntries([
     ["title", localized(data.title, locale)],
@@ -120,6 +144,8 @@ const articleFieldsFromData = (data = {}, locale) =>
     ["description", localized(data.description, locale)],
     ["body", localized(data.body, locale)],
     ["createAt", localized(data.createAt, locale)],
+    ["thumbnail", localized(thumbnailFromData(data), locale)],
+    ["alt", localized(data.alt, locale)],
     ["author", data.author ? localized(contentfulLink("Entry", data.author), locale) : undefined],
     ["cloudinary", Array.isArray(data.cloudinary) ? localized(data.cloudinary, locale) : undefined],
   ]);
@@ -138,7 +164,34 @@ const articlePayloadFromData = (data = {}, locale) => {
   };
 };
 
+const editorialRequestPayloadFromData = ({ requestType, articleId, session = {}, now, locale }) => ({
+  fields: definedEntries([
+    ["requestType", localized(requestType, locale)],
+    ["status", localized("readyForReview", locale)],
+    ["article", localized(contentfulLink("Entry", articleId), locale)],
+    ["writerSubject", localized(session.subject, locale)],
+    ["writerName", localized(session.name || "Writer", locale)],
+    ["createdAt", localized(now, locale)],
+    ["updatedAt", localized(now, locale)],
+  ]),
+});
+
 const managementTokenFromEnv = (env) => env.CONTENTFUL_MANAGEMENT_KEY || env.CONTENTFUL_MANAGEMENT_TOKEN;
+
+const cloudinaryFolderFromEnv = (env = {}) => env.CLOUDINARY_UPLOAD_FOLDER || env.CLOUDINARY_FOLDER || DEFAULT_CLOUDINARY_FOLDER;
+
+const cloudinaryConfigFromEnv = (env = {}, fetchImpl) => {
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET || typeof fetchImpl !== "function") {
+    throw new CloudinaryMediaConfigurationError();
+  }
+
+  return {
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    apiSecret: env.CLOUDINARY_API_SECRET,
+    folder: cloudinaryFolderFromEnv(env),
+  };
+};
 
 const managementConfigFromEnv = (env = {}, fetchImpl) => {
   const token = managementTokenFromEnv(env);
@@ -177,7 +230,103 @@ const readJson = async (response) => {
   }
 };
 
-export const createContentfulManagementFacade = ({ env = process.env, fetchImpl = globalThis.fetch } = {}) => {
+const safeMaxResults = (value) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : 24;
+};
+
+const basicAuth = (apiKey, apiSecret) => `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`;
+
+const signedParams = (params = {}, apiSecret) => {
+  const signatureBase = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  return createHash("sha1").update(`${signatureBase}${apiSecret}`).digest("hex");
+};
+
+const normalizeCloudinaryAsset = (asset = {}) => ({
+  public_id: asset.public_id,
+  secure_url: asset.secure_url || asset.url,
+  url: asset.secure_url || asset.url,
+  width: asset.width,
+  height: asset.height,
+  format: asset.format,
+  created_at: asset.created_at,
+});
+
+export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = globalThis.fetch, nowTimestamp = () => Math.floor(Date.now() / 1000) } = {}) => {
+  const readCloudinaryJson = async (response) => {
+    const payload = await readJson(response);
+
+    if (!response.ok) {
+      throw new CloudinaryMediaRequestError(response.status);
+    }
+
+    return payload;
+  };
+
+  return {
+    async listMedia({ query = {} } = {}) {
+      const config = cloudinaryConfigFromEnv(env, fetchImpl);
+      const url = new URL(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/resources/image/upload`);
+      url.searchParams.set("prefix", config.folder);
+      url.searchParams.set("max_results", String(safeMaxResults(query.max_results)));
+
+      const payload = await readCloudinaryJson(
+        await fetchImpl(url, {
+          method: "GET",
+          headers: {
+            authorization: basicAuth(config.apiKey, config.apiSecret),
+          },
+        })
+      );
+
+      return {
+        assets: (payload.resources || []).map(normalizeCloudinaryAsset),
+        ...(payload.next_cursor ? { next_cursor: payload.next_cursor } : {}),
+      };
+    },
+    async uploadMedia({ data = {} } = {}) {
+      const config = cloudinaryConfigFromEnv(env, fetchImpl);
+
+      if (!data.file || !String(data.file).startsWith("data:")) {
+        throw new CloudinaryMediaRequestError(422);
+      }
+
+      const timestamp = String(nowTimestamp());
+      const uploadParams = {
+        folder: config.folder,
+        timestamp,
+        unique_filename: "true",
+        use_filename: "true",
+      };
+      const form = new FormData();
+      form.set("file", data.file);
+      form.set("folder", uploadParams.folder);
+      form.set("timestamp", uploadParams.timestamp);
+      form.set("unique_filename", uploadParams.unique_filename);
+      form.set("use_filename", uploadParams.use_filename);
+      form.set("api_key", config.apiKey);
+      form.set("signature", signedParams(uploadParams, config.apiSecret));
+
+      const payload = await readCloudinaryJson(
+        await fetchImpl(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/image/upload`, {
+          method: "POST",
+          body: form,
+        })
+      );
+
+      return {
+        asset: normalizeCloudinaryAsset(payload),
+      };
+    },
+  };
+};
+
+export const createContentfulManagementFacade = ({ env = process.env, fetchImpl = globalThis.fetch, now = () => new Date().toISOString() } = {}) => {
   const request = async ({ method, path, body, headers = {} }) => {
     const config = managementConfigFromEnv(env, fetchImpl);
     const url = new URL(`${CONTENTFUL_MANAGEMENT_HOST}/spaces/${config.spaceId}/environments/${config.environmentId}${path}`);
@@ -266,6 +415,42 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         },
       });
     },
+    async submitArticleForReview({ articleId, session }) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+
+      return request({
+        method: "POST",
+        path: "/entries",
+        headers: {
+          "x-contentful-content-type": "blogEditorialRequest",
+        },
+        body: editorialRequestPayloadFromData({
+          requestType: "publication",
+          articleId,
+          session,
+          now: now(),
+          locale: config.locale,
+        }),
+      });
+    },
+    async requestUnpublication({ articleId, session }) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+
+      return request({
+        method: "POST",
+        path: "/entries",
+        headers: {
+          "x-contentful-content-type": "blogEditorialRequest",
+        },
+        body: editorialRequestPayloadFromData({
+          requestType: "unpublication",
+          articleId,
+          session,
+          now: now(),
+          locale: config.locale,
+        }),
+      });
+    },
   };
 };
 
@@ -279,9 +464,10 @@ export const createContentfulAdminHandler = ({
   logger = console,
 } = {}) => {
   const adminOperations = {
-    ...createContentfulManagementFacade({ env, fetchImpl }),
     submitArticleForReview: notImplementedOperation("submitArticleForReview"),
     requestUnpublication: notImplementedOperation("requestUnpublication"),
+    ...createContentfulManagementFacade({ env, fetchImpl }),
+    ...createCloudinaryMediaFacade({ env, fetchImpl }),
     ...operations,
   };
 
@@ -302,8 +488,8 @@ export const createContentfulAdminHandler = ({
       return jsonResponse(200, await operation({ ...payload, session }));
     } catch (error) {
       if (error?.publicError && error?.statusCode) {
-        if (error instanceof ContentfulAdminConfigurationError) {
-          logger.error("Contentful admin runtime configuration is missing");
+        if (error instanceof ContentfulAdminConfigurationError || error instanceof CloudinaryMediaConfigurationError) {
+          logger.error(error.message);
         } else if (!(error instanceof ContentfulVersionConflictError) && !(error instanceof ContentfulAdminNotImplementedError)) {
           logger.error("Contentful admin request failed:", error?.message || error);
         }
@@ -333,6 +519,24 @@ export const createContentfulAdminHandler = ({
         session,
         role: "writer",
         operation: adminOperations.createArticleDraft,
+        payload: { data },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/media/assets") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.listMedia,
+        payload: { query },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath === "/media/upload") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.uploadMedia,
         payload: { data },
       });
     }

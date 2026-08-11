@@ -59,6 +59,21 @@ describe("routing configuration", () => {
     assert.doesNotMatch(quasarConfig, /CONTENTFUL_DELIVERY_KEY|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE_ID/);
   });
 
+  it("keeps Cloudinary write credentials out of frontend source", () => {
+    const frontendFiles = [
+      "../src/pages/Admin.vue",
+      "../src/utils/adminApi.js",
+      "../src/utils/adminDashboard.js",
+      "../src/utils/contentfulImages.js",
+      "../quasar.config.js",
+    ];
+
+    for (const file of frontendFiles) {
+      const source = read(file);
+      assert.doesNotMatch(source, /CLOUDINARY_API_KEY|CLOUDINARY_API_SECRET|CLOUDINARY_UPLOAD_PRESET|api_secret/);
+    }
+  });
+
   it("keeps the Function free from Contentful SDK bundling", () => {
     const proxySource = read("../netlify/functions/contentfulProxyCore.js");
 
@@ -78,5 +93,13 @@ describe("routing configuration", () => {
 
     assert.match(functionSource, /from "\.\/contentfulAdminCore\.js"/);
     assert.doesNotMatch(functionSource, /\.\.\/\.\.\//);
+  });
+
+  it("does not accept browser-supplied Cloudinary credentials in the admin media facade", () => {
+    const adminSource = read("../netlify/functions/contentfulAdminCore.js");
+
+    assert.match(adminSource, /CLOUDINARY_API_KEY/);
+    assert.match(adminSource, /CLOUDINARY_API_SECRET/);
+    assert.doesNotMatch(adminSource, /data\.CLOUDINARY_API_KEY|data\.CLOUDINARY_API_SECRET|query\.CLOUDINARY_API_KEY|query\.CLOUDINARY_API_SECRET/);
   });
 });

@@ -1,146 +1,266 @@
 <template>
-  <q-page class="admin-page q-pa-md">
+  <q-page class="admin-page">
     <section class="admin-shell">
-      <header class="admin-header">
-        <div>
-          <p class="admin-kicker">Blog admin</p>
-          <h1>Editorial desk</h1>
+      <aside class="admin-sidebar">
+        <div class="admin-brand">
+          <q-icon name="edit_note" size="28px" />
+          <span>Admin</span>
         </div>
 
-        <div class="admin-session">
-          <q-icon :name="session ? 'edit_note' : 'lock'" size="24px" />
+        <q-btn flat no-caps align="left" icon="dashboard" label="Dashboard" :class="{ active: activeSection === 'dashboard' }" @click="activeSection = 'dashboard'" />
+        <q-btn flat no-caps align="left" icon="article" label="Articles" :class="{ active: activeSection === 'articles' }" @click="activeSection = 'articles'" />
+        <q-btn flat no-caps align="left" icon="drafts" label="Drafts" :class="{ active: filters.status === 'draft' }" @click="setStatusFilter('draft')" />
+        <q-btn flat no-caps align="left" icon="rate_review" label="Review" :class="{ active: filters.status === 'review' }" @click="setStatusFilter('review')" />
+        <q-btn flat no-caps align="left" icon="perm_media" label="Media" disable />
+        <q-btn flat no-caps align="left" icon="settings" label="Settings" disable />
+      </aside>
+
+      <section class="admin-workspace">
+        <header class="admin-topbar">
           <div>
-            <strong>{{ sessionLabel }}</strong>
-            <span>{{ roleLabel }}</span>
-          </div>
-          <q-btn v-if="!session" outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
-        </div>
-      </header>
-
-      <section v-if="!canWrite" class="admin-blocked">
-        <q-icon name="lock" size="32px" />
-        <div>
-          <h2>Writer access required</h2>
-          <p>Sign in with an invited writer account to draft articles.</p>
-        </div>
-      </section>
-
-      <section v-else class="admin-grid">
-        <aside class="editorial-rail">
-          <span :class="{ active: activeStep === 'draft' }">Draft</span>
-          <span :class="{ active: activeStep === 'review' }">Review</span>
-          <span :class="{ active: activeStep === 'request' }">Take down</span>
-        </aside>
-
-        <section class="admin-editor">
-          <div class="editor-toolbar">
-            <div>
-              <p class="admin-kicker">Article</p>
-              <h2>{{ articleForm.id ? "Edit draft" : "New draft" }}</h2>
-            </div>
-            <q-badge outline color="teal-8">{{ statusMessage || "Not saved" }}</q-badge>
+            <p class="admin-kicker">Blog admin</p>
+            <h1>Editorial dashboard</h1>
           </div>
 
-          <q-form class="editor-form" @submit.prevent="saveDraft">
-            <div class="form-row">
-              <q-input v-model="articleForm.title" label="Title" outlined dense :error="Boolean(errors.title)" :error-message="errors.title" />
-              <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" />
+          <div class="admin-topbar-actions">
+            <q-input v-model="filters.search" dense outlined clearable debounce="150" placeholder="Search articles" class="admin-search">
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+
+            <div class="admin-session">
+              <q-icon :name="session ? 'verified_user' : 'lock'" size="22px" />
+              <div>
+                <strong>{{ sessionLabel }}</strong>
+                <span>{{ roleLabel }}</span>
+              </div>
+              <q-btn v-if="!session" outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
             </div>
+          </div>
+        </header>
 
-            <q-input v-model="articleForm.description" label="Description" outlined dense type="textarea" autogrow :error="Boolean(errors.description)" :error-message="errors.description" />
-            <q-input v-model="articleForm.body" label="Body" outlined type="textarea" :rows="10" :error="Boolean(errors.body)" :error-message="errors.body" />
-
-            <div class="form-row">
-              <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
-              <q-input v-model="articleForm.author" label="Author entry ID" outlined dense :error="Boolean(errors.author)" :error-message="errors.author" />
-              <q-input v-model.number="articleForm.version" label="Version" outlined dense type="number" />
-            </div>
-
-            <div class="form-row">
-              <q-input v-model="articleForm.cloudinaryPublicId" label="Cloudinary public ID" outlined dense />
-              <q-input v-model="articleForm.cloudinaryUrl" label="Cloudinary URL" outlined dense />
-            </div>
-
-            <q-input v-model="articleForm.tags" label="Tags" outlined dense hint="Comma-separated Contentful tag IDs" />
-            <q-input v-model="articleForm.notes" label="Review notes" outlined dense type="textarea" autogrow />
-
-            <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
-
-            <div class="editor-actions">
-              <q-btn unelevated color="teal-8" icon="save" label="Save draft" type="submit" :loading="loadingAction === 'save'" />
-              <q-btn outline color="blue-grey-7" icon="rate_review" label="Submit for review" :disable="!articleForm.id" :loading="loadingAction === 'review'" @click="submitReview" />
-              <q-btn outline color="amber-9" icon="visibility_off" label="Request unpublication" :disable="!articleForm.id" :loading="loadingAction === 'unpublish'" @click="requestUnpublication" />
-            </div>
-          </q-form>
+        <section v-if="!canWrite" class="admin-blocked">
+          <q-icon name="lock" size="30px" />
+          <div>
+            <h2>Writer access required</h2>
+            <p>Sign in with an invited writer account to manage blog drafts.</p>
+          </div>
         </section>
 
-        <aside class="writer-panel">
-          <section>
-            <p class="admin-kicker">Draft status</p>
-            <dl>
-              <div>
-                <dt>Entry ID</dt>
-                <dd>{{ articleForm.id || "New draft" }}</dd>
-              </div>
-              <div>
-                <dt>Version</dt>
-                <dd>{{ articleForm.version || "Unsaved" }}</dd>
-              </div>
-              <div>
-                <dt>Role</dt>
-                <dd>{{ roleLabel }}</dd>
-              </div>
-            </dl>
+        <template v-else>
+          <section class="status-grid" aria-label="Article status">
+            <article class="status-card">
+              <span>Published</span>
+              <strong>{{ dashboardSummary.published }}</strong>
+              <small>Live articles</small>
+            </article>
+            <article class="status-card">
+              <span>Drafts</span>
+              <strong>{{ dashboardSummary.drafts }}</strong>
+              <small>Draft or unpublished</small>
+            </article>
+            <article class="status-card">
+              <span>In review</span>
+              <strong>{{ dashboardSummary.review }}</strong>
+              <small>Owner queue</small>
+            </article>
+            <article class="status-card status-card-muted">
+              <span>Page views pending</span>
+              <strong>--</strong>
+              <small>Free metrics source not connected</small>
+            </article>
           </section>
 
-          <section>
-            <p class="admin-kicker">Writer queue</p>
-            <ul>
-              <li>Save drafts without publishing.</li>
-              <li>Send ready drafts to owner review.</li>
-              <li>Ask the owner to take published work down.</li>
-            </ul>
+          <section class="admin-main-grid">
+            <section class="article-queue-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="admin-kicker">Article queue</p>
+                  <h2>Articles</h2>
+                </div>
+                <q-btn unelevated color="blue-grey-8" icon="add" label="New article" @click="startNewArticle" />
+              </div>
+
+              <div class="article-filters">
+                <q-select v-model="filters.status" dense outlined clearable emit-value map-options label="Status" :options="statusOptions" />
+                <q-input v-model="filters.tag" dense outlined clearable label="Tag" />
+                <q-input v-model="filters.date" dense outlined clearable label="Date" type="date" />
+                <q-input v-model="filters.author" dense outlined clearable label="Author" />
+              </div>
+
+              <q-table
+                flat
+                class="article-table"
+                row-key="id"
+                :rows="filteredArticles"
+                :columns="articleColumns"
+                :pagination="{ rowsPerPage: 6 }"
+                no-data-label="No articles match the current filters"
+              >
+                <template #body-cell-status="props">
+                  <q-td :props="props">
+                    <q-badge outline :color="statusColor(props.row.status)">{{ statusLabel(props.row.status) }}</q-badge>
+                  </q-td>
+                </template>
+
+                <template #body-cell-tags="props">
+                  <q-td :props="props">
+                    <span class="tag-list">{{ props.row.tags.join(", ") }}</span>
+                  </q-td>
+                </template>
+
+                <template #body-cell-actions="props">
+                  <q-td :props="props" class="table-actions">
+                    <q-btn dense flat round color="blue-grey-7" icon="edit" @click="editArticle(props.row)">
+                      <q-tooltip>Edit article</q-tooltip>
+                    </q-btn>
+                    <q-btn dense flat round color="blue-grey-7" icon="rate_review" :disable="props.row.status === 'published'" @click="editArticle(props.row)">
+                      <q-tooltip>Prepare for review</q-tooltip>
+                    </q-btn>
+                    <q-btn dense flat round color="amber-9" icon="visibility_off" :disable="!props.row.id" @click="requestUnpublicationFromRow(props.row)">
+                      <q-tooltip>Request unpublication</q-tooltip>
+                    </q-btn>
+                  </q-td>
+                </template>
+              </q-table>
+            </section>
+
+            <aside class="editor-panel">
+              <div class="panel-heading compact">
+                <div>
+                  <p class="admin-kicker">Article editor</p>
+                  <h2>{{ articleForm.id ? "Edit article" : "Create article" }}</h2>
+                </div>
+                <q-badge outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
+              </div>
+
+              <q-form class="editor-form" @submit.prevent="saveDraft">
+                <q-input v-model="articleForm.title" label="Title" outlined dense :error="Boolean(errors.title)" :error-message="errors.title" />
+                <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" />
+                <q-input v-model="articleForm.description" label="Description" outlined dense type="textarea" autogrow :error="Boolean(errors.description)" :error-message="errors.description" />
+                <q-input v-model="articleForm.body" label="Body" outlined type="textarea" :rows="8" :error="Boolean(errors.body)" :error-message="errors.body" />
+
+                <div class="form-row">
+                  <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
+                  <q-input v-model="articleForm.author" label="Author entry ID" outlined dense :error="Boolean(errors.author)" :error-message="errors.author" />
+                </div>
+
+                <div class="media-fields">
+                  <div class="media-fields-title">
+                    <q-icon name="cloud_upload" />
+                    <span>Thumbnail</span>
+                  </div>
+                  <div class="media-actions">
+                    <q-btn outline color="blue-grey-7" icon="perm_media" label="Select image" :loading="loadingAction === 'media-list'" @click="openMediaLibrary" />
+                    <q-file
+                      v-model="mediaUploadFile"
+                      dense
+                      outlined
+                      accept="image/*"
+                      label="Upload image"
+                      class="media-upload"
+                      :loading="loadingAction === 'media-upload'"
+                      @update:model-value="handleMediaFile"
+                    >
+                      <template #prepend>
+                        <q-icon name="upload" />
+                      </template>
+                    </q-file>
+                  </div>
+                  <q-input v-model="articleForm.thumbnailPublicId" label="Selected image ID" outlined dense readonly :error="Boolean(errors.thumbnail)" :error-message="errors.thumbnail" />
+                  <q-input v-model="articleForm.thumbnailUrl" label="Selected image URL" outlined dense readonly />
+                  <q-input v-model="articleForm.alt" label="Alt text" outlined dense />
+                </div>
+
+                <q-input v-model="articleForm.tags" label="Tags" outlined dense hint="Comma-separated Contentful tag IDs" />
+
+                <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
+
+                <div class="editor-actions">
+                  <q-btn unelevated color="blue-grey-8" icon="save" label="Save draft" type="submit" :loading="loadingAction === 'save'" />
+                  <q-btn outline color="blue-grey-7" icon="rate_review" label="Submit for review" :disable="!articleForm.id" :loading="loadingAction === 'review'" @click="submitReview" />
+                  <q-btn outline color="amber-9" icon="visibility_off" label="Request unpublication" :disable="!articleForm.id" :loading="loadingAction === 'unpublish'" @click="requestUnpublication" />
+                </div>
+              </q-form>
+            </aside>
           </section>
-        </aside>
+        </template>
       </section>
     </section>
+
+    <q-dialog v-model="mediaDialogOpen">
+      <q-card class="media-dialog">
+        <q-card-section class="media-dialog-header">
+          <div>
+            <p class="admin-kicker">Media library</p>
+            <h2>Select an image</h2>
+          </div>
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+
+        <q-card-section>
+          <q-banner v-if="mediaError" class="feedback-error" rounded>{{ mediaError }}</q-banner>
+          <q-inner-loading :showing="loadingAction === 'media-list'">
+            <q-spinner color="blue-grey-7" size="42px" />
+          </q-inner-loading>
+
+          <div class="media-grid">
+            <button v-for="asset in mediaAssets" :key="asset.public_id" type="button" class="media-asset" @click="applySelectedMedia(asset)">
+              <img :src="asset.secure_url || asset.url" :alt="asset.public_id" />
+              <span>{{ asset.public_id }}</span>
+            </button>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script>
 import { defineComponent } from "vue";
-import { createArticleDraft, requestArticleUnpublication, submitArticleForReview, updateArticleDraft, AdminApiError } from "../utils/adminApi.js";
+import { createArticleDraft, listMediaAssets, requestArticleUnpublication, submitArticleForReview, updateArticleDraft, uploadMediaAsset, AdminApiError } from "../utils/adminApi.js";
+import { articleToForm, buildArticlePayload, createEmptyArticleForm, filterAdminArticles, sampleAdminArticles, summarizeArticleStatuses } from "../utils/adminDashboard.js";
 import { getAdminSession, isOwnerSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
-
-const today = () => new Date().toISOString().slice(0, 10);
-
-const defaultArticleForm = () => ({
-  id: "",
-  title: "",
-  slug: "",
-  description: "",
-  body: "",
-  createAt: today(),
-  author: "",
-  version: null,
-  cloudinaryPublicId: "",
-  cloudinaryUrl: "",
-  tags: "",
-  notes: "",
-});
 
 export default defineComponent({
   name: "AdminPage",
   data() {
     return {
       session: null,
-      articleForm: defaultArticleForm(),
+      activeSection: "dashboard",
+      articles: [],
+      articleForm: createEmptyArticleForm(),
+      filters: {
+        search: "",
+        status: "",
+        tag: "",
+        date: "",
+        author: "",
+      },
       errors: {},
+      mediaAssets: [],
+      mediaDialogOpen: false,
+      mediaError: "",
+      mediaUploadFile: null,
       statusMessage: "",
       feedbackMessage: "",
       feedbackTone: "info",
       loadingAction: "",
-      activeStep: "draft",
+      articleColumns: [
+        { name: "title", label: "Title", field: "title", align: "left", sortable: true },
+        { name: "status", label: "Status", field: "status", align: "left", sortable: true },
+        { name: "tags", label: "Tags", field: "tags", align: "left" },
+        { name: "createAt", label: "Date", field: "createAt", align: "left", sortable: true },
+        { name: "author", label: "Author", field: "author", align: "left", sortable: true },
+        { name: "actions", label: "", field: "actions", align: "right" },
+      ],
+      statusOptions: [
+        { label: "Published", value: "published" },
+        { label: "Draft", value: "draft" },
+        { label: "Unpublished", value: "unpublished" },
+        { label: "In review", value: "review" },
+      ],
     };
   },
   computed: {
@@ -161,6 +281,12 @@ export default defineComponent({
 
       return isOwnerSession(this.session) ? "Owner" : "Writer";
     },
+    dashboardSummary() {
+      return summarizeArticleStatuses(this.articles);
+    },
+    filteredArticles() {
+      return filterAdminArticles(this.articles, this.filters);
+    },
     feedbackClass() {
       return {
         "feedback-success": this.feedbackTone === "success",
@@ -171,10 +297,48 @@ export default defineComponent({
   },
   async mounted() {
     this.session = await getAdminSession();
+    this.loadArticleDashboard();
   },
   methods: {
     openLogin() {
       openAdminLogin();
+    },
+    loadArticleDashboard() {
+      this.articles = sampleAdminArticles;
+    },
+    setStatusFilter(status) {
+      this.filters.status = this.filters.status === status ? "" : status;
+      this.activeSection = "dashboard";
+    },
+    startNewArticle() {
+      this.articleForm = createEmptyArticleForm();
+      this.errors = {};
+      this.statusMessage = "New draft";
+      this.showFeedback("", "info");
+    },
+    editArticle(article) {
+      this.articleForm = articleToForm(article);
+      this.errors = {};
+      this.statusMessage = "Loaded";
+      this.showFeedback("", "info");
+    },
+    statusColor(status) {
+      return {
+        published: "teal-8",
+        draft: "blue-grey-7",
+        unpublished: "amber-9",
+        review: "indigo-7",
+        archived: "grey-7",
+      }[status] || "blue-grey-7";
+    },
+    statusLabel(status) {
+      return {
+        published: "Published",
+        draft: "Draft",
+        unpublished: "Unpublished",
+        review: "In review",
+        archived: "Archived",
+      }[status] || "Draft";
     },
     validateArticleForm() {
       const errors = {};
@@ -199,33 +363,67 @@ export default defineComponent({
         errors.author = "Author entry ID is required";
       }
 
+      if (this.articleForm.thumbnailUrl && !this.articleForm.thumbnailPublicId) {
+        errors.thumbnail = "Select media again so the Cloudinary public ID is saved.";
+      }
+
       this.errors = errors;
       return Object.keys(errors).length === 0;
     },
     articlePayload() {
-      const cloudinary = this.articleForm.cloudinaryPublicId || this.articleForm.cloudinaryUrl
-        ? [
-            {
-              public_id: this.articleForm.cloudinaryPublicId,
-              url: this.articleForm.cloudinaryUrl,
-            },
-          ]
-        : undefined;
+      return buildArticlePayload(this.articleForm);
+    },
+    async openMediaLibrary() {
+      this.mediaDialogOpen = true;
+      this.mediaError = "";
+      this.loadingAction = "media-list";
 
-      return {
-        title: this.articleForm.title.trim(),
-        slug: this.articleForm.slug.trim(),
-        description: this.articleForm.description.trim(),
-        body: this.articleForm.body,
-        createAt: this.articleForm.createAt,
-        author: this.articleForm.author.trim(),
-        version: this.articleForm.version,
-        cloudinary,
-        tags: this.articleForm.tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-      };
+      try {
+        const response = await listMediaAssets({ session: this.session });
+        this.mediaAssets = response.assets || [];
+      } catch (error) {
+        this.handleMediaError(error);
+      } finally {
+        this.loadingAction = "";
+      }
+    },
+    applySelectedMedia(asset = {}) {
+      this.articleForm.thumbnailPublicId = asset.public_id || "";
+      this.articleForm.thumbnailUrl = asset.secure_url || asset.url || "";
+      this.mediaDialogOpen = false;
+      this.showFeedback("Image selected.", "success");
+    },
+    async handleMediaFile(file) {
+      if (!file) {
+        return;
+      }
+
+      this.mediaError = "";
+      this.loadingAction = "media-upload";
+
+      try {
+        const dataUrl = await this.readFileAsDataUrl(file);
+        const response = await uploadMediaAsset({
+          file: dataUrl,
+          filename: file.name,
+          session: this.session,
+        });
+
+        this.applySelectedMedia(response.asset);
+        this.mediaUploadFile = null;
+      } catch (error) {
+        this.handleMediaError(error);
+      } finally {
+        this.loadingAction = "";
+      }
+    },
+    readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
     },
     applyArticleResponse(payload = {}) {
       const sys = payload.sys || payload.draft?.sys;
@@ -239,8 +437,6 @@ export default defineComponent({
       }
     },
     async saveDraft() {
-      this.activeStep = "draft";
-
       if (!this.validateArticleForm()) {
         this.showFeedback("Fix the highlighted fields before saving.", "error");
         return;
@@ -264,14 +460,13 @@ export default defineComponent({
       }
     },
     async submitReview() {
-      this.activeStep = "review";
       this.loadingAction = "review";
 
       try {
         await submitArticleForReview({
           articleId: this.articleForm.id,
           version: this.articleForm.version,
-          notes: this.articleForm.notes,
+          notes: "",
           session: this.session,
         });
         this.showFeedback("Submitted for owner review.", "success");
@@ -281,15 +476,18 @@ export default defineComponent({
         this.loadingAction = "";
       }
     },
+    requestUnpublicationFromRow(article) {
+      this.editArticle(article);
+      return this.requestUnpublication();
+    },
     async requestUnpublication() {
-      this.activeStep = "request";
       this.loadingAction = "unpublish";
 
       try {
         await requestArticleUnpublication({
           articleId: this.articleForm.id,
           version: this.articleForm.version,
-          notes: this.articleForm.notes,
+          notes: "",
           session: this.session,
         });
         this.showFeedback("Unpublication request sent.", "success");
@@ -316,11 +514,38 @@ export default defineComponent({
           return;
         }
 
+        if (error.status === 422 || /media/i.test(error.message)) {
+          this.showFeedback("The media selection could not be saved. Select the image again.", "error");
+          return;
+        }
+
         this.showFeedback(error.message, "error");
         return;
       }
 
       this.showFeedback("The admin request could not be completed.", "error");
+    },
+    handleMediaError(error) {
+      if (error instanceof AdminApiError) {
+        if (error.status === 401) {
+          this.mediaError = "Sign in again before selecting media.";
+          this.showFeedback(this.mediaError, "error");
+          return;
+        }
+
+        if (error.status === 403) {
+          this.mediaError = "Your account cannot select media.";
+          this.showFeedback(this.mediaError, "error");
+          return;
+        }
+
+        this.mediaError = error.message || "Media request failed.";
+        this.showFeedback(this.mediaError, "error");
+        return;
+      }
+
+      this.mediaError = "Media request failed.";
+      this.showFeedback(this.mediaError, "error");
     },
     showFeedback(message, tone = "info") {
       this.feedbackMessage = message;
@@ -332,39 +557,84 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .admin-page {
-  background: #f5f7f4;
-  color: #1e2a27;
+  background: #f2f4f3;
+  color: #263238;
+  min-height: inherit;
 }
 
 .admin-shell {
-  max-width: 1180px;
-  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: calc(100vh - 98px);
 }
 
-.admin-header,
-.admin-grid,
-.editor-toolbar,
-.editor-actions,
-.form-row {
+.admin-sidebar {
+  background: #546e7a;
+  color: #eef3f5;
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 14px;
+
+  .q-btn {
+    justify-content: flex-start;
+    min-height: 40px;
+  }
+
+  .active {
+    background: rgba(255, 255, 255, 0.16);
+  }
 }
 
-.admin-header {
+.admin-brand {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  font-size: 1.1rem;
+  font-weight: 700;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  text-transform: uppercase;
+}
+
+.admin-workspace {
+  padding: 22px;
+}
+
+.admin-topbar,
+.admin-topbar-actions,
+.panel-heading,
+.article-filters,
+.form-row,
+.editor-actions,
+.media-fields-title {
+  display: flex;
+  gap: 14px;
+}
+
+.admin-topbar {
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #c8d6d0;
-  padding: 18px 0 22px;
+  margin-bottom: 20px;
 
   h1 {
-    font-size: 2rem;
-    line-height: 1.1;
+    font-size: 1.8rem;
+    line-height: 1.15;
     margin: 0;
   }
 }
 
+.admin-topbar-actions {
+  align-items: center;
+}
+
+.admin-search {
+  min-width: 260px;
+}
+
 .admin-kicker {
-  color: #60746d;
+  color: #607d8b;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -374,13 +644,15 @@ export default defineComponent({
 
 .admin-session {
   align-items: center;
-  border: 1px solid #c8d6d0;
+  background: #ffffff;
+  border: 1px solid #cfd8dc;
   display: flex;
   gap: 10px;
-  padding: 10px 12px;
+  min-height: 46px;
+  padding: 8px 10px;
 
   span {
-    color: #60746d;
+    color: #607d8b;
     display: block;
     font-size: 0.8rem;
   }
@@ -392,62 +664,94 @@ export default defineComponent({
   border-left: 4px solid #b7791f;
   display: flex;
   gap: 16px;
-  margin-top: 24px;
   padding: 18px;
 }
 
-.admin-grid {
-  align-items: stretch;
+.status-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.status-card,
+.article-queue-panel,
+.editor-panel {
+  background: #ffffff;
+  border: 1px solid #cfd8dc;
+}
+
+.status-card {
+  min-height: 112px;
+  padding: 16px;
+
+  span,
+  small {
+    color: #607d8b;
+    display: block;
+  }
+
+  strong {
+    color: #263238;
+    display: block;
+    font-size: 2rem;
+    line-height: 1.15;
+    margin: 8px 0 4px;
+  }
+}
+
+.status-card-muted {
+  background: #eef3f5;
+}
+
+.admin-main-grid {
   display: grid;
   gap: 18px;
-  grid-template-columns: 72px minmax(0, 1fr) 280px;
-  margin-top: 22px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr);
 }
 
-.editorial-rail {
-  align-items: center;
-  background: #1e2a27;
-  color: #d9e4df;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  justify-content: center;
-  min-height: 420px;
-  padding: 12px 8px;
-
-  span {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    writing-mode: vertical-rl;
-  }
-
-  .active {
-    color: #65a89a;
-  }
+.article-queue-panel,
+.editor-panel {
+  padding: 16px;
 }
 
-.admin-editor,
-.writer-panel {
-  background: #ffffff;
-  border: 1px solid #c8d6d0;
-  padding: 18px;
-}
-
-.editor-toolbar {
+.panel-heading {
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 
   h2 {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     margin: 0;
   }
 }
 
+.compact {
+  align-items: center;
+}
+
+.article-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  margin-bottom: 12px;
+}
+
+.article-table {
+  border: 1px solid #e0e6e8;
+}
+
+.tag-list {
+  color: #455a64;
+  font-size: 0.86rem;
+}
+
+.table-actions {
+  white-space: nowrap;
+}
+
 .editor-form {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .form-row {
@@ -456,34 +760,84 @@ export default defineComponent({
   }
 }
 
-.editor-actions {
-  flex-wrap: wrap;
+.media-fields {
+  border: 1px dashed #b0bec5;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
 }
 
-.writer-panel {
-  display: grid;
-  gap: 20px;
-  align-content: start;
+.media-fields-title {
+  align-items: center;
+  color: #455a64;
+  font-weight: 700;
+}
 
-  dl,
-  ul {
+.media-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.media-upload {
+  min-width: 0;
+}
+
+.media-dialog {
+  min-width: min(920px, 92vw);
+}
+
+.media-dialog-header {
+  align-items: flex-start;
+  border-bottom: 1px solid #e0e6e8;
+  display: flex;
+  justify-content: space-between;
+
+  h2 {
+    font-size: 1.25rem;
     margin: 0;
   }
+}
 
-  dt {
-    color: #60746d;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
+.media-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  min-height: 180px;
+}
+
+.media-asset {
+  background: #ffffff;
+  border: 1px solid #cfd8dc;
+  color: #263238;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  text-align: left;
+
+  img {
+    aspect-ratio: 16 / 10;
+    background: #eef3f5;
+    object-fit: cover;
+    width: 100%;
   }
 
-  dd {
-    margin: 0 0 12px;
+  span {
+    color: #455a64;
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
   }
 
-  li {
-    margin: 8px 0;
+  &:hover,
+  &:focus {
+    border-color: #607d8b;
+    outline: 2px solid rgba(96, 125, 139, 0.24);
   }
+}
+
+.editor-actions {
+  flex-wrap: wrap;
 }
 
 .feedback-success {
@@ -492,34 +846,55 @@ export default defineComponent({
 }
 
 .feedback-error {
-  background: #fff2df;
+  background: #fff3e0;
   color: #8a4b08;
 }
 
 .feedback-info {
-  background: #eef3f7;
-  color: #3f596b;
+  background: #eef3f5;
+  color: #455a64;
 }
 
-@media (max-width: 900px) {
-  .admin-header,
+@media (max-width: 1100px) {
+  .admin-shell,
+  .admin-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-brand {
+    grid-column: 1 / -1;
+  }
+
+  .status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-workspace {
+    padding: 14px;
+  }
+
+  .admin-topbar,
+  .admin-topbar-actions,
   .form-row {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .admin-grid {
-    grid-template-columns: 1fr;
+  .admin-search {
+    min-width: 0;
   }
 
-  .editorial-rail {
-    flex-direction: row;
-    justify-content: flex-start;
-    min-height: auto;
-
-    span {
-      writing-mode: horizontal-tb;
-    }
+  .status-grid,
+  .article-filters,
+  .media-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>

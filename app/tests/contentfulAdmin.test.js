@@ -92,18 +92,48 @@ describe("contentful admin handler", () => {
     assert.deepEqual(parse(response), { articleId: "article-1", approvedBy: "user-123" });
   });
 
-  it("keeps workflow endpoints unimplemented until editorial request storage is added", async () => {
+  it("allows writer sessions to record submit-for-review workflow requests", async () => {
     const handler = createContentfulAdminHandler({
       getSession() {
         return createSession(["writer"]);
       },
-      env: {},
+      operations: {
+        async submitArticleForReview({ articleId, session }) {
+          return {
+            sys: { id: "request-1" },
+            articleId,
+            writer: session.subject,
+          };
+        },
+      },
     });
 
-    const response = await handler({ method: "POST", path: "/articles/article-1/submit", body: "{}" });
+    const response = await handler({ method: "POST", path: "/articles/article-1/submit", body: JSON.stringify({ version: 5 }) });
 
-    assert.equal(response.statusCode, 501);
-    assert.deepEqual(parse(response), { error: "Admin operation not implemented" });
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(parse(response), { sys: { id: "request-1" }, articleId: "article-1", writer: "user-123" });
+  });
+
+  it("allows writer sessions to record unpublication workflow requests", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession() {
+        return createSession(["writer"]);
+      },
+      operations: {
+        async requestUnpublication({ articleId, session }) {
+          return {
+            sys: { id: "request-2" },
+            articleId,
+            writer: session.subject,
+          };
+        },
+      },
+    });
+
+    const response = await handler({ method: "POST", path: "/articles/article-1/unpublication-requests", body: JSON.stringify({ version: 5 }) });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(parse(response), { sys: { id: "request-2" }, articleId: "article-1", writer: "user-123" });
   });
 
   it("normalizes admin operation failures without leaking raw diagnostics", async () => {

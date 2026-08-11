@@ -3,7 +3,7 @@
     <q-circular-progress v-if="progress" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
 
     <article class="w-full" :class="progress && 'hidden'">
-      <img v-if="articleImg" :src="articleImg" :title="article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
+      <img v-if="articleImg" :src="articleImg" :title="article.title" :alt="article.alt || article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">
         {{ article.description }}
@@ -95,6 +95,7 @@ import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
+import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
 export default defineComponent({
   name: "BlogArticle",
@@ -181,7 +182,7 @@ export default defineComponent({
         this.createAt = article.sys.createdAt;
         this.article = article.fields;
         this.articleAuthor = article.fields.author.fields.name;
-        this.articleImg = article.fields.cloudinary ? article.fields.cloudinary[0].url.replace("http://", "https://") : "";
+        this.articleImg = articleHeroImageUrl(article.fields);
 
         const rawBody = article.fields.body;
 

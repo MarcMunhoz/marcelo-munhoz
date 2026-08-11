@@ -40,7 +40,8 @@ describe("contentful management facade", () => {
         body: "# Draft",
         createAt: "2026-08-11",
         author: "author-1",
-        cloudinary: [{ public_id: "folder/image", url: "https://example.invalid/image.jpg" }],
+        thumbnail: { public_id: "folder/image", secure_url: "https://example.invalid/image.jpg" },
+        alt: "Draft thumbnail",
         tags: ["vue", "contentful"],
       },
     });
@@ -64,7 +65,8 @@ describe("contentful management facade", () => {
     assert.deepEqual(body.fields.author["en-US"], {
       sys: { type: "Link", linkType: "Entry", id: "author-1" },
     });
-    assert.deepEqual(body.fields.cloudinary["en-US"], [{ public_id: "folder/image", url: "https://example.invalid/image.jpg" }]);
+    assert.deepEqual(body.fields.thumbnail["en-US"], { public_id: "folder/image", secure_url: "https://example.invalid/image.jpg" });
+    assert.equal(body.fields.alt["en-US"], "Draft thumbnail");
     assert.deepEqual(body.metadata.tags, [
       { sys: { type: "Link", linkType: "Tag", id: "vue" } },
       { sys: { type: "Link", linkType: "Tag", id: "contentful" } },
@@ -126,6 +128,53 @@ describe("contentful management facade", () => {
     assert.equal(calls[3].options.method, "DELETE");
     assert.equal(new URL(calls[3].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
     assert.equal(calls[3].options.headers["x-contentful-version"], "13");
+  });
+
+  it("creates editorial workflow request entries for review and unpublication", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        return createResponse(201, { sys: { id: `request-${calls.length}`, version: 1 } });
+      },
+      now: () => "2026-08-11T12:00:00.000Z",
+    });
+
+    await facade.submitArticleForReview({
+      articleId: "article-1",
+      session: { subject: "writer-1", name: "Guest Writer" },
+      data: { version: 7 },
+    });
+    await facade.requestUnpublication({
+      articleId: "article-2",
+      session: { subject: "writer-2", name: "Owner Writer" },
+      data: { version: 8 },
+    });
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].options.headers["x-contentful-content-type"], "blogEditorialRequest");
+    assert.equal(calls[1].options.headers["x-contentful-content-type"], "blogEditorialRequest");
+
+    const reviewBody = JSON.parse(calls[0].options.body);
+    assert.equal(reviewBody.fields.requestType["en-US"], "publication");
+    assert.equal(reviewBody.fields.status["en-US"], "readyForReview");
+    assert.deepEqual(reviewBody.fields.article["en-US"], {
+      sys: { type: "Link", linkType: "Entry", id: "article-1" },
+    });
+    assert.equal(reviewBody.fields.writerSubject["en-US"], "writer-1");
+    assert.equal(reviewBody.fields.writerName["en-US"], "Guest Writer");
+    assert.equal(reviewBody.fields.createdAt["en-US"], "2026-08-11T12:00:00.000Z");
+    assert.equal(reviewBody.fields.updatedAt["en-US"], "2026-08-11T12:00:00.000Z");
+
+    const unpublicationBody = JSON.parse(calls[1].options.body);
+    assert.equal(unpublicationBody.fields.requestType["en-US"], "unpublication");
+    assert.equal(unpublicationBody.fields.status["en-US"], "readyForReview");
+    assert.deepEqual(unpublicationBody.fields.article["en-US"], {
+      sys: { type: "Link", linkType: "Entry", id: "article-2" },
+    });
+    assert.equal(unpublicationBody.fields.writerSubject["en-US"], "writer-2");
+    assert.equal(unpublicationBody.fields.writerName["en-US"], "Owner Writer");
   });
 
   it("rejects missing management configuration before calling Contentful", async () => {

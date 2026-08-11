@@ -2,8 +2,7 @@
   <section class="row gap-4 justify-center w-full">
     <q-card class="w-[350px]" v-for="article in dataArticles" :key="article.sys.id">
       <router-link :to="{ name: 'Artigo', params: { slug: article.fields.slug } }">
-        <img v-if="article.fields.cloudinary" :src="`https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/${article.fields.cloudinary[0].public_id}`" />
-        <img v-else src="https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,w_350,h_233,c_fill/marcelo-munhoz-website/no-thumbnail.jpg" />
+        <img :src="articleCardImageUrl(article.fields)" :alt="article.fields.alt || article.fields.title" />
 
         <q-card-section>
           <div class="text-h6">{{ article.fields.title }}</div>
@@ -18,6 +17,7 @@
 
 <script>
 import { defineComponent } from "vue";
+import { articleCardImageUrl } from "../utils/contentfulImages.js";
 
 export default defineComponent({
   name: "ArticleList",
@@ -25,6 +25,9 @@ export default defineComponent({
     dataArticles: {
       type: Array,
     },
+  },
+  methods: {
+    articleCardImageUrl,
   },
 });
 </script>
