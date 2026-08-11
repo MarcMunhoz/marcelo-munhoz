@@ -26,6 +26,11 @@ The system SHALL make the admin dashboard the first screen for authenticated adm
 - **WHEN** an authenticated owner opens `/admin`
 - **THEN** the system displays article status counts, review queues, owner lifecycle actions, and writer workflows
 
+#### Scenario: Dashboard loads admin data
+- **WHEN** an authenticated admin opens the dashboard
+- **THEN** the system loads article rows, status counts, and review queues from server-side admin API data backed by Contentful article and editorial workflow records
+- **AND** the dashboard does not use static sample articles as its runtime data source
+
 #### Scenario: Metrics source is not connected
 - **WHEN** no free-compatible page-view metrics source is configured
 - **THEN** the dashboard displays editorial counts without requiring page-view counts

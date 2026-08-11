@@ -76,9 +76,21 @@
 - [x] 8.10 Run `openspec validate add-blog-admin-area --strict`.
 - [x] 8.11 Document optional live Contentful, Cloudinary, or deployed Netlify smoke checks separately from routine automated validation.
 
-## 9. Documentation And Rollout
+## 9. Live Admin Data And UX Completion
 
-- [ ] 9.1 Update project documentation with the admin architecture, free-plan constraints, owner/writer permission model, dashboard behavior, and Cloudinary media flow.
-- [ ] 9.2 Document required server-side runtime variables for admin behavior using sanitized placeholder values only.
-- [ ] 9.3 Document the rollback path that disables or hides admin routes while preserving the existing public blog read API.
-- [ ] 9.4 Document that guest writers should not be granted broad Contentful Editor access for normal guest authoring on the Free plan.
+- [ ] 9.1 Add a server-side admin read facade for real Contentful article listing, status metadata, and workflow records without exposing arbitrary Contentful queries.
+- [ ] 9.2 Add authenticated admin API read routes for dashboard/article data that require server-side writer or owner authorization before calling Contentful.
+- [ ] 9.3 Replace frontend `sampleAdminArticles` dashboard/list/review data with API-loaded admin data while keeping deterministic mock fixtures only in tests.
+- [ ] 9.4 Wire dashboard counts, article table rows, and owner review queues to real article and editorial request state.
+- [ ] 9.5 Ensure article-row actions use real entry/request identifiers and either perform the supported backend action or are hidden/disabled with a clear pending state.
+- [ ] 9.6 Fix admin layout responsiveness, horizontal overflow, and disabled navigation states so unfinished sections are intentionally hidden or clearly unavailable.
+- [ ] 9.7 Keep the local preview role switch dev-only and verify production admin reads/mutations still require Netlify Identity authorization.
+- [ ] 9.8 Add or update frontend and backend tests for real admin data loading, empty/error states, role filtering, and dev-only preview behavior.
+- [ ] 9.9 Re-run the project test suite, lint, build validation, and `openspec validate add-blog-admin-area --strict`.
+
+## 10. Documentation And Rollout
+
+- [ ] 10.1 Update project documentation with the admin architecture, free-plan constraints, owner/writer permission model, dashboard behavior, and Cloudinary media flow.
+- [ ] 10.2 Document required server-side runtime variables for admin behavior using sanitized placeholder values only.
+- [ ] 10.3 Document the rollback path that disables or hides admin routes while preserving the existing public blog read API.
+- [ ] 10.4 Document that guest writers should not be granted broad Contentful Editor access for normal guest authoring on the Free plan.

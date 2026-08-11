@@ -182,6 +182,26 @@ Alternatives considered:
 - Integrate Google Analytics Data API now: gives real page views, but adds credentials and complexity.
 - Store custom page views in the app: creates a new tracking/storage problem and may affect privacy posture.
 
+### Load Admin Dashboard Data Through Narrow Server Routes
+
+The production admin dashboard must load article lists, editorial counts, and review queues through authenticated server-side admin read routes. Static sample articles are allowed only as deterministic fixtures for frontend tests and should not be used as the runtime data source.
+
+Rationale: the dashboard is an operational admin surface. Counts, article rows, and owner queues must reflect Contentful article state and editorial workflow records so owner actions operate on real entry/request identifiers. The browser still must not receive Contentful Management credentials or arbitrary query controls.
+
+Expected behavior:
+
+- Writers see article lists and actions filtered to their permitted drafts, submissions, and requestable article states.
+- Owners see all relevant admin article state plus publication and unpublication review queues.
+- Dashboard cards and review counters are derived from the same server-returned admin data used to render tables and queues.
+- Loading, empty, configuration-error, authorization-error, and upstream-failure states are visible and do not leak secrets.
+- Local preview role switching remains development-only; production requests rely on Netlify Identity authorization.
+
+Alternatives considered:
+
+- Keep sample dashboard data until after rollout: rejected because it makes the admin look available while key workflows target fake identifiers.
+- Query Contentful directly from the browser: rejected because it would expose privileged credentials or widen the public Delivery API shape.
+- Use the public blog read API for admin lists: insufficient because it only exposes published public content and does not include draft/review workflow state.
+
 ## Risks / Trade-offs
 
 - Free-plan Contentful roles are coarse -> Keep guest writer permissions in the app and do not grant broad Contentful Editor access for normal guest authoring.
@@ -190,6 +210,7 @@ Alternatives considered:
 - Cloudinary credential leakage would be high impact -> Keep Cloudinary upload credentials server-side, use signed or backend-mediated upload, and scan frontend build output for configured secret values.
 - Multiple writers editing the same article can cause version conflicts -> Use Contentful version headers or equivalent optimistic concurrency behavior and return conflict-safe user errors.
 - Draft ownership may be hard to infer from Contentful alone -> Store writer ownership in separate admin-only editorial workflow records keyed by the authenticated identity subject.
+- Runtime sample data can mask incomplete admin behavior -> Keep sample admin data limited to tests and require live admin read routes before rollout documentation.
 - Staying 100% free may limit collaboration features -> Keep first version focused on draft submission and owner review rather than full multi-user CMS parity.
 - Dashboard view metrics may not be available for free -> Ship status counts first and show page-view metrics only when a free-compatible source is connected.
 - Live Contentful behavior is external and mutable -> Use mocks/fixtures for routine tests and document optional live smoke checks separately.
@@ -203,8 +224,9 @@ Alternatives considered:
 5. Add the article draft/editor workflow for writers using the real Article field set.
 6. Add owner review and lifecycle actions behind server-side owner authorization.
 7. Add validation that no management or Cloudinary credentials appear in frontend bundles or user-visible responses.
-8. Deploy behind the protected admin route while keeping public blog reads on the existing Delivery API proxy.
-9. Roll back by disabling or hiding the admin route and leaving the existing public blog read path untouched.
+8. Replace runtime sample dashboard data with authenticated admin reads backed by Contentful article and workflow records.
+9. Deploy behind the protected admin route while keeping public blog reads on the existing Delivery API proxy.
+10. Roll back by disabling or hiding the admin route and leaving the existing public blog read path untouched.
 
 ## Open Questions
 
