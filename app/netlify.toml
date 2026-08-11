@@ -9,6 +9,12 @@
     X-XSS-Protection = "1; mode=block"
 
 [[redirects]]
+  from = "/api/admin/contentful/*"
+  to = "/.netlify/functions/contentful-admin/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/contentful/*"
   to = "/.netlify/functions/contentful/:splat"
   status = 200

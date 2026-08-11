@@ -31,6 +31,28 @@ describe("routing configuration", () => {
     assert.match(netlifyToml, /connect-src 'self'/);
   });
 
+  it("routes admin Contentful API requests separately before public API and SPA fallbacks", () => {
+    const netlifyToml = read("../netlify.toml");
+    const adminRedirect = netlifyToml.indexOf('from = "/api/admin/contentful/*"');
+    const publicRedirect = netlifyToml.indexOf('from = "/api/contentful/*"');
+    const spaRedirect = netlifyToml.indexOf('from = "/*"');
+
+    assert.ok(adminRedirect >= 0);
+    assert.ok(publicRedirect >= 0);
+    assert.ok(spaRedirect >= 0);
+    assert.ok(adminRedirect < publicRedirect);
+    assert.ok(adminRedirect < spaRedirect);
+    assert.match(netlifyToml, /to = "\/\.netlify\/functions\/contentful-admin\/:splat"/);
+  });
+
+  it("mounts local admin Contentful routes separately from public routes", () => {
+    const serverSource = read("../middleware/server.js");
+
+    assert.match(serverSource, /contentfulAdminRoutes/);
+    assert.match(serverSource, /app\.use\("\/api\/admin\/contentful", contentfulAdminRoutes\)/);
+    assert.match(serverSource, /app\.use\("\/api\/contentful", contentfulRoutes\)/);
+  });
+
   it("does not inject Contentful credentials into the frontend build config", () => {
     const quasarConfig = read("../quasar.config.js");
 
@@ -48,6 +70,13 @@ describe("routing configuration", () => {
     const functionSource = read("../netlify/functions/contentful.js");
 
     assert.match(functionSource, /from "\.\/contentfulProxyCore\.js"/);
+    assert.doesNotMatch(functionSource, /\.\.\/\.\.\//);
+  });
+
+  it("keeps the admin Netlify Function dependency graph inside the functions directory", () => {
+    const functionSource = read("../netlify/functions/contentful-admin.js");
+
+    assert.match(functionSource, /from "\.\/contentfulAdminCore\.js"/);
     assert.doesNotMatch(functionSource, /\.\.\/\.\.\//);
   });
 });
