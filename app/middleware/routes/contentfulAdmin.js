@@ -1,12 +1,17 @@
 import express from "express";
-import { contentfulAdminHandler } from "../contentfulAdmin.js";
+import { createContentfulAdminHandler, devPreviewSessionFromHeaders } from "../contentfulAdmin.js";
 
 const router = express.Router();
+const localAdminHandler = createContentfulAdminHandler({
+  getSession({ headers }) {
+    return devPreviewSessionFromHeaders(headers);
+  },
+});
 
 router.use(express.json({ limit: "1mb" }));
 
 router.use(async (req, res) => {
-  const response = await contentfulAdminHandler({
+  const response = await localAdminHandler({
     method: req.method,
     path: req.path,
     query: req.query,

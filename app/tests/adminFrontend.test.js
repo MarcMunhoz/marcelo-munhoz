@@ -135,6 +135,29 @@ describe("admin frontend writer workflow", () => {
     assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
   });
 
+  it("sends a development-only preview role header instead of bearer auth for local preview sessions", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { ok: true };
+        },
+      };
+    };
+
+    await createArticleDraft({
+      article: { title: "Owner preview draft" },
+      session: { preview: true, roles: ["owner"] },
+      fetchImpl,
+    });
+
+    assert.equal(calls[0].options.headers["x-admin-preview-role"], "owner");
+    assert.equal(calls[0].options.headers.Authorization, undefined);
+  });
+
   it("summarizes article status counts for the dashboard", () => {
     const summary = summarizeArticleStatuses([
       { status: "published" },

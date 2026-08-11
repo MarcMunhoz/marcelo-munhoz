@@ -10,6 +10,7 @@ export {
   createCloudinaryMediaFacade,
   createContentfulAdminHandler,
   createContentfulManagementFacade,
+  devPreviewSessionFromHeaders,
   hasRole,
   isOwner,
   sessionFromNetlifyContext,

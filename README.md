@@ -80,6 +80,20 @@ The development stack exposes:
 - Local API wrapper: `http://localhost:3000`
 - Health check: `http://localhost:3000/healthz`
 
+Local `/admin` uses a development-only preview session so the admin API can be tested without Netlify Identity running locally. The default preview role is `owner`, which can exercise writer and owner workflows. To test writer-only behavior, set the preview role in the browser console and reload:
+
+```js
+localStorage.setItem("admin.previewRole", "writer");
+```
+
+Restore full local admin access with:
+
+```js
+localStorage.setItem("admin.previewRole", "owner");
+```
+
+The preview role is sent to the local middleware with `x-admin-preview-role` only in the dev flow. The deployed Netlify Function ignores that header and requires a real Netlify Identity session.
+
 Useful commands:
 
 ```bash

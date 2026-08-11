@@ -7,6 +7,7 @@ import {
   ContentfulAdminConfigurationError,
   ContentfulVersionConflictError,
   createContentfulAdminHandler,
+  devPreviewSessionFromHeaders,
 } from "../middleware/contentfulAdmin.js";
 
 const parse = (response) => JSON.parse(response.body);
@@ -18,6 +19,18 @@ const createSession = (roles = []) => ({
 });
 
 describe("contentful admin handler", () => {
+  it("creates local preview sessions from dev-only role headers", () => {
+    assert.deepEqual(devPreviewSessionFromHeaders({ "x-admin-preview-role": "owner" }, { nodeEnv: "development" }), {
+      subject: "local-preview-owner",
+      name: "Owner preview",
+      roles: ["owner"],
+      preview: true,
+    });
+    assert.deepEqual(devPreviewSessionFromHeaders({ "x-admin-preview-role": "writer" }, { nodeEnv: "development" }).roles, ["writer"]);
+    assert.equal(devPreviewSessionFromHeaders({ "x-admin-preview-role": "owner" }, { nodeEnv: "production" }), null);
+    assert.equal(devPreviewSessionFromHeaders({ "x-admin-preview-role": "admin" }, { nodeEnv: "development" }), null);
+  });
+
   it("rejects unauthenticated admin API requests without running an operation", async () => {
     let operationRan = false;
     const handler = createContentfulAdminHandler({

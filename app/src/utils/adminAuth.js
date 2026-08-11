@@ -1,7 +1,23 @@
-const previewWriterSession = () => ({
-  subject: "local-preview-writer",
-  name: "Writer preview",
-  roles: ["writer"],
+const PREVIEW_ROLE_STORAGE_KEY = "admin.previewRole";
+const PREVIEW_ROLES = new Set(["writer", "owner"]);
+
+export const selectedPreviewRole = ({ storage = globalThis.localStorage } = {}) => {
+  const role = storage?.getItem?.(PREVIEW_ROLE_STORAGE_KEY);
+  return PREVIEW_ROLES.has(role) ? role : "owner";
+};
+
+export const setPreviewRole = (role, { storage = globalThis.localStorage } = {}) => {
+  if (!PREVIEW_ROLES.has(role)) {
+    return;
+  }
+
+  storage?.setItem?.(PREVIEW_ROLE_STORAGE_KEY, role);
+};
+
+export const createPreviewSession = ({ role = "owner" } = {}) => ({
+  subject: `local-preview-${role}`,
+  name: `${role === "owner" ? "Owner" : "Writer"} preview`,
+  roles: [role],
   preview: true,
 });
 
@@ -35,7 +51,7 @@ export const getAdminSession = async () => {
     return session;
   }
 
-  return import.meta.env?.DEV ? previewWriterSession() : null;
+  return import.meta.env?.DEV ? createPreviewSession({ role: selectedPreviewRole() }) : null;
 };
 
 export const openAdminLogin = () => {

@@ -53,6 +53,11 @@ export const adminRequest = async ({ path, method = "GET", body, session, fetchI
     headers.Authorization = `Bearer ${session.token}`;
   }
 
+  if (session?.preview) {
+    const previewRole = session.roles?.includes("owner") ? "owner" : "writer";
+    headers["x-admin-preview-role"] = previewRole;
+  }
+
   const response = await fetchImpl(buildApiUrl(`/api/admin/contentful${path}`), {
     method,
     headers,

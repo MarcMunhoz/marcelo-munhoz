@@ -63,6 +63,25 @@ export const canWriteDrafts = (session) => hasRole(session, "writer") || hasRole
 
 export const isOwner = (session) => hasRole(session, "owner");
 
+export const devPreviewSessionFromHeaders = (headers = {}, { nodeEnv = process.env.NODE_ENV } = {}) => {
+  if (nodeEnv !== "development") {
+    return null;
+  }
+
+  const role = headers["x-admin-preview-role"] || headers["X-Admin-Preview-Role"];
+
+  if (role !== "writer" && role !== "owner") {
+    return null;
+  }
+
+  return {
+    subject: `local-preview-${role}`,
+    name: `${role === "owner" ? "Owner" : "Writer"} preview`,
+    roles: [role],
+    preview: true,
+  };
+};
+
 export class ContentfulAdminConfigurationError extends Error {
   constructor() {
     super("Contentful admin runtime configuration is missing");
