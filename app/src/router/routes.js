@@ -26,6 +26,15 @@ const routes = [
           title: "Artigos por tag",
         },
       },
+      {
+        path: "/admin",
+        name: "Admin",
+        component: () => import("pages/Admin.vue"),
+        meta: {
+          title: "Admin",
+          requiresAdmin: true,
+        },
+      },
     ],
   },
   {

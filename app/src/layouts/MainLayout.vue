@@ -15,7 +15,8 @@
         </q-toolbar-title>
 
         <q-btn outline icon="badge" label="About" to="/about" size="sm" class="mr-4" color="blue-grey-5" />
-        <q-btn outline icon="newspaper" label="Blog" to="/blog" size="sm" color="blue-grey-5" />
+        <q-btn outline icon="newspaper" label="Blog" to="/blog" size="sm" class="mr-4" color="blue-grey-5" />
+        <q-btn outline icon="edit_note" label="Admin" to="/admin" size="sm" color="blue-grey-5" />
       </q-toolbar>
     </q-header>
 
