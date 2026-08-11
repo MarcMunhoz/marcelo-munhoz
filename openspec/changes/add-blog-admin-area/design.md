@@ -11,11 +11,14 @@ The safer free-plan model is to avoid granting guest writers broad Contentful Ed
 **Goals:**
 
 - Provide a protected `/admin` experience for blog article drafting, editing, review, and owner actions.
+- Provide a CMS-style admin dashboard as the first `/admin` screen, including article counts, status filters, article tables, and role-appropriate actions.
 - Keep the existing public blog read API unchanged.
 - Add separate server-side admin API routes for Contentful Management API operations.
 - Keep the Contentful Management API token server-side only.
+- Manage article images through Cloudinary from the custom admin without exposing Cloudinary secrets to the browser.
 - Support guest writers without requiring paid Contentful custom roles.
 - Enforce owner-only publication lifecycle and destructive actions in the admin backend.
+- Keep article page-view metrics optional until a free-compatible analytics data source is selected.
 - Preserve deterministic tests that do not require live Contentful data.
 
 **Non-Goals:**
@@ -24,7 +27,9 @@ The safer free-plan model is to avoid granting guest writers broad Contentful Ed
 - Require paid Contentful custom roles or a paid hosting plan.
 - Build a generic Contentful administration console.
 - Expose arbitrary Contentful Management API requests to the browser.
+- Expose Cloudinary API secrets, upload signatures, or broad media-library credentials to the browser.
 - Let guest writers permanently delete, archive, publish, or unpublish directly in the first version.
+- Require Google Analytics Data API, paid analytics, or a database-backed metrics pipeline for the first dashboard version.
 - Change the public blog route contract or article rendering behavior.
 
 ## Decisions
@@ -39,6 +44,36 @@ Alternatives considered:
 
 - Extend `/api/contentful/*` with mutation routes: simpler routing, but weak separation between public and privileged operations.
 - Add a generic Contentful proxy: flexible, but difficult to audit and unnecessary for this application.
+
+### Use A CMS-Style Admin Shell
+
+Use a dashboard-first layout inspired by compact CMS admin tools: persistent sidebar, topbar, status cards, filterable article table, and separate create/edit screens. The article editor should mirror the real Contentful Article model rather than exposing implementation fields.
+
+The visual identity must remain consistent with the existing site. The CMS references guide structure and density only, not branding. Use the current Quasar/Roboto typography, existing `grey` and `blue-grey` palette, restrained spacing, and the site's current button/icon conventions unless a specific admin affordance requires a small extension.
+
+Rationale: the admin must feel like an operational tool, not a public website page or a single long form. Writers need obvious create/edit flows, while owners need at-a-glance state and action queues.
+
+Article editor fields for the first version:
+
+- `createAt`
+- `title`
+- `slug`
+- `description`
+- `body`
+- `thumbnail`
+- `alt`
+- `author`
+- Contentful tags
+
+Fields not shown as editable user inputs:
+
+- Contentful version, kept as hidden state for optimistic concurrency.
+- Review notes, removed until the editorial request workflow needs explicit notes.
+
+Alternatives considered:
+
+- Keep the direct article editor as `/admin`: faster, but it hides owner/admin needs and does not match the CMS workflow.
+- Copy Contentful's full editor: familiar, but too large for this project and not necessary for guest writers.
 
 ### Use Server-Side Contentful Management API Access
 
@@ -109,28 +144,63 @@ Alternatives considered:
 - Store workflow fields directly on `article`: simpler, but risks leaking private workflow metadata unless the public proxy is changed to whitelist fields.
 - Add a separate database: clearer separation, but outside the current free-plan target.
 
+### Add Server-Side Cloudinary Media Handling
+
+Add a narrow server-side media API for article image upload/selection. The browser should upload or select media through the admin backend, and the backend should handle Cloudinary credentials/signatures. The resulting Cloudinary metadata is saved into the Article `thumbnail` field in the shape expected by the existing public blog UI.
+
+Rationale: the current Contentful app delegates image management to Cloudinary. The custom admin must preserve that workflow without requiring writers to manually copy public IDs or URLs.
+
+Expected behavior:
+
+- Writers can upload/select an image for an article thumbnail.
+- The system stores Cloudinary `public_id` and URL-compatible metadata in Contentful.
+- The optional `alt` field is edited separately as article accessibility metadata.
+- Cloudinary credentials stay server-side and are never placed in `VITE_*` variables.
+
+Alternatives considered:
+
+- Keep manual Cloudinary fields in the editor: lowest implementation cost, but poor author experience and error-prone.
+- Use Contentful Assets instead of Cloudinary: simpler CMS integration, but changes the site's current image hosting model.
+
+### Defer Page-View Metrics Integration
+
+The dashboard should include editorial status counts immediately and reserve a metrics area for page views, but page-view counts remain optional until a free-compatible analytics source is selected.
+
+Rationale: status counts come from Contentful/admin data and are essential for admin work. View counts require a separate analytics integration and should not block the core admin permissions model.
+
+Alternatives considered:
+
+- Integrate Google Analytics Data API now: gives real page views, but adds credentials and complexity.
+- Store custom page views in the app: creates a new tracking/storage problem and may affect privacy posture.
+
 ## Risks / Trade-offs
 
 - Free-plan Contentful roles are coarse -> Keep guest writer permissions in the app and do not grant broad Contentful Editor access for normal guest authoring.
 - App-level authorization can drift from Contentful reality -> Restrict server routes to narrow operations and cover each role/action combination with tests.
 - Management token leakage would be high impact -> Keep it out of build config, responses, browser-visible logs, GitHub artifacts, and OpenSpec artifacts; scan built assets during validation.
+- Cloudinary credential leakage would be high impact -> Keep Cloudinary upload credentials server-side, use signed or backend-mediated upload, and scan frontend build output for configured secret values.
 - Multiple writers editing the same article can cause version conflicts -> Use Contentful version headers or equivalent optimistic concurrency behavior and return conflict-safe user errors.
 - Draft ownership may be hard to infer from Contentful alone -> Store writer ownership in separate admin-only editorial workflow records keyed by the authenticated identity subject.
 - Staying 100% free may limit collaboration features -> Keep first version focused on draft submission and owner review rather than full multi-user CMS parity.
+- Dashboard view metrics may not be available for free -> Ship status counts first and show page-view metrics only when a free-compatible source is connected.
 - Live Contentful behavior is external and mutable -> Use mocks/fixtures for routine tests and document optional live smoke checks separately.
 
 ## Migration Plan
 
 1. Add the protected admin route shell without changing public blog behavior.
 2. Add server-side admin API handlers with mocked Contentful Management API tests first.
-3. Add the article draft/editor workflow for writers.
-4. Add owner review and lifecycle actions behind server-side owner authorization.
-5. Add validation that no management credentials appear in frontend bundles or user-visible responses.
-6. Deploy behind the protected admin route while keeping public blog reads on the existing Delivery API proxy.
-7. Roll back by disabling or hiding the admin route and leaving the existing public blog read path untouched.
+3. Add the dashboard-first admin shell with article status counts and table scaffolding.
+4. Add server-side Cloudinary media handling and image selection/upload UI.
+5. Add the article draft/editor workflow for writers using the real Article field set.
+6. Add owner review and lifecycle actions behind server-side owner authorization.
+7. Add validation that no management or Cloudinary credentials appear in frontend bundles or user-visible responses.
+8. Deploy behind the protected admin route while keeping public blog reads on the existing Delivery API proxy.
+9. Roll back by disabling or hiding the admin route and leaving the existing public blog read path untouched.
 
 ## Open Questions
 
-- What exact Contentful validations already exist on the live `article` content type, and do they need to be mirrored in the custom editor?
+- What exact Contentful field IDs are used by the live `article` content type for `thumbnail` and `alt`, and do existing public components need compatibility shims for older `cloudinary` data?
+- Which Cloudinary upload mode should be used first: signed upload directly from the browser, or upload streamed through a backend Function?
+- Should writers select only from the configured Cloudinary folder, or also upload new images into that folder?
 - Should the first version allow writers to select only their own owner-managed author profile, or should owners assign the author during review?
 - What confirmation text should the owner UI require before permanent deletion?

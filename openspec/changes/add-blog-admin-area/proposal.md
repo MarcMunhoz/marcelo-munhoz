@@ -7,11 +7,14 @@ This change captures the decisions from GitHub issue #49: guest writers should b
 ## What Changes
 
 - Add a protected blog administration area for article drafting, editing, review, and owner actions.
+- Make the admin dashboard the first admin screen, with article status summaries, article lists, and role-appropriate actions.
 - Add server-side admin API routes separate from the existing public `/api/contentful/*` read API.
 - Integrate server-side Contentful Management API access for article draft management and owner-only publication lifecycle actions.
+- Add a server-side Cloudinary upload/selection flow so article images can be managed from the custom admin without exposing Cloudinary secrets in the browser.
 - Keep Contentful Management API credentials exclusively in server-side runtime configuration.
 - Support a free-plan-safe guest writer flow where writers create and edit drafts or submissions but do not receive broad destructive Contentful access.
 - Add an owner review workflow for publication, unpublication requests, archiving, and permanent deletion.
+- Prepare the dashboard for article metrics while keeping page-view counts optional until a free-compatible analytics data source is selected.
 - Preserve the existing public blog read behavior and Contentful Delivery API proxy contract.
 
 ## Capabilities
@@ -26,8 +29,8 @@ This change captures the decisions from GitHub issue #49: guest writers should b
 
 ## Impact
 
-- Affected frontend areas: routing, layout/navigation, new admin views, article editor UI, review queues, and authenticated admin states.
-- Affected server/runtime areas: Netlify Functions, local middleware wrappers, server-side Contentful Management API client logic, environment configuration, and admin API error handling.
-- Affected existing systems: Contentful remains the content repository; the current public Contentful Delivery API proxy remains the read path for published blog pages.
+- Affected frontend areas: routing, layout/navigation, CMS-style admin shell, dashboard, article table, article editor UI, media picker/upload UI, review queues, and authenticated admin states.
+- Affected server/runtime areas: Netlify Functions, local middleware wrappers, server-side Contentful Management API client logic, server-side Cloudinary upload/signature logic, environment configuration, and admin API error handling.
+- Affected existing systems: Contentful remains the content repository; Cloudinary remains the image host; the current public Contentful Delivery API proxy remains the read path for published blog pages.
 - Security impact: introduces authenticated write-capable server operations and a high-impact Contentful Management API token that must never be exposed to browser bundles, user-visible errors, logs intended for users, or GitHub/OpenSpec artifacts.
 - Operational impact: keep the implementation compatible with Contentful Free plan limits and Netlify Free plan usage constraints; do not require paid Contentful custom roles for the first version.

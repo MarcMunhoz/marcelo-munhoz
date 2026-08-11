@@ -34,8 +34,9 @@ The current frontend expects these Contentful article fields and metadata:
 | Detail body | `article.fields.body`, rendered as Markdown |
 | Display date | `article.fields.createAt`, with fallback to `article.sys.createdAt` |
 | Author display | `article.fields.author.fields.name` |
-| Card image | optional `article.fields.cloudinary[0].public_id` |
-| Detail/social image | optional `article.fields.cloudinary[0].url` |
+| Card image | Cloudinary metadata from the article thumbnail field, including `public_id` where available |
+| Detail/social image | Cloudinary metadata from the article thumbnail field, including URL-compatible data where available |
+| Image alt text | `article.fields.alt` |
 | Tags | `article.metadata.tags[*].sys.id` |
 
 The first admin editor must preserve this shape for published articles so existing public blog rendering remains unchanged.
@@ -97,17 +98,18 @@ Avoid storing writer email unless the authentication implementation proves it is
 
 ## 1.5 First-Version Editor Field Set
 
-The first article editor should support the fields needed by the existing public blog, plus minimal review controls:
+The first article editor should support the fields from the real Contentful Article model, plus minimal workflow controls:
 
 Article fields:
 
+- `createAt`: optional display date; default to current date when creating.
 - `title`: required plain text.
 - `slug`: required URL-safe unique slug.
-- `description`: required short summary.
+- `description`: required long text summary.
 - `body`: required Markdown content.
-- `createAt`: optional display date; default to current date when creating.
+- `thumbnail`: optional Cloudinary image metadata selected or uploaded through admin media controls.
+- `alt`: optional image alt text.
 - `author`: required owner-managed author reference.
-- `cloudinary`: optional image metadata compatible with the existing `public_id` and `url` usage.
 - `metadata.tags`: optional Contentful tag selection.
 
 Workflow fields:
@@ -115,7 +117,11 @@ Workflow fields:
 - Request type: publication or unpublication.
 - Review status.
 - Writer display name.
-- Optional notes.
+
+Technical state:
+
+- Contentful version is tracked internally for optimistic concurrency and MUST NOT be a manually editable form field.
+- Review notes are deferred until the review workflow has a clear user-facing need.
 
 Validation rules:
 
@@ -124,7 +130,43 @@ Validation rules:
 - `description` must be non-empty and short enough for cards and meta descriptions.
 - `body` must be non-empty Markdown.
 - `author` must reference an allowed author profile.
-- `cloudinary`, when present, must provide the values currently consumed by list and detail views.
+- `thumbnail`, when present, must provide the Cloudinary values currently consumed by list and detail views.
+- `alt` should be present when `thumbnail` is present.
 - Writer saves must not publish content.
 - Owner lifecycle actions must be authorized server-side.
 - Saves must include Contentful version handling to avoid silently overwriting newer edits.
+
+## 1.6 Admin UI Direction
+
+The current admin direction is dashboard-first, not editor-first.
+
+Required first screen:
+
+- Sidebar navigation for Dashboard, Articles, Drafts, Review, Media, and Settings.
+- Topbar with search and session state.
+- Status summary cards for published articles, drafts/unpublished articles, and review requests.
+- Article table with title, status, tags, create date, author, and role-appropriate actions.
+- Metrics area prepared for page views, but not blocked on a metrics integration.
+
+Visual target:
+
+- Compact CMS layout with dense tables and clear operational affordances.
+- Avoid public-site hero composition and decorative cards.
+- Use cards only for metrics, repeated article rows, and framed editor/queue panels.
+- Follow the existing site identity for colors, typography, spacing, and component language.
+- Treat external CMS screenshots as structural references only; do not copy their red/accent palette or unrelated branding.
+
+## 1.7 Cloudinary Baseline
+
+The live Contentful editor uses a Cloudinary app/integration for Article images. The custom admin must replicate the outcome, not require manual public ID or URL copying.
+
+Expected media flow:
+
+- Writer chooses an existing image from the configured Cloudinary folder or uploads a new image.
+- The admin backend authorizes the Cloudinary operation using server-side configuration.
+- The returned Cloudinary metadata is stored in the Article thumbnail field.
+- The public blog continues rendering images from Cloudinary.
+
+Open implementation choice:
+
+- Use signed direct browser upload with a backend signature endpoint, or stream upload through the backend Function.

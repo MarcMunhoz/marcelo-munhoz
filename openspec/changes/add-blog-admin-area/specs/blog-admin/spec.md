@@ -15,6 +15,21 @@ The system SHALL expose blog administration pages only to authenticated admin us
 - **WHEN** an authenticated owner requests the admin area
 - **THEN** the system displays owner review and article lifecycle workflows
 
+### Requirement: Admin Dashboard Is The First Admin Screen
+The system SHALL make the admin dashboard the first screen for authenticated admin users.
+
+#### Scenario: Writer opens dashboard
+- **WHEN** an authenticated writer opens `/admin`
+- **THEN** the system displays a CMS-style dashboard with article status counts, writer-allowed article lists, and writer-allowed article actions
+
+#### Scenario: Owner opens dashboard
+- **WHEN** an authenticated owner opens `/admin`
+- **THEN** the system displays article status counts, review queues, owner lifecycle actions, and writer workflows
+
+#### Scenario: Metrics source is not connected
+- **WHEN** no free-compatible page-view metrics source is configured
+- **THEN** the dashboard displays editorial counts without requiring page-view counts
+
 ### Requirement: Admin API Requires Server-Side Authorization
 The system MUST authorize every admin API request on the server before performing any Contentful Management API operation.
 
@@ -74,6 +89,33 @@ The system SHALL allow authenticated writers to create and edit article drafts o
 #### Scenario: Writer submits article for review
 - **WHEN** an authenticated writer marks an article draft as ready for review
 - **THEN** the system makes the article visible in the owner review workflow
+
+#### Scenario: Writer edits article fields
+- **WHEN** an authenticated writer creates or edits an article
+- **THEN** the system provides inputs for create date, title, slug, description, body, thumbnail, alt text, author, and Contentful tags
+
+#### Scenario: Writer edits technical state
+- **WHEN** an authenticated writer edits an article
+- **THEN** the system does not expose Contentful version as a manually editable field
+
+### Requirement: Article Images Use Cloudinary
+The system SHALL allow authenticated writers to manage article thumbnail images through Cloudinary without exposing Cloudinary credentials to the browser.
+
+#### Scenario: Writer selects existing Cloudinary image
+- **WHEN** an authenticated writer selects an existing Cloudinary image for an article
+- **THEN** the system stores the selected Cloudinary metadata in the article thumbnail field through the authenticated admin API
+
+#### Scenario: Writer uploads image
+- **WHEN** an authenticated writer uploads a new article image
+- **THEN** the system uploads the image through a server-authorized Cloudinary flow and stores the returned Cloudinary metadata in the article thumbnail field
+
+#### Scenario: Cloudinary configuration is missing
+- **WHEN** required Cloudinary server configuration is absent
+- **THEN** the system returns a user-safe media configuration error without exposing secret names, secret values, stack traces, or raw upstream diagnostics
+
+#### Scenario: Frontend bundle is built with media support
+- **WHEN** production frontend assets are built
+- **THEN** the bundle does not contain Cloudinary API secrets or signed upload credentials
 
 ### Requirement: Writers Can Request Unpublication
 The system SHALL allow authenticated writers to request that a published article be taken down without directly unpublishing it.
