@@ -44,16 +44,25 @@ Browser on :4242
 
 ## Environment Variables
 
-Configure these variables in Netlify for the Contentful Function:
+Configure these variables in Netlify. Keep Function-scoped values in the server/runtime environment only, not in frontend build variables:
 
 | Variable | Required | Scope | Purpose |
 | --- | --- | --- | --- |
 | `CONTENTFUL_SPACE_ID` | Yes | Functions | Contentful space used by the blog API. |
 | `CONTENTFUL_DELIVERY_KEY` | Yes | Functions | Contentful delivery token used by the server-side proxy. |
+| `CONTENTFUL_MANAGEMENT_KEY` or `CONTENTFUL_MANAGEMENT_TOKEN` | Yes for `/admin` writes | Functions | Contentful Management API token used only by the admin API facade. |
+| `CONTENTFUL_ENVIRONMENT_ID` | No | Functions | Contentful environment for admin writes. Defaults to `master`. |
+| `CONTENTFUL_DEFAULT_LOCALE` | No | Functions | Locale used for localized admin article fields. Defaults to `en-US`. |
+| `CLOUDINARY_CLOUD_NAME` | Yes for admin media | Functions | Cloudinary cloud used by the server-side media facade. |
+| `CLOUDINARY_API_KEY` | Yes for admin media | Functions | Cloudinary API key used only by the server-side media facade. |
+| `CLOUDINARY_API_SECRET` | Yes for admin media | Functions | Cloudinary API secret used only by the server-side media facade. |
+| `CLOUDINARY_UPLOAD_FOLDER` or `CLOUDINARY_FOLDER` | No | Functions | Folder/prefix used by the admin media picker and upload flow. |
 | `VITE_API_BASE_URL` | No | Builds | Explicit frontend API override. Leave unset for normal Netlify and local usage. |
 | `VITE_API_URL` | No | None | Legacy variable. The app ignores it; remove it from Netlify and local environments. |
 
-Do not expose Contentful credentials as `VITE_*` variables. `CONTENTFUL_SPACE_ID` and `CONTENTFUL_DELIVERY_KEY` are server-side only.
+Use sanitized placeholder values in documentation and tickets, for example `<contentful-management-token>` or `<cloudinary-api-secret>`. Do not paste real values into README, OpenSpec artifacts, GitHub issues, PRs, commits, or logs intended for users.
+
+Do not expose Contentful or Cloudinary credentials as `VITE_*` variables. The only supported frontend build variable is `VITE_API_BASE_URL`; all Contentful and Cloudinary credential variables above are server-side only.
 
 `NODE_VERSION` and `NPM_VERSION` are Netlify build settings rather than application secrets. Keep them only if the Netlify build needs explicit version pinning.
 
@@ -90,7 +99,8 @@ Run validation inside the container:
 docker compose exec app npm test
 docker compose exec app npm run lint
 docker compose exec app npm run build
-openspec validate migrate-contentful-proxy-to-netlify-functions --strict
+docker compose exec app npm run scan:build-credentials
+openspec validate add-blog-admin-area --strict
 ```
 
 For a clean build validation without local `.env` files, use a temporary copy that excludes `.env`, `.env.*`, `node_modules`, `dist`, and `.quasar`, then run `npm ci`, `npm test`, `npm run lint`, and `npm run build` inside a Node container.
@@ -100,6 +110,12 @@ For a clean build validation without local `.env` files, use a temporary copy th
 `app/netlify.toml` applies API redirects before the SPA fallback:
 
 ```toml
+[[redirects]]
+  from = "/api/admin/contentful/*"
+  to = "/.netlify/functions/contentful-admin/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/api/contentful/*"
   to = "/.netlify/functions/contentful/:splat"
@@ -119,12 +135,20 @@ The Contentful API contract is:
 - `/api/contentful/tagged?page=<page>&tag=<tag>`
 - `/api/contentful/article/<slug>`
 
-Optional smoke checks after a Netlify deploy:
+Optional public smoke checks after a Netlify deploy:
 
 ```bash
 curl "https://<netlify-site>/api/contentful/entries?page=1"
 curl "https://<netlify-site>/api/contentful/tags"
 ```
+
+Optional live admin smoke checks are separate from routine automated validation. Run them only against a deployed Netlify site with provider credentials configured in Netlify and an invited authenticated writer or owner session:
+
+- Writer session: open `/admin`, create a draft with placeholder article text, select or upload a Cloudinary thumbnail, save the draft, and submit it for owner review.
+- Owner session: open `/admin`, confirm the submitted article appears in the owner queue, then publish, unpublish, archive, or delete only disposable test content.
+- Admin Function: confirm `/api/admin/contentful/*` requests require authentication and return user-safe JSON errors when called without a session.
+
+Do not paste live Contentful, Cloudinary, or Netlify Identity tokens into local files, docs, GitHub artifacts, OpenSpec artifacts, or smoke-check notes.
 
 ## Netlify Free Plan Notes
 
@@ -144,9 +168,13 @@ Normal local and production requests should target `/api/contentful/*`.
 
 Check `app/netlify.toml` route order. `/api/contentful/*` must appear before the catch-all `/*` redirect.
 
-### Function returns a configuration error
+### Public Function returns a configuration error
 
 Confirm `CONTENTFUL_SPACE_ID` and `CONTENTFUL_DELIVERY_KEY` are configured for Netlify Functions.
+
+### Admin Function returns a configuration error
+
+Confirm the admin server-side runtime variables are configured in Netlify Functions using placeholders in documentation and real values only in the provider environment. Do not add `VITE_` versions of Contentful Management or Cloudinary credentials.
 
 ## Reference
 

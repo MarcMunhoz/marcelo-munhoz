@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
     "test": "node --test",
+    "scan:build-credentials": "node scripts/scan-built-assets.js dist",
     "dev": "concurrently \"quasar dev\" \"node middleware/server.js\"",
     "build": "quasar build",
     "start": "node middleware/server.js"

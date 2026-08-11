@@ -56,7 +56,11 @@ describe("routing configuration", () => {
   it("does not inject Contentful credentials into the frontend build config", () => {
     const quasarConfig = read("../quasar.config.js");
 
-    assert.doesNotMatch(quasarConfig, /CONTENTFUL_DELIVERY_KEY|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE_ID/);
+    assert.doesNotMatch(
+      quasarConfig,
+      /CONTENTFUL_DELIVERY_KEY|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE_ID|CONTENTFUL_MANAGEMENT_KEY|CONTENTFUL_MANAGEMENT_TOKEN|CLOUDINARY_API_KEY|CLOUDINARY_API_SECRET/
+    );
+    assert.match(quasarConfig, /env:\s*\{\}/);
   });
 
   it("keeps Cloudinary write credentials out of frontend source", () => {

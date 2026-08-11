@@ -53,7 +53,7 @@ export const sampleAdminArticles = [
     id: "article-cloudinary-media",
     title: "Cloudinary media workflow",
     slug: "cloudinary-media-workflow",
-    status: "unpublished",
+    status: "unpublicationRequested",
     tags: ["media", "cloudinary"],
     createAt: "2026-08-07",
     author: "Guest Writer",
@@ -69,7 +69,7 @@ export const summarizeArticleStatuses = (articles = []) =>
 
       if (status === "published") {
         summary.published += 1;
-      } else if (status === "draft" || status === "unpublished") {
+      } else if (status === "draft" || status === "unpublished" || status === "unpublicationrequested") {
         summary.drafts += 1;
       } else if (status === "review") {
         summary.review += 1;
@@ -104,6 +104,11 @@ export const filterAdminArticles = (articles = [], filters = {}) => {
   });
 };
 
+export const ownerReviewQueues = (articles = []) => ({
+  submissions: articles.filter((article) => normalize(article.status) === "review"),
+  unpublicationRequests: articles.filter((article) => normalize(article.status) === "unpublicationrequested"),
+});
+
 export const articleToForm = (article = {}) => ({
   ...createEmptyArticleForm(),
   id: article.id || "",
@@ -119,6 +124,23 @@ export const articleToForm = (article = {}) => ({
   tags: Array.isArray(article.tags) ? article.tags.join(", ") : article.tags || "",
   version: article.version || null,
 });
+
+export const applyArticleResponseToForm = (form = {}, payload = {}) => {
+  const sys = payload.sys || payload.draft?.sys;
+
+  return {
+    ...form,
+    ...(sys?.id ? { id: sys.id } : {}),
+    ...(sys?.version ? { version: sys.version } : {}),
+  };
+};
+
+export const updateArticleStatusById = (articles = [], articleId, status) =>
+  articles.map((article) => (article.id === articleId ? { ...article, status } : article));
+
+export const removeArticleById = (articles = [], articleId) => articles.filter((article) => article.id !== articleId);
+
+export const canConfirmArticleDeletion = (article, confirmation) => Boolean(article?.title && confirmation === article.title);
 
 export const buildArticlePayload = (form = {}) => {
   const thumbnail = form.thumbnail || (form.thumbnailPublicId || form.thumbnailUrl

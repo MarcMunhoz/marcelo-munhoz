@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   ContentfulAdminConfigurationError,
+  ContentfulManagementRequestError,
   ContentfulVersionConflictError,
   createContentfulManagementFacade,
 } from "../middleware/contentfulAdmin.js";
@@ -221,5 +222,49 @@ describe("contentful management facade", () => {
       () => facade.publishArticle({ articleId: "article-1", data: { version: 4 } }),
       ContentfulVersionConflictError
     );
+  });
+
+  it("maps upstream management failures with malformed diagnostics to a safe request error", async () => {
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        return {
+          ok: false,
+          status: 502,
+          async json() {
+            throw new Error("CONTENTFUL_MANAGEMENT_KEY=management-key raw upstream body");
+          },
+        };
+      },
+    });
+
+    await assert.rejects(
+      () => facade.updateArticleDraft({ articleId: "article-1", data: { version: 8, title: "Updated" } }),
+      (error) => {
+        assert.ok(error instanceof ContentfulManagementRequestError);
+        assert.equal(error.publicError, "Admin request failed");
+        assert.doesNotMatch(error.message, /CONTENTFUL_MANAGEMENT_KEY|management-key|raw upstream body/i);
+        return true;
+      }
+    );
+  });
+
+  it("returns an empty safe payload for malformed successful management responses", async () => {
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        return {
+          ok: true,
+          status: 201,
+          async json() {
+            throw new Error("malformed upstream JSON");
+          },
+        };
+      },
+    });
+
+    const result = await facade.createArticleDraft({ data: { title: "Draft" } });
+
+    assert.deepEqual(result, {});
   });
 });

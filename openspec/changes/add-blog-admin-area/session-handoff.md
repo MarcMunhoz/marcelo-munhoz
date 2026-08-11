@@ -6,7 +6,7 @@ This file captures the current state so a new Codex session can resume the `add-
 
 - Active branch: `issue_49`
 - GitHub issue: `#49`
-- Last pushed implementation commit: `ab7a5f3 docs(openspec): Atualiza direção do admin com dashboard e Cloudinary`
+- Last pushed implementation commit: `8612559 docs(openspec): Registra conclusão dos conjuntos 4 e 5`
 - The branch has local uncommitted work after the last push.
 
 ## Completed And Pushed
@@ -17,9 +17,11 @@ This file captures the current state so a new Codex session can resume the `add-
   - admin API routing foundation
   - server-side Contentful Management API facade
 - The first pass of set 4 planning/UI direction was committed and pushed before the dashboard rework.
-- Last verified before those commits:
-  - `node --test app/tests/*.test.js` passed
-  - `openspec validate add-blog-admin-area --strict` passed
+- Sets 4 and 5 were completed, committed, and pushed:
+  - dashboard-first admin shell
+  - writer article editor fields
+  - Cloudinary media facade, routes, picker, and upload flow
+  - public image compatibility for `thumbnail` and legacy `cloudinary`
 
 ## Current Local Work
 
@@ -32,20 +34,17 @@ Uncommitted files currently include:
 - `app/tests/adminFrontend.test.js`
 - `app/tests/cloudinaryMedia.test.js`
 - `app/tests/contentfulAdmin.test.js`
-- `app/tests/contentfulManagementFacade.test.js`
-- `app/tests/routingConfiguration.test.js`
-- `app/netlify/functions/contentfulAdminCore.js`
-- `app/middleware/contentfulAdmin.js`
-- `app/src/components/ArticlesList.vue`
-- `app/src/components/ArticlesTags.vue`
-- `app/src/components/BlogArticle.vue`
-- `openspec/changes/add-blog-admin-area/proposal.md`
-- `openspec/changes/add-blog-admin-area/design.md`
-- `openspec/changes/add-blog-admin-area/discovery.md`
 - `openspec/changes/add-blog-admin-area/tasks.md`
-- `openspec/changes/add-blog-admin-area/specs/blog-admin/spec.md`
+- `openspec/changes/add-blog-admin-area/session-handoff.md`
 
-Sets 4 and 5 are implemented locally and not yet committed after the last push.
+Set 6 is implemented locally and not yet committed after the last push.
+
+Set 7 is implemented locally and not yet committed after the last push:
+
+- `README.md` documents server-only Contentful Management and Cloudinary admin runtime variables using placeholders only.
+- `app/quasar.config.js` remains with `build.env: {}` and tests cover no admin credentials in frontend build config.
+- `app/scripts/scan-built-assets.js` adds built asset scanning for admin credential names and configured sanitized secret values, wired as `npm run scan:build-credentials`.
+- Admin API logging and frontend admin/media error display now use fixed user-safe messages instead of raw upstream diagnostics.
 
 ## Latest User Decisions
 
@@ -79,11 +78,15 @@ Sets 4 and 5 are implemented locally and not yet committed after the last push.
   - upload browser-selected images as Data URIs through the admin backend
   - sign Cloudinary upload requests server-side
   - keep public rendering compatible with legacy `cloudinary` while preferring `thumbnail`
+- Set 6 added owner workflows:
+  - owner-only review queue for publication and unpublication requests
+  - owner publish, unpublish, archive, and permanent delete actions
+  - explicit title confirmation before permanent deletion
+  - backend tests now cover writer rejection for all owner-only lifecycle routes
 
 ## Open Design/Implementation Questions
 
 - Decide how to map Contentful tags in the admin UI and CMA payload.
-- Decide whether draft/unpublished terminology in UI should be `Draft`, `Unpublished`, or both.
 
 ## Recommended Resume Point
 
@@ -97,18 +100,19 @@ Start the next session by reading:
 - `openspec/changes/add-blog-admin-area/tasks.md`
 - `openspec/changes/add-blog-admin-area/specs/blog-admin/spec.md`
 
-Then continue with set 6 unless the user asks to commit/push first:
+Then continue with set 9 unless the user asks to commit/push first:
 
-1. Review set 6 owner workflow tasks.
-2. Add owner-only UI actions and review queues with tests first.
-3. Keep writer sessions unable to invoke owner actions from UI and backend.
-4. Run `node --test app/tests/*.test.js`.
-5. Run `openspec validate add-blog-admin-area --strict`.
+1. Review set 9 documentation and rollout tasks.
+2. Update project documentation for admin architecture, free-plan constraints, permissions, dashboard behavior, Cloudinary media, rollback, and guest writer Contentful access guidance.
+3. Run `npm test`, `npm run lint`, `npm run build`, and `npm run scan:build-credentials` in the container context if docs touch validation paths or code changes continue.
+4. Run `openspec validate add-blog-admin-area --strict`.
 
 ## Current Validation
 
-After sets 4 and 5:
+After set 8 checks:
 
-- `node --test app/tests/*.test.js` passes with 55 tests.
-- `openspec validate add-blog-admin-area --strict` passes.
-- `git diff --check` passes.
+- `docker compose exec app npm test -- tests/contentfulProxy.test.js` passes with 10 public blog proxy tests.
+- `docker compose exec app npm test` passes with 74 tests.
+- `docker compose exec app npm run lint` passes.
+- `docker compose exec app npm run build` passes.
+- `docker compose exec app npm run scan:build-credentials` passes against `dist`.

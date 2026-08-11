@@ -47,34 +47,34 @@
 
 ## 6. Owner Workflows
 
-- [ ] 6.1 Add protected admin routing and navigation states for owner sessions.
-- [ ] 6.2 Add owner review queues for draft submissions and unpublication requests.
-- [ ] 6.3 Add owner publish behavior for reviewed article submissions.
-- [ ] 6.4 Add owner unpublish behavior for approved unpublication requests or selected articles.
-- [ ] 6.5 Add owner archive behavior for selected articles.
-- [ ] 6.6 Add owner-only permanent deletion flow with explicit confirmation and cancellation behavior.
-- [ ] 6.7 Ensure writer sessions cannot access owner-only UI actions and that the backend rejects owner-only API requests from writers.
+- [x] 6.1 Add protected admin routing and navigation states for owner sessions.
+- [x] 6.2 Add owner review queues for draft submissions and unpublication requests.
+- [x] 6.3 Add owner publish behavior for reviewed article submissions.
+- [x] 6.4 Add owner unpublish behavior for approved unpublication requests or selected articles.
+- [x] 6.5 Add owner archive behavior for selected articles.
+- [x] 6.6 Add owner-only permanent deletion flow with explicit confirmation and cancellation behavior.
+- [x] 6.7 Ensure writer sessions cannot access owner-only UI actions and that the backend rejects owner-only API requests from writers.
 
 ## 7. Credential And Build Safety
 
-- [ ] 7.1 Update runtime configuration documentation for Contentful Management API and Cloudinary credentials without exposing secret values.
-- [ ] 7.2 Ensure no Contentful management or Cloudinary credential is injected through `VITE_*` or other frontend build-time variables.
-- [ ] 7.3 Add or update validation that scans built frontend assets for management and Cloudinary credential names and configured secret values using sanitized test values.
-- [ ] 7.4 Ensure admin API logs intended for users do not include secret names, secret values, stack traces, or raw upstream diagnostics.
+- [x] 7.1 Update runtime configuration documentation for Contentful Management API and Cloudinary credentials without exposing secret values.
+- [x] 7.2 Ensure no Contentful management or Cloudinary credential is injected through `VITE_*` or other frontend build-time variables.
+- [x] 7.3 Add or update validation that scans built frontend assets for management and Cloudinary credential names and configured secret values using sanitized test values.
+- [x] 7.4 Ensure admin API logs intended for users do not include secret names, secret values, stack traces, or raw upstream diagnostics.
 
 ## 8. Tests And Validation
 
-- [ ] 8.1 Add deterministic tests for unauthenticated, writer, and owner admin API authorization behavior.
-- [ ] 8.2 Add deterministic tests for Contentful Management API facade success paths using mocks or fixtures.
-- [ ] 8.3 Add deterministic tests for Cloudinary media facade success and failure paths using mocks or fixtures.
-- [ ] 8.4 Add deterministic tests for missing configuration, upstream failures, malformed upstream responses, and version conflicts.
-- [ ] 8.5 Add frontend regression coverage for dashboard status cards, article table filtering, writer draft creation, writer draft editing, submit-for-review, and unpublication request flows.
-- [ ] 8.6 Add frontend regression coverage for owner publish, unpublish, archive, and permanent deletion confirmation flows.
-- [ ] 8.7 Verify the existing public blog read tests still pass unchanged.
-- [ ] 8.8 Run the project test suite in the container context.
-- [ ] 8.9 Run lint and build validation in the container context.
-- [ ] 8.10 Run `openspec validate add-blog-admin-area --strict`.
-- [ ] 8.11 Document optional live Contentful, Cloudinary, or deployed Netlify smoke checks separately from routine automated validation.
+- [x] 8.1 Add deterministic tests for unauthenticated, writer, and owner admin API authorization behavior.
+- [x] 8.2 Add deterministic tests for Contentful Management API facade success paths using mocks or fixtures.
+- [x] 8.3 Add deterministic tests for Cloudinary media facade success and failure paths using mocks or fixtures.
+- [x] 8.4 Add deterministic tests for missing configuration, upstream failures, malformed upstream responses, and version conflicts.
+- [x] 8.5 Add frontend regression coverage for dashboard status cards, article table filtering, writer draft creation, writer draft editing, submit-for-review, and unpublication request flows.
+- [x] 8.6 Add frontend regression coverage for owner publish, unpublish, archive, and permanent deletion confirmation flows.
+- [x] 8.7 Verify the existing public blog read tests still pass unchanged.
+- [x] 8.8 Run the project test suite in the container context.
+- [x] 8.9 Run lint and build validation in the container context.
+- [x] 8.10 Run `openspec validate add-blog-admin-area --strict`.
+- [x] 8.11 Document optional live Contentful, Cloudinary, or deployed Netlify smoke checks separately from routine automated validation.
 
 ## 9. Documentation And Rollout
 

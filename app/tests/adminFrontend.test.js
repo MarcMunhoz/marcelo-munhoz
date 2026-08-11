@@ -1,7 +1,29 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { buildArticlePayload, filterAdminArticles, summarizeArticleStatuses } from "../src/utils/adminDashboard.js";
+import {
+  adminUserMessage,
+  AdminApiError,
+  archiveArticle,
+  createArticleDraft,
+  deleteArticle,
+  publishArticle,
+  requestArticleUnpublication,
+  submitArticleForReview,
+  unpublishArticle,
+  updateArticleDraft,
+} from "../src/utils/adminApi.js";
+import {
+  applyArticleResponseToForm,
+  articleToForm,
+  buildArticlePayload,
+  canConfirmArticleDeletion,
+  filterAdminArticles,
+  ownerReviewQueues,
+  removeArticleById,
+  summarizeArticleStatuses,
+  updateArticleStatusById,
+} from "../src/utils/adminDashboard.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -42,9 +64,75 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /updateArticleDraft/);
     assert.match(api, /submitArticleForReview/);
     assert.match(api, /requestArticleUnpublication/);
+    assert.match(api, /publishArticle/);
+    assert.match(api, /unpublishArticle/);
+    assert.match(api, /archiveArticle/);
+    assert.match(api, /deleteArticle/);
     assert.match(api, /listMediaAssets/);
     assert.match(api, /uploadMediaAsset/);
     assert.match(api, /Authorization/);
+  });
+
+  it("calls owner lifecycle endpoints with version state and server authorization", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { ok: true };
+        },
+      };
+    };
+    const session = { token: "owner-token" };
+
+    await publishArticle({ articleId: "article-1", version: 7, session, fetchImpl });
+    await unpublishArticle({ articleId: "article-1", version: 8, session, fetchImpl });
+    await archiveArticle({ articleId: "article-1", version: 9, session, fetchImpl });
+    await deleteArticle({ articleId: "article-1", version: 10, session, fetchImpl });
+
+    assert.deepEqual(
+      calls.map((call) => [call.url, call.options.method, JSON.parse(call.options.body)]),
+      [
+        ["/api/admin/contentful/articles/article-1/publish", "POST", { version: 7 }],
+        ["/api/admin/contentful/articles/article-1/unpublish", "POST", { version: 8 }],
+        ["/api/admin/contentful/articles/article-1/archive", "POST", { version: 9 }],
+        ["/api/admin/contentful/articles/article-1", "DELETE", { version: 10 }],
+      ]
+    );
+    assert.equal(calls[0].options.headers.Authorization, "Bearer owner-token");
+  });
+
+  it("calls writer draft and review endpoints with article payloads and hidden version state", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { ok: true };
+        },
+      };
+    };
+    const session = { token: "writer-token" };
+
+    await createArticleDraft({ article: { title: "Draft" }, session, fetchImpl });
+    await updateArticleDraft({ articleId: "article-1", article: { title: "Updated", version: 4 }, session, fetchImpl });
+    await submitArticleForReview({ articleId: "article-1", version: 5, notes: "", session, fetchImpl });
+    await requestArticleUnpublication({ articleId: "article-1", version: 6, notes: "", session, fetchImpl });
+
+    assert.deepEqual(
+      calls.map((call) => [call.url, call.options.method, JSON.parse(call.options.body)]),
+      [
+        ["/api/admin/contentful/articles", "POST", { title: "Draft" }],
+        ["/api/admin/contentful/articles/article-1", "PUT", { title: "Updated", version: 4 }],
+        ["/api/admin/contentful/articles/article-1/submit", "POST", { version: 5, notes: "" }],
+        ["/api/admin/contentful/articles/article-1/unpublication-requests", "POST", { version: 6, notes: "" }],
+      ]
+    );
+    assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
   });
 
   it("summarizes article status counts for the dashboard", () => {
@@ -84,6 +172,19 @@ describe("admin frontend writer workflow", () => {
     assert.deepEqual(filtered, [rows[0]]);
   });
 
+  it("builds owner review queues for publication and unpublication requests", () => {
+    const queues = ownerReviewQueues([
+      { id: "review-1", title: "Ready article", status: "review", version: 4 },
+      { id: "take-down-1", title: "Published article", status: "unpublicationRequested", version: 9 },
+      { id: "draft-1", title: "Draft article", status: "draft", version: 2 },
+    ]);
+
+    assert.deepEqual(queues, {
+      submissions: [{ id: "review-1", title: "Ready article", status: "review", version: 4 }],
+      unpublicationRequests: [{ id: "take-down-1", title: "Published article", status: "unpublicationRequested", version: 9 }],
+    });
+  });
+
   it("builds article payloads with real Contentful fields and hidden version state", () => {
     const payload = buildArticlePayload({
       title: "  New Admin  ",
@@ -113,6 +214,80 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
+  it("hydrates writer edit forms from existing articles without exposing review notes", () => {
+    const form = articleToForm({
+      id: "article-1",
+      title: "Existing article",
+      slug: "existing-article",
+      description: "Existing description",
+      body: "# Body",
+      createAt: "2026-08-11",
+      thumbnail: {
+        public_id: "marcelo-munhoz-website/existing",
+        secure_url: "https://example.test/existing.jpg",
+      },
+      alt: "Existing image",
+      authorEntryId: "author-1",
+      tags: ["admin", "review"],
+      version: 12,
+      reviewNotes: "owner-only note",
+    });
+
+    assert.deepEqual(form, {
+      id: "article-1",
+      title: "Existing article",
+      slug: "existing-article",
+      description: "Existing description",
+      body: "# Body",
+      createAt: "2026-08-11",
+      thumbnailPublicId: "marcelo-munhoz-website/existing",
+      thumbnailUrl: "https://example.test/existing.jpg",
+      alt: "Existing image",
+      author: "author-1",
+      tags: "admin, review",
+      version: 12,
+    });
+  });
+
+  it("stores returned Contentful id and version after a successful draft save", () => {
+    const form = { id: "", version: null, title: "Draft" };
+
+    assert.deepEqual(
+      applyArticleResponseToForm(form, {
+        sys: { id: "article-1", version: 3 },
+      }),
+      { id: "article-1", version: 3, title: "Draft" }
+    );
+    assert.deepEqual(
+      applyArticleResponseToForm(form, {
+        draft: { sys: { id: "article-2", version: 4 } },
+      }),
+      { id: "article-2", version: 4, title: "Draft" }
+    );
+  });
+
+  it("updates owner lifecycle article state without changing unrelated rows", () => {
+    const rows = [
+      { id: "article-1", status: "review" },
+      { id: "article-2", status: "published" },
+    ];
+
+    assert.deepEqual(updateArticleStatusById(rows, "article-1", "published"), [
+      { id: "article-1", status: "published" },
+      { id: "article-2", status: "published" },
+    ]);
+    assert.deepEqual(removeArticleById(rows, "article-2"), [{ id: "article-1", status: "review" }]);
+  });
+
+  it("requires an exact article title before confirming permanent deletion", () => {
+    const article = { id: "article-1", title: "Permanent Delete Target" };
+
+    assert.equal(canConfirmArticleDeletion(article, "Permanent Delete Target"), true);
+    assert.equal(canConfirmArticleDeletion(article, " permanent delete target "), false);
+    assert.equal(canConfirmArticleDeletion(article, "Other article"), false);
+    assert.equal(canConfirmArticleDeletion(null, "Permanent Delete Target"), false);
+  });
+
   it("resolves Contentful thumbnail images with legacy Cloudinary fallback", () => {
     assert.equal(
       articleCardImageUrl({ thumbnail: { public_id: "marcelo-munhoz-website/new-image" } }),
@@ -135,7 +310,7 @@ describe("admin frontend writer workflow", () => {
   it("renders the dashboard-first shell, article table, editor fields, and workflow controls", () => {
     const page = read("../src/pages/Admin.vue");
 
-    for (const text of ["Editorial dashboard", "Published", "Drafts", "In review", "Article queue", "Media library", "Page views pending"]) {
+    for (const text of ["Editorial dashboard", "Published", "Drafts", "In review", "Article queue", "Owner review", "Media library", "Page views pending"]) {
       assert.match(page, new RegExp(text));
     }
 
@@ -149,6 +324,13 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /Save draft/);
     assert.match(page, /Submit for review/);
     assert.match(page, /Request unpublication/);
+    assert.match(page, /Publish/);
+    assert.match(page, /Unpublish/);
+    assert.match(page, /Archive/);
+    assert.match(page, /Delete permanently/);
+    assert.match(page, /confirmPermanentDeletion/);
+    assert.match(page, /v-if="isOwner"/);
+    assert.match(page, /isOwnerSession\(this\.session\)/);
     assert.match(page, /Select image/);
     assert.match(page, /Upload image/);
     assert.match(page, /applySelectedMedia/);
@@ -161,10 +343,24 @@ describe("admin frontend writer workflow", () => {
     const page = read("../src/pages/Admin.vue");
 
     assert.match(page, /validateArticleForm/);
-    assert.match(page, /status === 401/);
-    assert.match(page, /status === 403/);
-    assert.match(page, /status === 409/);
-    assert.match(page, /media/i);
+    assert.match(page, /adminUserMessage\(error\)/);
+    assert.match(page, /adminUserMessage\(error, \{ media: true \}\)/);
+    assert.doesNotMatch(page, /showFeedback\(error\.message/);
+    assert.doesNotMatch(page, /mediaError = error\.message/);
     assert.match(page, /Draft saved/);
+  });
+
+  it("maps backend admin error payloads to fixed user-safe frontend messages", () => {
+    assert.equal(
+      adminUserMessage(new AdminApiError(500, { error: "CONTENTFUL_MANAGEMENT_KEY=cfmgmt_sanitized_secret_123 upstream failed" })),
+      "The admin request could not be completed."
+    );
+    assert.equal(
+      adminUserMessage(new AdminApiError(502, { error: "Cloudinary API returned api-secret from raw diagnostics" }), { media: true }),
+      "Media request failed."
+    );
+    assert.equal(adminUserMessage(new AdminApiError(401, { error: "raw" })), "Sign in again before saving.");
+    assert.equal(adminUserMessage(new AdminApiError(403, { error: "raw" })), "Your account cannot perform this action.");
+    assert.equal(adminUserMessage(new AdminApiError(409, { error: "raw" })), "This article changed elsewhere. Reload before saving.");
   });
 });

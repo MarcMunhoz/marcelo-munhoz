@@ -20,6 +20,30 @@ export class AdminApiError extends Error {
   }
 }
 
+export const adminUserMessage = (error, { media = false } = {}) => {
+  if (!(error instanceof AdminApiError)) {
+    return media ? "Media request failed." : "The admin request could not be completed.";
+  }
+
+  if (error.status === 401) {
+    return media ? "Sign in again before selecting media." : "Sign in again before saving.";
+  }
+
+  if (error.status === 403) {
+    return media ? "Your account cannot select media." : "Your account cannot perform this action.";
+  }
+
+  if (!media && error.status === 409) {
+    return "This article changed elsewhere. Reload before saving.";
+  }
+
+  if (!media && (error.status === 422 || /media/i.test(error.message))) {
+    return "The media selection could not be saved. Select the image again.";
+  }
+
+  return media ? "Media request failed." : "The admin request could not be completed.";
+};
+
 export const adminRequest = async ({ path, method = "GET", body, session, fetchImpl = fetch }) => {
   const headers = {
     "content-type": "application/json",
@@ -92,6 +116,42 @@ export const uploadMediaAsset = ({ file, filename, session, fetchImpl }) =>
     path: "/media/upload",
     method: "POST",
     body: { file, filename },
+    session,
+    fetchImpl,
+  });
+
+export const publishArticle = ({ articleId, version, session, fetchImpl }) =>
+  adminRequest({
+    path: `/articles/${encodeURIComponent(articleId)}/publish`,
+    method: "POST",
+    body: { version },
+    session,
+    fetchImpl,
+  });
+
+export const unpublishArticle = ({ articleId, version, session, fetchImpl }) =>
+  adminRequest({
+    path: `/articles/${encodeURIComponent(articleId)}/unpublish`,
+    method: "POST",
+    body: { version },
+    session,
+    fetchImpl,
+  });
+
+export const archiveArticle = ({ articleId, version, session, fetchImpl }) =>
+  adminRequest({
+    path: `/articles/${encodeURIComponent(articleId)}/archive`,
+    method: "POST",
+    body: { version },
+    session,
+    fetchImpl,
+  });
+
+export const deleteArticle = ({ articleId, version, session, fetchImpl }) =>
+  adminRequest({
+    path: `/articles/${encodeURIComponent(articleId)}`,
+    method: "DELETE",
+    body: { version },
     session,
     fetchImpl,
   });

@@ -117,6 +117,10 @@ export class CloudinaryMediaRequestError extends Error {
   }
 }
 
+const logAdminError = (logger, message) => {
+  logger?.error?.(message);
+};
+
 const notImplementedOperation = (operation) => async () => {
   throw new ContentfulAdminNotImplementedError(operation);
 };
@@ -489,15 +493,15 @@ export const createContentfulAdminHandler = ({
     } catch (error) {
       if (error?.publicError && error?.statusCode) {
         if (error instanceof ContentfulAdminConfigurationError || error instanceof CloudinaryMediaConfigurationError) {
-          logger.error(error.message);
+          logAdminError(logger, "Admin runtime configuration is missing");
         } else if (!(error instanceof ContentfulVersionConflictError) && !(error instanceof ContentfulAdminNotImplementedError)) {
-          logger.error("Contentful admin request failed:", error?.message || error);
+          logAdminError(logger, "Contentful admin request failed");
         }
 
         return jsonResponse(error.statusCode, { error: error.publicError });
       }
 
-      logger.error("Contentful admin request failed:", error?.message || error);
+      logAdminError(logger, "Contentful admin request failed");
       return jsonResponse(500, { error: "Admin request failed" });
     }
   };

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   CloudinaryMediaConfigurationError,
+  CloudinaryMediaRequestError,
   createCloudinaryMediaFacade,
   createContentfulAdminHandler,
 } from "../middleware/contentfulAdmin.js";
@@ -131,6 +132,60 @@ describe("cloudinary media facade", () => {
     await assert.rejects(() => facade.listMedia({ query: {} }), CloudinaryMediaConfigurationError);
     await assert.rejects(() => facade.uploadMedia({ data: { file: "data:image/jpeg;base64,abc123" } }), CloudinaryMediaConfigurationError);
     assert.equal(called, false);
+  });
+
+  it("maps upstream media failures to safe media request errors", async () => {
+    const facade = createCloudinaryMediaFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        return createResponse(503, { error: { message: "CLOUDINARY_API_SECRET=api-secret raw failure" } });
+      },
+    });
+
+    await assert.rejects(
+      () => facade.listMedia({ query: {} }),
+      (error) => {
+        assert.ok(error instanceof CloudinaryMediaRequestError);
+        assert.equal(error.publicError, "Media request failed");
+        assert.doesNotMatch(error.message, /CLOUDINARY_API_SECRET|api-secret|raw failure/i);
+        return true;
+      }
+    );
+  });
+
+  it("rejects malformed upload input before calling Cloudinary", async () => {
+    let called = false;
+    const facade = createCloudinaryMediaFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        called = true;
+      },
+    });
+
+    await assert.rejects(
+      () => facade.uploadMedia({ data: { file: "https://example.test/image.jpg" } }),
+      CloudinaryMediaRequestError
+    );
+    assert.equal(called, false);
+  });
+
+  it("returns an empty safe media list for malformed successful media responses", async () => {
+    const facade = createCloudinaryMediaFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            throw new Error("malformed Cloudinary JSON");
+          },
+        };
+      },
+    });
+
+    const result = await facade.listMedia({ query: {} });
+
+    assert.deepEqual(result, { assets: [] });
   });
 });
 

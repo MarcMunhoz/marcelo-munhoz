@@ -126,6 +126,49 @@
               </q-table>
             </section>
 
+            <section v-if="isOwner" class="owner-review-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="admin-kicker">Owner review</p>
+                  <h2>Review queue</h2>
+                </div>
+                <q-badge outline color="blue-grey-7">{{ ownerQueueCount }} pending</q-badge>
+              </div>
+
+              <div class="owner-queue-grid">
+                <article class="owner-queue">
+                  <h3>Publication requests</h3>
+                  <p v-if="ownerQueues.submissions.length === 0" class="empty-queue">No drafts waiting for publication.</p>
+                  <div v-for="article in ownerQueues.submissions" :key="article.id" class="owner-queue-row">
+                    <div>
+                      <strong>{{ article.title }}</strong>
+                      <span>{{ article.author }} · {{ article.createAt }}</span>
+                    </div>
+                    <div class="owner-actions">
+                      <q-btn dense unelevated color="blue-grey-8" icon="publish" label="Publish" :loading="loadingAction === `publish-${article.id}`" @click="publishSelectedArticle(article)" />
+                      <q-btn dense outline color="blue-grey-7" icon="archive" label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="archiveSelectedArticle(article)" />
+                    </div>
+                  </div>
+                </article>
+
+                <article class="owner-queue">
+                  <h3>Unpublication requests</h3>
+                  <p v-if="ownerQueues.unpublicationRequests.length === 0" class="empty-queue">No take-down requests waiting for review.</p>
+                  <div v-for="article in ownerQueues.unpublicationRequests" :key="article.id" class="owner-queue-row">
+                    <div>
+                      <strong>{{ article.title }}</strong>
+                      <span>{{ article.author }} · {{ article.createAt }}</span>
+                    </div>
+                    <div class="owner-actions">
+                      <q-btn dense unelevated color="amber-9" icon="visibility_off" label="Unpublish" :loading="loadingAction === `unpublish-${article.id}`" @click="unpublishSelectedArticle(article)" />
+                      <q-btn dense outline color="blue-grey-7" icon="archive" label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="archiveSelectedArticle(article)" />
+                      <q-btn dense outline color="negative" icon="delete_forever" label="Delete permanently" @click="openDeleteConfirmation(article)" />
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </section>
+
             <aside class="editor-panel">
               <div class="panel-heading compact">
                 <div>
@@ -214,13 +257,63 @@
         </q-card-section>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="deleteDialogOpen">
+      <q-card class="delete-dialog">
+        <q-card-section>
+          <p class="admin-kicker">Owner action</p>
+          <h2>Delete permanently</h2>
+          <p>
+            This permanently deletes <strong>{{ articlePendingDeletion?.title }}</strong>. Type the article title to confirm.
+          </p>
+          <q-input v-model="deleteConfirmation" outlined dense label="Article title" autofocus />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat color="blue-grey-7" label="Cancel" v-close-popup />
+          <q-btn
+            unelevated
+            color="negative"
+            icon="delete_forever"
+            label="Delete permanently"
+            :disable="deleteConfirmation !== articlePendingDeletion?.title"
+            :loading="loadingAction === `delete-${articlePendingDeletion?.id}`"
+            @click="confirmPermanentDeletion"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script>
 import { defineComponent } from "vue";
-import { createArticleDraft, listMediaAssets, requestArticleUnpublication, submitArticleForReview, updateArticleDraft, uploadMediaAsset, AdminApiError } from "../utils/adminApi.js";
-import { articleToForm, buildArticlePayload, createEmptyArticleForm, filterAdminArticles, sampleAdminArticles, summarizeArticleStatuses } from "../utils/adminDashboard.js";
+import {
+  archiveArticle,
+  createArticleDraft,
+  deleteArticle,
+  listMediaAssets,
+  publishArticle,
+  requestArticleUnpublication,
+  submitArticleForReview,
+  unpublishArticle,
+  updateArticleDraft,
+  uploadMediaAsset,
+  adminUserMessage,
+  AdminApiError,
+} from "../utils/adminApi.js";
+import {
+  applyArticleResponseToForm,
+  articleToForm,
+  buildArticlePayload,
+  canConfirmArticleDeletion,
+  createEmptyArticleForm,
+  filterAdminArticles,
+  ownerReviewQueues,
+  removeArticleById,
+  sampleAdminArticles,
+  summarizeArticleStatuses,
+  updateArticleStatusById,
+} from "../utils/adminDashboard.js";
 import { getAdminSession, isOwnerSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
 
 export default defineComponent({
@@ -243,6 +336,9 @@ export default defineComponent({
       mediaDialogOpen: false,
       mediaError: "",
       mediaUploadFile: null,
+      deleteDialogOpen: false,
+      articlePendingDeletion: null,
+      deleteConfirmation: "",
       statusMessage: "",
       feedbackMessage: "",
       feedbackTone: "info",
@@ -259,6 +355,7 @@ export default defineComponent({
         { label: "Published", value: "published" },
         { label: "Draft", value: "draft" },
         { label: "Unpublished", value: "unpublished" },
+        { label: "Unpublication requested", value: "unpublicationRequested" },
         { label: "In review", value: "review" },
       ],
     };
@@ -281,8 +378,17 @@ export default defineComponent({
 
       return isOwnerSession(this.session) ? "Owner" : "Writer";
     },
+    isOwner() {
+      return isOwnerSession(this.session);
+    },
     dashboardSummary() {
       return summarizeArticleStatuses(this.articles);
+    },
+    ownerQueues() {
+      return ownerReviewQueues(this.articles);
+    },
+    ownerQueueCount() {
+      return this.ownerQueues.submissions.length + this.ownerQueues.unpublicationRequests.length;
     },
     filteredArticles() {
       return filterAdminArticles(this.articles, this.filters);
@@ -327,6 +433,7 @@ export default defineComponent({
         published: "teal-8",
         draft: "blue-grey-7",
         unpublished: "amber-9",
+        unpublicationRequested: "amber-9",
         review: "indigo-7",
         archived: "grey-7",
       }[status] || "blue-grey-7";
@@ -336,6 +443,7 @@ export default defineComponent({
         published: "Published",
         draft: "Draft",
         unpublished: "Unpublished",
+        unpublicationRequested: "Unpublication requested",
         review: "In review",
         archived: "Archived",
       }[status] || "Draft";
@@ -426,15 +534,7 @@ export default defineComponent({
       });
     },
     applyArticleResponse(payload = {}) {
-      const sys = payload.sys || payload.draft?.sys;
-
-      if (sys?.id) {
-        this.articleForm.id = sys.id;
-      }
-
-      if (sys?.version) {
-        this.articleForm.version = sys.version;
-      }
+      this.articleForm = applyArticleResponseToForm(this.articleForm, payload);
     },
     async saveDraft() {
       if (!this.validateArticleForm()) {
@@ -497,54 +597,81 @@ export default defineComponent({
         this.loadingAction = "";
       }
     },
-    handleAdminError(error) {
-      if (error instanceof AdminApiError) {
-        if (error.status === 401) {
-          this.showFeedback("Sign in again before saving.", "error");
-          return;
-        }
-
-        if (error.status === 403) {
-          this.showFeedback("Your account cannot perform this action.", "error");
-          return;
-        }
-
-        if (error.status === 409) {
-          this.showFeedback("This article changed elsewhere. Reload before saving.", "error");
-          return;
-        }
-
-        if (error.status === 422 || /media/i.test(error.message)) {
-          this.showFeedback("The media selection could not be saved. Select the image again.", "error");
-          return;
-        }
-
-        this.showFeedback(error.message, "error");
+    updateArticleStatus(articleId, status) {
+      this.articles = updateArticleStatusById(this.articles, articleId, status);
+    },
+    removeArticle(articleId) {
+      this.articles = removeArticleById(this.articles, articleId);
+    },
+    async runOwnerLifecycleAction(article, actionName, operation, successMessage, afterSuccess) {
+      if (!this.isOwner) {
+        this.showFeedback("Only owners can perform this action.", "error");
         return;
       }
 
-      this.showFeedback("The admin request could not be completed.", "error");
+      this.loadingAction = `${actionName}-${article.id}`;
+
+      try {
+        await operation({
+          articleId: article.id,
+          version: article.version,
+          session: this.session,
+        });
+        afterSuccess?.();
+        this.showFeedback(successMessage, "success");
+      } catch (error) {
+        this.handleAdminError(error);
+      } finally {
+        this.loadingAction = "";
+      }
+    },
+    publishSelectedArticle(article) {
+      return this.runOwnerLifecycleAction(article, "publish", publishArticle, "Article published.", () => this.updateArticleStatus(article.id, "published"));
+    },
+    unpublishSelectedArticle(article) {
+      return this.runOwnerLifecycleAction(article, "unpublish", unpublishArticle, "Article unpublished.", () => this.updateArticleStatus(article.id, "unpublished"));
+    },
+    archiveSelectedArticle(article) {
+      return this.runOwnerLifecycleAction(article, "archive", archiveArticle, "Article archived.", () => this.updateArticleStatus(article.id, "archived"));
+    },
+    openDeleteConfirmation(article) {
+      if (!this.isOwner) {
+        this.showFeedback("Only owners can perform this action.", "error");
+        return;
+      }
+
+      this.articlePendingDeletion = article;
+      this.deleteConfirmation = "";
+      this.deleteDialogOpen = true;
+    },
+    async confirmPermanentDeletion() {
+      const article = this.articlePendingDeletion;
+
+      if (!canConfirmArticleDeletion(article, this.deleteConfirmation)) {
+        return;
+      }
+
+      await this.runOwnerLifecycleAction(article, "delete", deleteArticle, "Article permanently deleted.", () => this.removeArticle(article.id));
+      this.deleteDialogOpen = false;
+      this.articlePendingDeletion = null;
+      this.deleteConfirmation = "";
+    },
+    handleAdminError(error) {
+      if (error instanceof AdminApiError) {
+        this.showFeedback(adminUserMessage(error), "error");
+        return;
+      }
+
+      this.showFeedback(adminUserMessage(error), "error");
     },
     handleMediaError(error) {
       if (error instanceof AdminApiError) {
-        if (error.status === 401) {
-          this.mediaError = "Sign in again before selecting media.";
-          this.showFeedback(this.mediaError, "error");
-          return;
-        }
-
-        if (error.status === 403) {
-          this.mediaError = "Your account cannot select media.";
-          this.showFeedback(this.mediaError, "error");
-          return;
-        }
-
-        this.mediaError = error.message || "Media request failed.";
+        this.mediaError = adminUserMessage(error, { media: true });
         this.showFeedback(this.mediaError, "error");
         return;
       }
 
-      this.mediaError = "Media request failed.";
+      this.mediaError = adminUserMessage(error, { media: true });
       this.showFeedback(this.mediaError, "error");
     },
     showFeedback(message, tone = "info") {
@@ -676,6 +803,7 @@ export default defineComponent({
 
 .status-card,
 .article-queue-panel,
+.owner-review-panel,
 .editor-panel {
   background: #ffffff;
   border: 1px solid #cfd8dc;
@@ -711,8 +839,59 @@ export default defineComponent({
 }
 
 .article-queue-panel,
+.owner-review-panel,
 .editor-panel {
   padding: 16px;
+}
+
+.owner-review-panel {
+  grid-column: 1 / -1;
+}
+
+.owner-queue-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.owner-queue {
+  border: 1px solid #e0e6e8;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+
+  h3 {
+    color: #37474f;
+    font-size: 1rem;
+    margin: 0;
+  }
+}
+
+.owner-queue-row {
+  align-items: center;
+  border-top: 1px solid #edf1f2;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-top: 10px;
+
+  span {
+    color: #607d8b;
+    display: block;
+    font-size: 0.82rem;
+  }
+}
+
+.owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.empty-queue {
+  color: #607d8b;
+  margin: 0;
 }
 
 .panel-heading {
@@ -787,6 +966,16 @@ export default defineComponent({
   min-width: min(920px, 92vw);
 }
 
+.delete-dialog {
+  max-width: 520px;
+  width: min(520px, 92vw);
+
+  h2 {
+    font-size: 1.25rem;
+    margin: 0 0 12px;
+  }
+}
+
 .media-dialog-header {
   align-items: flex-start;
   border-bottom: 1px solid #e0e6e8;
@@ -857,7 +1046,8 @@ export default defineComponent({
 
 @media (max-width: 1100px) {
   .admin-shell,
-  .admin-main-grid {
+  .admin-main-grid,
+  .owner-queue-grid {
     grid-template-columns: 1fr;
   }
 
@@ -882,9 +1072,18 @@ export default defineComponent({
 
   .admin-topbar,
   .admin-topbar-actions,
-  .form-row {
+  .form-row,
+  .owner-queue-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .owner-queue-row {
+    display: flex;
+  }
+
+  .owner-actions {
+    justify-content: flex-start;
   }
 
   .admin-search {
