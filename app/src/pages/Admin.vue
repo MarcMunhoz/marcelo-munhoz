@@ -1,6 +1,6 @@
 <template>
   <q-page class="admin-page">
-    <section class="admin-shell">
+    <section v-if="showAdminSurface" class="admin-shell">
       <section class="admin-workspace">
         <header class="admin-topbar">
           <div>
@@ -177,6 +177,8 @@
         </template>
       </section>
     </section>
+
+    <section v-else class="admin-login-shell" aria-hidden="true"></section>
 
     <q-drawer v-model="editorOpen" side="right" overlay bordered class="editor-drawer" :width="560">
       <div class="editor-drawer-body">
@@ -386,6 +388,8 @@ export default defineComponent({
   data() {
     return {
       session: null,
+      sessionResolved: false,
+      loginRedirecting: false,
       activeSection: "dashboard",
       articles: [],
       adminSummary: summarizeArticleStatuses([]),
@@ -439,6 +443,9 @@ export default defineComponent({
     canWrite() {
       return isWriterSession(this.session);
     },
+    showAdminSurface() {
+      return this.sessionResolved && !this.loginRedirecting;
+    },
     isOwner() {
       return isOwnerSession(this.session);
     },
@@ -471,6 +478,7 @@ export default defineComponent({
   },
   async mounted() {
     this.session = await getAdminSession();
+    this.sessionResolved = true;
     this.redirectToLoginIfSignedOut();
     this.loadArticleDashboard();
   },
@@ -480,6 +488,7 @@ export default defineComponent({
     },
     redirectToLoginIfSignedOut() {
       if (!this.session) {
+        this.loginRedirecting = true;
         this.openLogin();
       }
     },
@@ -843,6 +852,10 @@ export default defineComponent({
   grid-template-columns: minmax(0, 1fr);
   min-height: calc(100vh - 98px);
   width: 100%;
+}
+
+.admin-login-shell {
+  min-height: calc(100vh - 98px);
 }
 
 .admin-workspace {

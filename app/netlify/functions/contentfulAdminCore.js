@@ -311,6 +311,8 @@ const safeMaxResults = (value) => {
 
 const basicAuth = (apiKey, apiSecret) => `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`;
 
+const uniqueMediaPrefixes = (...prefixes) => [...new Set(prefixes.map((prefix) => String(prefix || "").trim()).filter(Boolean))];
+
 const signedParams = (params = {}, apiSecret) => {
   const signatureBase = Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== "")
@@ -480,26 +482,45 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
     return payload;
   };
 
+  const fetchMediaResources = async ({ config, maxResults, prefix }) => {
+    const url = new URL(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/resources/image/upload`);
+
+    if (prefix) {
+      url.searchParams.set("prefix", prefix);
+    }
+
+    url.searchParams.set("max_results", String(maxResults));
+
+    const payload = await readCloudinaryJson(
+      await fetchImpl(url, {
+        method: "GET",
+        headers: {
+          authorization: basicAuth(config.apiKey, config.apiSecret),
+        },
+      })
+    );
+
+    return {
+      assets: Array.isArray(payload.resources) ? payload.resources.map(normalizeCloudinaryAsset) : [],
+      ...(payload.next_cursor ? { next_cursor: payload.next_cursor } : {}),
+    };
+  };
+
   return {
     async listMedia({ query = {} } = {}) {
       const config = cloudinaryConfigFromEnv(env, fetchImpl);
-      const url = new URL(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/resources/image/upload`);
-      url.searchParams.set("prefix", config.folder);
-      url.searchParams.set("max_results", String(safeMaxResults(query.max_results)));
+      const maxResults = safeMaxResults(query.max_results);
+      const prefixes = uniqueMediaPrefixes(config.folder, DEFAULT_CLOUDINARY_FOLDER);
 
-      const payload = await readCloudinaryJson(
-        await fetchImpl(url, {
-          method: "GET",
-          headers: {
-            authorization: basicAuth(config.apiKey, config.apiSecret),
-          },
-        })
-      );
+      for (const prefix of prefixes) {
+        const result = await fetchMediaResources({ config, maxResults, prefix });
 
-      return {
-        assets: (payload.resources || []).map(normalizeCloudinaryAsset),
-        ...(payload.next_cursor ? { next_cursor: payload.next_cursor } : {}),
-      };
+        if (result.assets.length > 0) {
+          return result;
+        }
+      }
+
+      return fetchMediaResources({ config, maxResults });
     },
     async uploadMedia({ data = {} } = {}) {
       const config = cloudinaryConfigFromEnv(env, fetchImpl);
