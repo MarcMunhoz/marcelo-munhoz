@@ -77,6 +77,8 @@ Configure these variables in Netlify. Keep Function-scoped values in the server/
 | `VITE_API_BASE_URL` | No | Builds | Explicit frontend API override. Leave unset for normal Netlify and local usage. |
 | `VITE_API_URL` | No | None | Legacy variable. The app ignores it; remove it from Netlify and local environments. |
 
+Do not mark `CLOUDINARY_UPLOAD_FOLDER` or `CLOUDINARY_FOLDER` as secret values in Netlify. They are public path prefixes that can appear in Cloudinary image URLs. The build config omits those keys from Netlify secret scanning so real credential scanning can stay enabled.
+
 Use sanitized placeholder values in documentation and tickets, for example `<contentful-management-token>` or `<cloudinary-api-secret>`. Do not paste real values into README, OpenSpec artifacts, GitHub issues, PRs, commits, or logs intended for users.
 
 Do not expose Contentful or Cloudinary credentials as `VITE_*` variables. The only supported frontend build variable is `VITE_API_BASE_URL`; all Contentful and Cloudinary credential variables above are server-side only.

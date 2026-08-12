@@ -8,6 +8,9 @@
     X-Frame-Options = "SAMEORIGIN"
     X-XSS-Protection = "1; mode=block"
 
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "CLOUDINARY_UPLOAD_FOLDER,CLOUDINARY_FOLDER"
+
 [[redirects]]
   from = "/api/admin/contentful/*"
   to = "/.netlify/functions/contentful-admin/:splat"
