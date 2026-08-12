@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import contentfulAdminRoutes from "./routes/contentfulAdmin.js";
 import contentfulRoutes from "./routes/contentful.js";
 
 dotenv.config();
@@ -27,6 +28,7 @@ app.get("/healthz", (_, res) => {
 });
 
 // 👉 API
+app.use("/api/admin/contentful", contentfulAdminRoutes);
 app.use("/api/contentful", contentfulRoutes);
 
 app.listen(port, () => {

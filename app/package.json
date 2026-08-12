@@ -1,6 +1,6 @@
 {
   "name": "marcelo-munhoz-website",
-  "version": "2.1.4",
+  "version": "2.1.6",
   "productName": "Marcelo Munhoz Website",
   "author": "Marcelo Munhoz",
   "private": true,
@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
     "test": "node --test",
+    "scan:build-credentials": "node scripts/scan-built-assets.js dist",
     "dev": "concurrently \"quasar dev\" \"node middleware/server.js\"",
     "build": "quasar build",
     "start": "node middleware/server.js"
@@ -22,7 +23,7 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "marked": "^18.0.5",
-    "quasar": "^2.20.1",
+    "quasar": "^2.23.5",
     "sass-loader": "^17.0.0",
     "vue": "^3.5.38",
     "vue-router": "^4.0.0",
@@ -31,14 +32,14 @@
   "devDependencies": {
     "@quasar/app-vite": "^2.6.2",
     "autoprefixer": "^10.5.2",
-    "concurrently": "^10.0.3",
+    "concurrently": "^10.0.4",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^9.0.0",
     "marked-gfm-heading-id": "^4.1.4",
     "marked-mangle": "^1.0.1",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.25",
     "prettier": "^3.8.4",
     "sass": "^1.101.0",
     "tailwindcss": "^3.3.1"

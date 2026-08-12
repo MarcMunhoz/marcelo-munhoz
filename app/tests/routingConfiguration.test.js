@@ -31,10 +31,59 @@ describe("routing configuration", () => {
     assert.match(netlifyToml, /connect-src 'self'/);
   });
 
+  it("routes admin Contentful API requests separately before public API and SPA fallbacks", () => {
+    const netlifyToml = read("../netlify.toml");
+    const adminRedirect = netlifyToml.indexOf('from = "/api/admin/contentful/*"');
+    const publicRedirect = netlifyToml.indexOf('from = "/api/contentful/*"');
+    const spaRedirect = netlifyToml.indexOf('from = "/*"');
+
+    assert.ok(adminRedirect >= 0);
+    assert.ok(publicRedirect >= 0);
+    assert.ok(spaRedirect >= 0);
+    assert.ok(adminRedirect < publicRedirect);
+    assert.ok(adminRedirect < spaRedirect);
+    assert.match(netlifyToml, /to = "\/\.netlify\/functions\/contentful-admin\/:splat"/);
+  });
+
+  it("mounts local admin Contentful routes separately from public routes", () => {
+    const serverSource = read("../middleware/server.js");
+
+    assert.match(serverSource, /contentfulAdminRoutes/);
+    assert.match(serverSource, /app\.use\("\/api\/admin\/contentful", contentfulAdminRoutes\)/);
+    assert.match(serverSource, /app\.use\("\/api\/contentful", contentfulRoutes\)/);
+  });
+
+  it("proxies local admin API calls from the Quasar dev server to the local middleware server", () => {
+    const quasarConfig = read("../quasar.config.js");
+
+    assert.match(quasarConfig, /devServer:\s*\{/);
+    assert.match(quasarConfig, /"\/api\/admin\/contentful"/);
+    assert.match(quasarConfig, /target:\s*"http:\/\/localhost:3000"/);
+  });
+
   it("does not inject Contentful credentials into the frontend build config", () => {
     const quasarConfig = read("../quasar.config.js");
 
-    assert.doesNotMatch(quasarConfig, /CONTENTFUL_DELIVERY_KEY|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE_ID/);
+    assert.doesNotMatch(
+      quasarConfig,
+      /CONTENTFUL_DELIVERY_KEY|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE_ID|CONTENTFUL_MANAGEMENT_KEY|CONTENTFUL_MANAGEMENT_TOKEN|CLOUDINARY_API_KEY|CLOUDINARY_API_SECRET/
+    );
+    assert.match(quasarConfig, /env:\s*\{\}/);
+  });
+
+  it("keeps Cloudinary write credentials out of frontend source", () => {
+    const frontendFiles = [
+      "../src/pages/Admin.vue",
+      "../src/utils/adminApi.js",
+      "../src/utils/adminDashboard.js",
+      "../src/utils/contentfulImages.js",
+      "../quasar.config.js",
+    ];
+
+    for (const file of frontendFiles) {
+      const source = read(file);
+      assert.doesNotMatch(source, /CLOUDINARY_API_KEY|CLOUDINARY_API_SECRET|CLOUDINARY_UPLOAD_PRESET|api_secret/);
+    }
   });
 
   it("keeps the Function free from Contentful SDK bundling", () => {
@@ -49,5 +98,20 @@ describe("routing configuration", () => {
 
     assert.match(functionSource, /from "\.\/contentfulProxyCore\.js"/);
     assert.doesNotMatch(functionSource, /\.\.\/\.\.\//);
+  });
+
+  it("keeps the admin Netlify Function dependency graph inside the functions directory", () => {
+    const functionSource = read("../netlify/functions/contentful-admin.js");
+
+    assert.match(functionSource, /from "\.\/contentfulAdminCore\.js"/);
+    assert.doesNotMatch(functionSource, /\.\.\/\.\.\//);
+  });
+
+  it("does not accept browser-supplied Cloudinary credentials in the admin media facade", () => {
+    const adminSource = read("../netlify/functions/contentfulAdminCore.js");
+
+    assert.match(adminSource, /CLOUDINARY_API_KEY/);
+    assert.match(adminSource, /CLOUDINARY_API_SECRET/);
+    assert.doesNotMatch(adminSource, /data\.CLOUDINARY_API_KEY|data\.CLOUDINARY_API_SECRET|query\.CLOUDINARY_API_KEY|query\.CLOUDINARY_API_SECRET/);
   });
 });

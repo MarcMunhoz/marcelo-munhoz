@@ -1,6 +1,6 @@
 ## Implementation Summary
 
-The Contentful blog API now has a shared proxy handler used by the local Express wrapper and a native Netlify Function. Frontend blog fetches use a shared API URL helper and default to same-origin `/api/contentful` routes. `VITE_API_BASE_URL` remains available as an explicit override, while legacy `VITE_API_URL` is ignored to avoid stale external API traffic from old environment values.
+The Contentful blog API now has a shared proxy handler used by the local Express wrapper and a native Netlify Function. The Function uses the Contentful Delivery REST API through Node's native `fetch`, resolves `includes` links needed by the existing blog UI, and avoids bundling the Contentful SDK in the Netlify runtime. Frontend blog fetches use a shared API URL helper and default to same-origin `/api/contentful` routes. `VITE_API_BASE_URL` remains available as an explicit override, while legacy `VITE_API_URL` is ignored to avoid stale external API traffic from old environment values.
 
 ## Validation Commands
 
@@ -13,10 +13,12 @@ All package-manager, test, lint, and build validation was run in containers. A c
 - `find <sanitized-app-copy> -maxdepth 2 \( -name '.env' -o -name '.env.*' \) -print`
 - `rg "CONTENTFUL|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE|VITE_API_URL" <sanitized-app-copy>/dist`
 - `openspec validate migrate-contentful-proxy-to-netlify-functions --strict`
+- Netlify staging smoke check for `/api/contentful/entries?page=1` returned `200`
 
 ## Security Checks
 
 - Contentful credentials are read only in server-side runtime code.
+- The Netlify Function no longer bundles the `contentful` SDK; it performs narrow REST requests with server-side authorization headers.
 - Quasar build env injection no longer includes Contentful delivery credentials.
 - Browser-facing errors return safe JSON messages without stack traces or secret values.
 - Contentful query construction ignores browser-supplied credential-like query parameters.
@@ -26,5 +28,5 @@ All package-manager, test, lint, and build validation was run in containers. A c
 ## Remaining Rollout Steps
 
 - Configure `CONTENTFUL_SPACE_ID` and `CONTENTFUL_DELIVERY_KEY` in the Netlify site environment.
-- Deploy to Netlify and run optional live smoke checks for `/api/contentful/entries?page=1` and `/api/contentful/tags`.
+- Run the same live smoke checks after the final `main` deployment.
 - Remove any legacy external API environment variables from local and production environments.
