@@ -90,7 +90,7 @@
 
 ## 10. Documentation And Rollout
 
-- [ ] 10.1 Update project documentation with the admin architecture, free-plan constraints, owner/writer permission model, dashboard behavior, and Cloudinary media flow.
-- [ ] 10.2 Document required server-side runtime variables for admin behavior using sanitized placeholder values only.
-- [ ] 10.3 Document the rollback path that disables or hides admin routes while preserving the existing public blog read API.
-- [ ] 10.4 Document that guest writers should not be granted broad Contentful Editor access for normal guest authoring on the Free plan.
+- [x] 10.1 Update project documentation with the admin architecture, free-plan constraints, owner/writer permission model, dashboard behavior, and Cloudinary media flow.
+- [x] 10.2 Document required server-side runtime variables for admin behavior using sanitized placeholder values only.
+- [x] 10.3 Document the rollback path that disables or hides admin routes while preserving the existing public blog read API.
+- [x] 10.4 Document that guest writers should not be granted broad Contentful Editor access for normal guest authoring on the Free plan.
