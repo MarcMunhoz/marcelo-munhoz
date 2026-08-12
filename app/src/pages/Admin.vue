@@ -196,8 +196,16 @@
         </div>
 
         <q-form class="editor-form" @submit.prevent="saveDraft">
-          <q-input v-model="articleForm.title" label="Title" outlined dense :error="Boolean(errors.title)" :error-message="errors.title" />
-          <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" />
+          <q-input
+            :model-value="articleForm.title"
+            label="Title"
+            outlined
+            dense
+            :error="Boolean(errors.title)"
+            :error-message="errors.title"
+            @update:model-value="updateArticleTitle"
+          />
+          <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" @update:model-value="markSlugTouched" />
           <q-input v-model="articleForm.description" label="Description" outlined dense type="textarea" autogrow :error="Boolean(errors.description)" :error-message="errors.description" />
           <q-input v-model="articleForm.body" label="Body" outlined type="textarea" :rows="8" :error="Boolean(errors.body)" :error-message="errors.body" />
 
@@ -378,6 +386,7 @@ import {
   ownerReviewQueues,
   removeArticleById,
   reconcileAdminDashboardData,
+  slugFromTitle,
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
@@ -396,6 +405,7 @@ export default defineComponent({
       reviewRequests: [],
       editorOpen: false,
       articleForm: createEmptyArticleForm(),
+      slugTouched: false,
       filters: {
         search: "",
         status: "",
@@ -477,12 +487,30 @@ export default defineComponent({
     },
   },
   async mounted() {
+    this.bindIdentityCallbacks();
     this.session = await getAdminSession();
     this.sessionResolved = true;
     this.redirectToLoginIfSignedOut();
     this.loadArticleDashboard();
   },
   methods: {
+    bindIdentityCallbacks() {
+      const identity = globalThis.netlifyIdentity;
+
+      if (typeof identity?.on !== "function") {
+        return;
+      }
+
+      identity.on("login", async () => {
+        if (typeof identity.close === "function") {
+          identity.close();
+        }
+
+        this.loginRedirecting = false;
+        this.session = await getAdminSession();
+        this.loadArticleDashboard();
+      });
+    },
     openLogin() {
       openAdminLogin();
     },
@@ -520,6 +548,7 @@ export default defineComponent({
     },
     openEditorForNewArticle() {
       this.articleForm = createEmptyArticleForm();
+      this.slugTouched = false;
       this.errors = {};
       this.statusMessage = "New draft";
       this.showFeedback("", "info");
@@ -527,6 +556,7 @@ export default defineComponent({
     },
     openEditorForArticle(article) {
       this.articleForm = articleToForm(article);
+      this.slugTouched = true;
       this.errors = {};
       this.statusMessage = "Loaded";
       this.showFeedback("", "info");
@@ -543,6 +573,16 @@ export default defineComponent({
     },
     editArticle(article) {
       this.openEditorForArticle(article);
+    },
+    updateArticleTitle(value) {
+      this.articleForm.title = value;
+
+      if (!this.articleForm.id && !this.slugTouched) {
+        this.articleForm.slug = slugFromTitle(value);
+      }
+    },
+    markSlugTouched() {
+      this.slugTouched = true;
     },
     statusColor(status) {
       return {

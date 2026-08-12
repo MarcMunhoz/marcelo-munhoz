@@ -33,6 +33,7 @@ import {
   ownerReviewQueues,
   removeArticleById,
   reconcileAdminDashboardData,
+  slugFromTitle,
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../src/utils/adminDashboard.js";
@@ -78,6 +79,17 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /if\s*\(!this\.session\)\s*{/);
     assert.match(page, /this\.loginRedirecting\s*=\s*true/);
     assert.match(page, /this\.openLogin\(\)/);
+  });
+
+  it("closes the Netlify Identity modal and reloads admin data after login", () => {
+    const page = read("../src/pages/Admin.vue");
+
+    assert.match(page, /bindIdentityCallbacks/);
+    assert.match(page, /identity\.on\("login"/);
+    assert.match(page, /identity\.close\(\)/);
+    assert.match(page, /this\.loginRedirecting\s*=\s*false/);
+    assert.match(page, /this\.session\s*=\s*await getAdminSession\(\)/);
+    assert.match(page, /this\.loadArticleDashboard\(\)/);
   });
 
   it("loads the Netlify Identity widget and allows it through CSP", () => {
@@ -366,6 +378,19 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
+  it("derives URL-safe slugs from new article titles", () => {
+    assert.equal(slugFromTitle("Inteligência Artificial para developers e creators"), "inteligencia-artificial-para-developers-e-creators");
+    assert.equal(slugFromTitle("  Vue, Contentful & Cloudinary!  "), "vue-contentful-cloudinary");
+  });
+
+  it("auto-fills new article slugs from title input until the slug is edited", () => {
+    const page = read("../src/pages/Admin.vue");
+
+    assert.match(page, /@update:model-value="updateArticleTitle"/);
+    assert.match(page, /@update:model-value="markSlugTouched"/);
+    assert.match(page, /this\.articleForm\.slug\s*=\s*slugFromTitle\(value\)/);
+  });
+
   it("creates new article forms with focused-editor display fields and internal technical state", () => {
     const form = createEmptyArticleForm();
 
@@ -510,6 +535,13 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }, owner), false);
   });
 
+  it("allows an owner to edit legacy articles when the resolved author name matches their identity", () => {
+    const owner = { subject: "owner-1", name: "Marcelo Munhoz", roles: ["owner"] };
+
+    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", author: "Marcelo Munhoz" }, owner), true);
+    assert.equal(canEditArticleAction({ id: "draft-2", status: "draft", author: "Guest Writer" }, owner), false);
+  });
+
   it("resolves Contentful thumbnail images with legacy Cloudinary fallback", () => {
     assert.equal(
       articleCardImageUrl({ thumbnail: { public_id: "marcelo-munhoz-website/new-image" } }),
@@ -587,7 +619,9 @@ describe("admin frontend writer workflow", () => {
       assert.match(page, new RegExp(text));
     }
 
-    for (const field of ["title", "slug", "description", "body", "createAt", "alt", "authorName", "tagInput"]) {
+    assert.match(page, /:model-value="articleForm\.title"/);
+
+    for (const field of ["slug", "description", "body", "createAt", "alt", "authorName", "tagInput"]) {
       assert.match(page, new RegExp(`v-model="articleForm\\.${field}"`));
     }
 

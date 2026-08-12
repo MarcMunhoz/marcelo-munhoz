@@ -394,7 +394,8 @@ const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
 const sessionOwnsArticle = (article = {}, session = {}) =>
   Boolean(
     (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
-      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
+      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId) ||
+      (isOwner(session) && article.author && session.name && article.author.trim().toLowerCase() === session.name.trim().toLowerCase())
   );
 
 const ensureCanEditArticle = (article = {}, session = {}) => {
@@ -482,11 +483,15 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
     return payload;
   };
 
-  const fetchMediaResources = async ({ config, maxResults, prefix }) => {
+  const fetchMediaResources = async ({ config, maxResults, prefix, nextCursor }) => {
     const url = new URL(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/resources/image/upload`);
 
     if (prefix) {
       url.searchParams.set("prefix", prefix);
+    }
+
+    if (nextCursor) {
+      url.searchParams.set("next_cursor", nextCursor);
     }
 
     url.searchParams.set("max_results", String(maxResults));
@@ -513,14 +518,28 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
       const prefixes = uniqueMediaPrefixes(config.folder, DEFAULT_CLOUDINARY_FOLDER);
 
       for (const prefix of prefixes) {
-        const result = await fetchMediaResources({ config, maxResults, prefix });
+        let result = await fetchMediaResources({ config, maxResults, prefix });
+        let pageCount = 1;
+
+        while (result.assets.length === 0 && result.next_cursor && pageCount < 5) {
+          result = await fetchMediaResources({ config, maxResults, prefix, nextCursor: result.next_cursor });
+          pageCount += 1;
+        }
 
         if (result.assets.length > 0) {
           return result;
         }
       }
 
-      return fetchMediaResources({ config, maxResults });
+      let result = await fetchMediaResources({ config, maxResults });
+      let pageCount = 1;
+
+      while (result.assets.length === 0 && result.next_cursor && pageCount < 5) {
+        result = await fetchMediaResources({ config, maxResults, nextCursor: result.next_cursor });
+        pageCount += 1;
+      }
+
+      return result;
     },
     async uploadMedia({ data = {} } = {}) {
       const config = cloudinaryConfigFromEnv(env, fetchImpl);
