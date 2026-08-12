@@ -1,18 +1,6 @@
 <template>
   <q-page class="admin-page">
     <section class="admin-shell">
-      <aside class="admin-sidebar">
-        <div class="admin-brand">
-          <q-icon name="edit_note" size="28px" />
-          <span>Admin</span>
-        </div>
-
-        <q-btn flat no-caps align="left" icon="dashboard" label="Dashboard" :class="{ active: activeSection === 'dashboard' }" @click="activeSection = 'dashboard'" />
-        <q-btn flat no-caps align="left" icon="article" label="Articles" :class="{ active: activeSection === 'articles' }" @click="activeSection = 'articles'" />
-        <q-btn flat no-caps align="left" icon="drafts" label="Drafts" :class="{ active: filters.status === 'draft' }" @click="setStatusFilter('draft')" />
-        <q-btn flat no-caps align="left" icon="rate_review" label="Review" :class="{ active: filters.status === 'review' }" @click="setStatusFilter('review')" />
-      </aside>
-
       <section class="admin-workspace">
         <header class="admin-topbar">
           <div>
@@ -27,13 +15,16 @@
               </template>
             </q-input>
 
-            <div class="admin-session">
-              <q-icon :name="session ? 'verified_user' : 'lock'" size="22px" />
+            <div class="admin-session" :class="{ preview: sessionDisplay.preview }">
+              <q-icon :name="session ? 'account_circle' : 'lock'" size="22px" />
               <div>
-                <strong>{{ sessionLabel }}</strong>
-                <span>{{ roleLabel }}</span>
+                <strong>{{ sessionDisplay.name }}</strong>
+                <span>{{ sessionDisplay.role }} · {{ sessionDisplay.context }}</span>
               </div>
               <q-btn v-if="!session" outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
+              <q-btn v-if="sessionDisplay.canSignOut" flat round color="blue-grey-7" icon="logout" size="sm" @click="signOut">
+                <q-tooltip>Sign out</q-tooltip>
+              </q-btn>
             </div>
           </div>
         </header>
@@ -69,6 +60,17 @@
               <small>Free metrics source not connected</small>
             </article>
           </section>
+
+          <div class="admin-filter-tabs" aria-label="Article filters">
+            <q-btn-toggle
+              :model-value="filters.status"
+              flat
+              no-caps
+              toggle-color="blue-grey-8"
+              :options="filterTabOptions"
+              @update:model-value="setStatusFilter"
+            />
+          </div>
 
           <section class="admin-main-grid">
             <section class="article-queue-panel">
@@ -107,20 +109,31 @@
 
                 <template #body-cell-tags="props">
                   <q-td :props="props">
-                    <span class="tag-list">{{ props.row.tags.join(", ") }}</span>
+                    <span class="tag-list">
+                      <q-badge v-for="tag in props.row.displayTags" :key="tag.id" outline color="blue-grey-7">{{ tag.label }}</q-badge>
+                    </span>
                   </q-td>
                 </template>
 
                 <template #body-cell-actions="props">
                   <q-td :props="props" class="table-actions">
-                    <q-btn dense flat round color="blue-grey-7" icon="edit" @click="editArticle(props.row)">
+                    <q-btn v-if="canEditArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="edit" @click="editArticle(props.row)">
                       <q-tooltip>Edit article</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canPrepareReviewAction(props.row)" dense flat round color="blue-grey-7" icon="rate_review" @click="editArticle(props.row)">
-                      <q-tooltip>Edit draft before review</q-tooltip>
+                    <q-btn v-if="canPrepareReviewAction(props.row, session)" dense flat round color="blue-grey-7" icon="rate_review" @click="editArticle(props.row)">
+                      <q-tooltip>Submit draft for review</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canRequestUnpublicationAction(props.row)" dense flat round color="amber-9" icon="visibility_off" @click="requestUnpublicationFromRow(props.row)">
+                    <q-btn v-if="canRequestUnpublicationAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" @click="requestUnpublicationFromRow(props.row)">
                       <q-tooltip>Request unpublication</q-tooltip>
+                    </q-btn>
+                    <q-btn v-if="canOwnerPublishAction(props.row, session)" dense flat round color="blue-grey-8" icon="publish" @click="publishSelectedArticle(props.row)">
+                      <q-tooltip>Publish</q-tooltip>
+                    </q-btn>
+                    <q-btn v-if="canOwnerUnpublishAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" @click="unpublishSelectedArticle(props.row)">
+                      <q-tooltip>Unpublish</q-tooltip>
+                    </q-btn>
+                    <q-btn v-if="canArchiveArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="archive" @click="archiveSelectedArticle(props.row)">
+                      <q-tooltip>Archive</q-tooltip>
                     </q-btn>
                   </q-td>
                 </template>
@@ -143,7 +156,7 @@
                   <div v-for="article in ownerQueues.submissions" :key="article.id" class="owner-queue-row">
                     <div>
                       <strong>{{ article.title }}</strong>
-                      <span>{{ article.author }} · {{ article.createAt }}</span>
+                      <span>{{ article.displayAuthor }} · {{ article.displayDate }}</span>
                     </div>
                     <div class="owner-actions">
                       <q-btn dense unelevated color="blue-grey-8" icon="publish" label="Publish" :loading="loadingAction === `publish-${article.id}`" @click="publishSelectedArticle(article)" />
@@ -158,7 +171,7 @@
                   <div v-for="article in ownerQueues.unpublicationRequests" :key="article.id" class="owner-queue-row">
                     <div>
                       <strong>{{ article.title }}</strong>
-                      <span>{{ article.author }} · {{ article.createAt }}</span>
+                      <span>{{ article.displayAuthor }} · {{ article.displayDate }}</span>
                     </div>
                     <div class="owner-actions">
                       <q-btn dense unelevated color="amber-9" icon="visibility_off" label="Unpublish" :loading="loadingAction === `unpublish-${article.id}`" @click="unpublishSelectedArticle(article)" />
@@ -307,6 +320,10 @@ import {
   applyArticleResponseToForm,
   articleToForm,
   buildArticlePayload,
+  canArchiveArticleAction,
+  canEditArticleAction,
+  canOwnerPublishAction,
+  canOwnerUnpublishAction,
   canPrepareReviewAction,
   canConfirmArticleDeletion,
   canRequestUnpublicationAction,
@@ -318,7 +335,7 @@ import {
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
-import { getAdminSession, isOwnerSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
+import { adminSessionDisplay, getAdminSession, isOwnerSession, isWriterSession, openAdminLogin, signOutAdmin } from "../utils/adminAuth.js";
 
 export default defineComponent({
   name: "AdminPage",
@@ -354,8 +371,8 @@ export default defineComponent({
         { name: "title", label: "Title", field: "title", align: "left", sortable: true },
         { name: "status", label: "Status", field: "status", align: "left", sortable: true },
         { name: "tags", label: "Tags", field: "tags", align: "left" },
-        { name: "createAt", label: "Date", field: "createAt", align: "left", sortable: true },
-        { name: "author", label: "Author", field: "author", align: "left", sortable: true },
+        { name: "createAt", label: "Date", field: "displayDate", align: "left", sortable: true },
+        { name: "author", label: "Author", field: "displayAuthor", align: "left", sortable: true },
         { name: "actions", label: "", field: "actions", align: "right" },
       ],
       statusOptions: [
@@ -365,25 +382,20 @@ export default defineComponent({
         { label: "Unpublication requested", value: "unpublicationRequested" },
         { label: "In review", value: "review" },
       ],
+      filterTabOptions: [
+        { label: "All", value: "" },
+        { label: "Drafts", value: "draft" },
+        { label: "Review", value: "review" },
+        { label: "Published", value: "published" },
+      ],
     };
   },
   computed: {
     canWrite() {
       return isWriterSession(this.session);
     },
-    sessionLabel() {
-      return this.session?.name || "Signed out";
-    },
-    roleLabel() {
-      if (!this.session) {
-        return "No session";
-      }
-
-      if (this.session.preview) {
-        return isOwnerSession(this.session) ? "Owner preview" : "Writer preview";
-      }
-
-      return isOwnerSession(this.session) ? "Owner" : "Writer";
+    sessionDisplay() {
+      return adminSessionDisplay(this.session);
     },
     isOwner() {
       return isOwnerSession(this.session);
@@ -439,7 +451,7 @@ export default defineComponent({
       }
     },
     setStatusFilter(status) {
-      this.filters.status = this.filters.status === status ? "" : status;
+      this.filters.status = this.filters.status === status ? "" : status || "";
       this.activeSection = "dashboard";
     },
     startNewArticle() {
@@ -507,8 +519,22 @@ export default defineComponent({
     articlePayload() {
       return buildArticlePayload(this.articleForm);
     },
+    async signOut() {
+      const signedOut = await signOutAdmin();
+
+      if (signedOut) {
+        this.session = null;
+        this.articles = [];
+        this.adminSummary = summarizeArticleStatuses([]);
+        this.reviewRequests = [];
+      }
+    },
+    canEditArticleAction,
     canPrepareReviewAction,
     canRequestUnpublicationAction,
+    canOwnerPublishAction,
+    canOwnerUnpublishAction,
+    canArchiveArticleAction,
     async openMediaLibrary() {
       this.mediaDialogOpen = true;
       this.mediaError = "";
@@ -724,39 +750,9 @@ export default defineComponent({
 
 .admin-shell {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-height: calc(100vh - 98px);
   width: 100%;
-}
-
-.admin-sidebar {
-  background: #546e7a;
-  color: #eef3f5;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 20px 14px;
-
-  .q-btn {
-    justify-content: flex-start;
-    min-height: 40px;
-  }
-
-  .active {
-    background: rgba(255, 255, 255, 0.16);
-  }
-}
-
-.admin-brand {
-  align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  display: flex;
-  font-size: 1.1rem;
-  font-weight: 700;
-  gap: 10px;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  text-transform: uppercase;
 }
 
 .admin-workspace {
@@ -811,6 +807,10 @@ export default defineComponent({
   text-transform: uppercase;
 }
 
+.admin-filter-tabs {
+  margin: 0 0 14px;
+}
+
 .admin-session {
   align-items: center;
   background: #ffffff;
@@ -825,6 +825,10 @@ export default defineComponent({
     display: block;
     font-size: 0.8rem;
   }
+}
+
+.admin-session.preview {
+  background: #eef3f5;
 }
 
 .admin-blocked {
@@ -969,7 +973,10 @@ export default defineComponent({
 
 .tag-list {
   color: #455a64;
+  display: flex;
+  flex-wrap: wrap;
   font-size: 0.86rem;
+  gap: 6px;
 }
 
 .table-actions {
@@ -1097,15 +1104,6 @@ export default defineComponent({
     grid-template-columns: 1fr;
   }
 
-  .admin-sidebar {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  }
-
-  .admin-brand {
-    grid-column: 1 / -1;
-  }
-
   .admin-workspace {
     padding: 16px;
   }
@@ -1127,15 +1125,6 @@ export default defineComponent({
   .admin-main-grid,
   .owner-queue-grid {
     grid-template-columns: 1fr;
-  }
-
-  .admin-sidebar {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .admin-brand {
-    grid-column: 1 / -1;
   }
 
   .status-grid {

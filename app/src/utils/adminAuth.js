@@ -62,6 +62,50 @@ export const openAdminLogin = () => {
   }
 };
 
+export const adminSessionDisplay = (session) => {
+  if (!session) {
+    return {
+      name: "Signed out",
+      role: "No access",
+      context: "Sign in required",
+      preview: false,
+      canSignOut: false,
+    };
+  }
+
+  const role = session.roles?.includes("owner") ? "Owner" : "Writer";
+
+  if (session.preview) {
+    return {
+      name: "Local preview",
+      role,
+      context: "Development only",
+      preview: true,
+      canSignOut: false,
+    };
+  }
+
+  return {
+    name: session.name || "Authenticated user",
+    role,
+    context: "Signed in",
+    preview: false,
+    canSignOut: true,
+  };
+};
+
+export const signOutAdmin = async ({ identity = globalThis.netlifyIdentity, confirmImpl = globalThis.confirm } = {}) => {
+  if (typeof confirmImpl === "function" && !confirmImpl("Sign out of the admin area?")) {
+    return false;
+  }
+
+  if (typeof identity?.logout === "function") {
+    await identity.logout();
+  }
+
+  return true;
+};
+
 export const isWriterSession = (session) => Boolean(session?.roles?.includes("writer") || session?.roles?.includes("owner"));
 
 export const isOwnerSession = (session) => Boolean(session?.roles?.includes("owner"));

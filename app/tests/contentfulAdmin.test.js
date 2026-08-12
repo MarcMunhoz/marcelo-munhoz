@@ -432,6 +432,44 @@ describe("contentful admin handler", () => {
     assert.doesNotMatch(calls[0], /content_type=|include=|order=/);
   });
 
+  it("keeps resolved author names in admin article reads when Contentful returns expanded author fields", async () => {
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          items: [
+            {
+              sys: { id: "article-1", version: 3, publishedVersion: 2, contentType: { sys: { id: "article" } } },
+              fields: {
+                title: { "pt-BR": "Published" },
+                author: {
+                  "pt-BR": {
+                    sys: { id: "author-1" },
+                    fields: { name: { "pt-BR": "Marcelo Munhoz" } },
+                  },
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const dashboard = await facade.listAdminArticles({ session: createSession(["owner"]) });
+
+    assert.equal(dashboard.articles[0].author, "Marcelo Munhoz");
+    assert.equal(dashboard.articles[0].authorEntryId, "author-1");
+  });
+
   it("allows writer sessions to record submit-for-review workflow requests", async () => {
     const handler = createContentfulAdminHandler({
       getSession() {

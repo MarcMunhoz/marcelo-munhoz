@@ -18,10 +18,15 @@ import {
   applyArticleResponseToForm,
   articleToForm,
   buildArticlePayload,
+  canArchiveArticleAction,
   canConfirmArticleDeletion,
+  canEditArticleAction,
+  canOwnerPublishAction,
+  canOwnerUnpublishAction,
   canPrepareReviewAction,
   canRequestUnpublicationAction,
   filterAdminArticles,
+  normalizeAdminArticleDisplay,
   ownerReviewQueues,
   removeArticleById,
   reconcileAdminDashboardData,
@@ -46,7 +51,8 @@ describe("admin frontend writer workflow", () => {
     const layout = read("../src/layouts/MainLayout.vue");
 
     assert.match(layout, /to="\/admin"/);
-    assert.match(layout, /label="Admin"/);
+    assert.match(layout, /adminNavLabel/);
+    assert.match(layout, /q-btn-dropdown/);
   });
 
   it("provides writer session helpers without adding an auth package", () => {
@@ -190,6 +196,46 @@ describe("admin frontend writer workflow", () => {
       summary: { published: 0, drafts: 0, review: 0, archived: 0, total: 0 },
       reviewRequests: [],
     });
+  });
+
+  it("formats admin article dates for editorial display", () => {
+    assert.equal(normalizeAdminArticleDisplay({ createAt: "2026-07-25T14:38:24.390Z" }).displayDate, "July 25, 2026");
+    assert.equal(normalizeAdminArticleDisplay({ createAt: "2026-08-11" }).displayDate, "August 11, 2026");
+    assert.equal(normalizeAdminArticleDisplay({ createAt: "" }).displayDate, "No date");
+  });
+
+  it("resolves admin author display without exposing entry ids as primary values", () => {
+    assert.equal(
+      normalizeAdminArticleDisplay({
+        author: "Marcelo Munhoz",
+        authorEntryId: "cvs0Tg41EntryId",
+      }).displayAuthor,
+      "Marcelo Munhoz"
+    );
+    assert.equal(
+      normalizeAdminArticleDisplay({
+        author: "cvs0Tg41EntryId",
+        authorEntryId: "cvs0Tg41EntryId",
+      }).displayAuthor,
+      "Unknown author"
+    );
+    assert.equal(normalizeAdminArticleDisplay({ authorEntryId: "cvs0Tg41EntryId" }).displayAuthor, "Unknown author");
+  });
+
+  it("builds structured admin tag display and thumbnail preview metadata", () => {
+    const article = normalizeAdminArticleDisplay({
+      tags: ["admin", "contentful"],
+      thumbnail: {
+        public_id: "marcelo-munhoz-website/admin",
+        secure_url: "https://example.test/admin.jpg",
+      },
+    });
+
+    assert.deepEqual(article.displayTags, [
+      { id: "admin", label: "admin" },
+      { id: "contentful", label: "contentful" },
+    ]);
+    assert.equal(article.thumbnailPreviewUrl, "https://example.test/admin.jpg");
   });
 
   it("sends a development-only preview role header instead of bearer auth for local preview sessions", async () => {
@@ -378,6 +424,31 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canRequestUnpublicationAction({ id: "review-1", status: "review" }), false);
   });
 
+  it("shows writer actions only for writer-eligible article states", () => {
+    const writer = { roles: ["writer"] };
+
+    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft" }, writer), true);
+    assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft" }, writer), true);
+    assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }, writer), true);
+
+    assert.equal(canPrepareReviewAction({ id: "published-1", status: "published" }, writer), false);
+    assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, writer), false);
+    assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, writer), false);
+    assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, writer), false);
+  });
+
+  it("shows owner lifecycle actions directly instead of writer request actions", () => {
+    const owner = { roles: ["owner"] };
+
+    assert.equal(canEditArticleAction({ id: "published-1", status: "published" }, owner), true);
+    assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, owner), true);
+    assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, owner), true);
+    assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, owner), true);
+
+    assert.equal(canPrepareReviewAction({ id: "review-1", status: "review" }, owner), false);
+    assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }, owner), false);
+  });
+
   it("resolves Contentful thumbnail images with legacy Cloudinary fallback", () => {
     assert.equal(
       articleCardImageUrl({ thumbnail: { public_id: "marcelo-munhoz-website/new-image" } }),
@@ -425,12 +496,29 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /Upload image/);
     assert.match(page, /applySelectedMedia/);
     assert.match(page, /handleMediaFile/);
-    assert.match(page, /admin-sidebar/);
+    assert.doesNotMatch(page, /admin-sidebar/);
+    assert.match(page, /admin-filter-tabs/);
     assert.match(page, /article-table/);
     assert.doesNotMatch(page, /label="Media" disable/);
     assert.doesNotMatch(page, /label="Settings" disable/);
     assert.match(page, /loadArticleDashboard/);
     assert.doesNotMatch(page, /this\.articles = sampleAdminArticles/);
+  });
+
+  it("renders user-centered admin session and sign-out controls", () => {
+    const page = read("../src/pages/Admin.vue");
+    const layout = read("../src/layouts/MainLayout.vue");
+
+    assert.match(page, /sessionDisplay\.name/);
+    assert.match(page, /sessionDisplay\.role/);
+    assert.match(page, /sessionDisplay\.context/);
+    assert.match(page, /signOut/);
+    assert.doesNotMatch(page, /verified_user/);
+    assert.doesNotMatch(page, /Owner preview"\s*:\s*"Writer preview/);
+
+    assert.match(layout, /adminSessionDisplay/);
+    assert.match(layout, /adminNavLabel/);
+    assert.match(layout, /signOut/);
   });
 
   it("keeps admin layout responsive without relying on a horizontally oversized table shell", () => {

@@ -1,4 +1,75 @@
 const normalize = (value) => String(value || "").trim().toLowerCase();
+const hasRole = (session, role) => Boolean(session?.roles?.includes(role));
+const isOwner = (session) => hasRole(session, "owner");
+const isWriter = (session) => hasRole(session, "writer") || isOwner(session);
+
+const humanDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+const looksLikeEntryId = (value = "") => {
+  const text = String(value || "").trim();
+  return /^[A-Za-z0-9_-]{10,}$/.test(text) && !/\s/.test(text);
+};
+
+export const displayArticleDate = (value) => {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return "No date";
+  }
+
+  const date = new Date(text.length === 10 ? `${text}T00:00:00.000Z` : text);
+
+  if (Number.isNaN(date.getTime())) {
+    return "No date";
+  }
+
+  return humanDateFormatter.format(date);
+};
+
+export const displayAuthorName = (article = {}) => {
+  const author = String(article.authorName || article.author || "").trim();
+
+  if (author && author !== article.authorEntryId && !looksLikeEntryId(author)) {
+    return author;
+  }
+
+  return "Unknown author";
+};
+
+export const displayTags = (tags = []) =>
+  (Array.isArray(tags) ? tags : String(tags || "").split(","))
+    .map((tag) => String(tag || "").trim())
+    .filter(Boolean)
+    .map((tag) => ({ id: tag, label: tag }));
+
+export const thumbnailPreviewUrl = (article = {}) => {
+  const thumbnail = article.thumbnail || {};
+  return thumbnail.secure_url || thumbnail.url || article.thumbnailUrl || "";
+};
+
+export const statusLabel = (status) =>
+  ({
+    published: "Published",
+    draft: "Draft",
+    unpublished: "Unpublished",
+    unpublicationRequested: "Unpublication requested",
+    review: "In review",
+    archived: "Archived",
+  })[status] || "Draft";
+
+export const normalizeAdminArticleDisplay = (article = {}) => ({
+  ...article,
+  displayDate: displayArticleDate(article.createAt),
+  displayAuthor: displayAuthorName(article),
+  displayTags: displayTags(article.tags),
+  statusLabel: statusLabel(article.status),
+  thumbnailPreviewUrl: thumbnailPreviewUrl(article),
+});
 
 export const createEmptyArticleForm = () => ({
   id: "",
@@ -37,7 +108,7 @@ export const summarizeArticleStatuses = (articles = []) =>
   );
 
 export const reconcileAdminDashboardData = (payload = {}) => {
-  const articles = Array.isArray(payload.articles) ? payload.articles : [];
+  const articles = (Array.isArray(payload.articles) ? payload.articles : []).map(normalizeAdminArticleDisplay);
 
   return {
     articles,
@@ -105,9 +176,35 @@ export const removeArticleById = (articles = [], articleId) => articles.filter((
 
 export const canConfirmArticleDeletion = (article, confirmation) => Boolean(article?.title && confirmation === article.title);
 
-export const canPrepareReviewAction = (article = {}) => Boolean(article.id && normalize(article.status) !== "published");
+export const canEditArticleAction = (article = {}, session) => {
+  if (!article.id || !isWriter(session)) {
+    return false;
+  }
 
-export const canRequestUnpublicationAction = (article = {}) => Boolean(article.id && normalize(article.status) === "published");
+  if (isOwner(session)) {
+    return normalize(article.status) !== "archived";
+  }
+
+  return ["draft", "review", "unpublished", "unpublicationrequested"].includes(normalize(article.status));
+};
+
+export const canPrepareReviewAction = (article = {}, session = { roles: ["writer"] }) => {
+  if (!article.id || !hasRole(session, "writer") || isOwner(session)) {
+    return false;
+  }
+
+  return ["draft", "unpublished"].includes(normalize(article.status));
+};
+
+export const canRequestUnpublicationAction = (article = {}, session = { roles: ["writer"] }) =>
+  Boolean(article.id && hasRole(session, "writer") && !isOwner(session) && normalize(article.status) === "published");
+
+export const canOwnerPublishAction = (article = {}, session) => Boolean(article.id && isOwner(session) && normalize(article.status) === "review");
+
+export const canOwnerUnpublishAction = (article = {}, session) =>
+  Boolean(article.id && isOwner(session) && ["published", "unpublicationrequested"].includes(normalize(article.status)));
+
+export const canArchiveArticleAction = (article = {}, session) => Boolean(article.id && isOwner(session) && normalize(article.status) !== "archived");
 
 export const buildArticlePayload = (form = {}) => {
   const thumbnail = form.thumbnail || (form.thumbnailPublicId || form.thumbnailUrl
