@@ -67,6 +67,23 @@ describe("admin frontend writer workflow", () => {
     assert.match(auth, /isOwnerSession/);
   });
 
+  it("redirects signed-out production visitors to Netlify Identity login", () => {
+    const page = read("../src/pages/Admin.vue");
+
+    assert.match(page, /redirectToLoginIfSignedOut/);
+    assert.match(page, /if\s*\(!this\.session\)\s*{/);
+    assert.match(page, /this\.openLogin\(\)/);
+  });
+
+  it("loads the Netlify Identity widget and allows it through CSP", () => {
+    const index = read("../index.html");
+    const netlifyConfig = read("../../app/netlify.toml");
+
+    assert.match(index, /identity\.netlify\.com\/v1\/netlify-identity-widget\.js/);
+    assert.match(netlifyConfig, /script-src[^"]*https:\/\/identity\.netlify\.com/);
+    assert.match(netlifyConfig, /connect-src[^"]*https:\/\/identity\.netlify\.com/);
+  });
+
   it("provides admin API helpers for draft and workflow requests", () => {
     const api = read("../src/utils/adminApi.js");
 

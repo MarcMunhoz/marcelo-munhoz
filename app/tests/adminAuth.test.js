@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { adminSessionDisplay, createPreviewSession, getAdminSession, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
+import { adminSessionDisplay, createPreviewSession, getAdminSession, openAdminLogin, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
 
 describe("admin auth preview sessions", () => {
   it("uses owner as the default local preview role for full admin testing", () => {
@@ -98,6 +98,20 @@ describe("admin auth preview sessions", () => {
       preview: true,
       canSignOut: false,
     });
+  });
+
+  it("falls back to the Netlify Identity login route when the widget is unavailable", () => {
+    const previousIdentity = globalThis.netlifyIdentity;
+    const location = { href: "" };
+
+    globalThis.netlifyIdentity = undefined;
+
+    try {
+      assert.equal(openAdminLogin({ location }), true);
+      assert.equal(location.href, "/.netlify/identity/login");
+    } finally {
+      globalThis.netlifyIdentity = previousIdentity;
+    }
   });
 
   it("signs out only after confirmation", async () => {
