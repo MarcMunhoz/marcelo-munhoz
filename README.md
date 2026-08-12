@@ -79,6 +79,8 @@ Configure these variables in Netlify. Keep Function-scoped values in the server/
 
 Do not mark `CLOUDINARY_UPLOAD_FOLDER` or `CLOUDINARY_FOLDER` as secret values in Netlify. They are public path prefixes that can appear in Cloudinary image URLs. The build config omits those keys from Netlify secret scanning so real credential scanning can stay enabled.
 
+The Cloudinary API key used by the admin media facade must belong to the same cloud as the Media Library and needs the `Master Admin` role. The `Media Library User` role can authenticate but does not provide enough access for the Admin API resource listing used by `/api/admin/contentful/media/assets`.
+
 Use sanitized placeholder values in documentation and tickets, for example `<contentful-management-token>` or `<cloudinary-api-secret>`. Do not paste real values into README, OpenSpec artifacts, GitHub issues, PRs, commits, or logs intended for users.
 
 Do not expose Contentful or Cloudinary credentials as `VITE_*` variables. The only supported frontend build variable is `VITE_API_BASE_URL`; all Contentful and Cloudinary credential variables above are server-side only.
@@ -119,6 +121,8 @@ The admin dashboard is the first `/admin` screen. It loads real article rows, st
 Editorial workflow records are stored separately from public `article` entries, using the admin-only workflow content type selected for this change. That separation keeps writer identity and review state out of the public blog read API.
 
 Cloudinary media management is backend-mediated. The browser can request image listing or upload through the admin API, but Cloudinary API credentials and upload signatures stay server-side. The returned Cloudinary metadata is saved to the article thumbnail field, while alt text remains a separate article field.
+
+Because Cloudinary exposes only `Master Admin` and `Media Library User` for the configured account, use `Master Admin` for the server-side API credentials. Keep those credentials scoped to Netlify Functions/runtime only and never expose them through frontend build variables.
 
 ### Guest Writer Access
 

@@ -19,6 +19,7 @@ This handoff records the production-like smoke status for the refined blog admin
 - Article author names render as readable names instead of raw Contentful entry IDs.
 - Owner edit actions appear for the owner-authored articles currently visible in staging.
 - The media library route returns `200` and a safe JSON payload.
+- Cloudinary media library listing works after changing the Cloudinary API user role from `Media Library User` to `Master Admin`.
 
 ## Implemented Fixes During Staging Smoke
 
@@ -30,31 +31,30 @@ This handoff records the production-like smoke status for the refined blog admin
 - Added automatic slug generation for new articles until the slug field is edited manually.
 - Added Cloudinary media fallback across configured folder, default folder, unscoped listing, and empty pages that return `next_cursor`.
 
-## Known Remaining Issue
+## Cloudinary Media Library Finding
 
-The media library still returns an empty asset list in staging even though the route returns `200`.
+The media library initially returned an empty asset list in staging even though the route returned `200`.
 
 Current evidence:
 
 - The browser request is made to the admin media route with `max_results`.
 - The Function response is successful and sanitized.
-- The current response body contains an empty `assets` array.
+- With the Cloudinary API user set to `Media Library User`, the response contained an empty `assets` array.
 - Earlier smoke evidence showed an empty page with a cursor; the backend now follows empty cursor pages before returning.
 - Marking the Cloudinary folder variable as secret in Netlify should not affect runtime listing. It only affects Netlify build secret scanning, and the build config already omits public folder keys from secret scanning.
+- Changing the same Cloudinary API user to `Master Admin` made existing assets appear without rebuilding or redeploying staging.
 
-Most likely causes to verify next:
+Conclusion:
 
-- The staging deploy context is using Cloudinary credentials for a different cloud/account than the visible media library.
-- Existing Cloudinary assets are not `image/upload` resources.
-- Existing assets are in a delivery type or product area not returned by the Admin API resource list used by the Function.
-- The relevant assets are under a different resource type or are not visible to the configured API key.
-- The configured folder is no longer the issue if unscoped listing also returns empty.
+- The staging environment variables were pointing at the expected Cloudinary cloud and folder.
+- `Media Library User` can authenticate but does not provide enough access for the Admin API resource listing used by the admin backend.
+- The server-side Cloudinary API user must use `Master Admin` for this workflow unless Cloudinary exposes a narrower role that still supports resource listing and upload.
 
-Next diagnostic should remain sanitized:
+Operational rule:
 
-- Use the staging Function response only to inspect `status`, `assets.length`, and whether `next_cursor` exists.
-- In Cloudinary UI, compare the cloud/account and resource type for a known existing image without copying asset IDs into logs or docs.
-- If a disposable upload through the admin succeeds, reopen the media library and confirm whether that uploaded asset appears.
+- Keep Cloudinary API credentials server-side in Netlify Functions/runtime only.
+- Keep `CLOUDINARY_UPLOAD_FOLDER` or `CLOUDINARY_FOLDER` unmarked as secret because the folder is a public URL path prefix.
+- Do not add frontend `VITE_` variants for Cloudinary API credentials.
 
 ## Identity Metadata Notes
 
@@ -69,7 +69,6 @@ The owner-name fallback exists only to support legacy owner-authored content alr
 - Confirm login closes automatically after successful sign-in.
 - Confirm a new article title fills the slug until the slug is manually edited.
 - Confirm owner edit buttons remain visible for owner-authored rows.
-- Reopen media library and inspect sanitized response shape.
-- If media remains empty, test a disposable admin upload and then list media again.
-- If the disposable upload appears, existing assets are outside the current list scope.
-- If the disposable upload does not appear, inspect the Cloudinary account/context configured for staging.
+- Reopen media library and confirm existing Cloudinary assets appear.
+- Keep the Cloudinary API user on `Master Admin` while this admin workflow uses the Admin API resource list.
+- If Cloudinary exposes narrower account roles later, retest resource listing and upload before reducing permissions.
