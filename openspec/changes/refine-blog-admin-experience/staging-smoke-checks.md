@@ -64,3 +64,7 @@ Use this checklist only with disposable content and media. Do not publish or mut
 - Disposable article slug or title prefix.
 - Result for each section.
 - Cleanup confirmation for disposable content and media.
+
+## Current Handoff
+
+See `staging-handoff.md` for the latest staging findings, implemented fixes, and remaining Cloudinary media-library diagnostics.
