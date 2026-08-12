@@ -13,6 +13,8 @@ The frontend and blog API are deployed together on Netlify. Browser requests use
 
 ## Architecture
 
+Public blog reads and admin writes use separate server-side boundaries.
+
 ```text
 Browser
   -> /api/contentful/*
@@ -20,6 +22,17 @@ Browser
   -> app/netlify/functions/contentful.js
   -> app/middleware/contentfulProxy.js
   -> Contentful Delivery API
+```
+
+The admin API is authenticated and write-capable:
+
+```text
+Authenticated browser session
+  -> /api/admin/contentful/*
+  -> Netlify redirect
+  -> app/netlify/functions/contentful-admin.js
+  -> server-side admin facade
+  -> Contentful Management API and Cloudinary Admin/Upload APIs
 ```
 
 Local development uses the same shared proxy behavior:
@@ -32,6 +45,10 @@ Browser on :4242
   -> app/middleware/contentfulProxy.js
   -> Contentful Delivery API
 ```
+
+Local admin requests use a separate dev proxy for `/api/admin/contentful/*`, then the same server-side admin routing used by the Function wrapper.
+
+The public `/api/contentful/*` proxy remains read-only and is used by public blog pages. It must not expose create, edit, publish, unpublish, archive, delete, Cloudinary upload, or arbitrary upstream proxy behavior. The admin `/api/admin/contentful/*` surface is the only path for Contentful Management API mutations and Cloudinary media operations.
 
 ## Project Layout
 
@@ -65,6 +82,47 @@ Use sanitized placeholder values in documentation and tickets, for example `<con
 Do not expose Contentful or Cloudinary credentials as `VITE_*` variables. The only supported frontend build variable is `VITE_API_BASE_URL`; all Contentful and Cloudinary credential variables above are server-side only.
 
 `NODE_VERSION` and `NPM_VERSION` are Netlify build settings rather than application secrets. Keep them only if the Netlify build needs explicit version pinning.
+
+For local or Netlify setup, use placeholders when documenting values:
+
+```text
+CONTENTFUL_SPACE_ID=<contentful-space-id>
+CONTENTFUL_DELIVERY_KEY=<contentful-delivery-token>
+CONTENTFUL_MANAGEMENT_KEY=<contentful-management-token>
+CONTENTFUL_ENVIRONMENT_ID=master
+CONTENTFUL_DEFAULT_LOCALE=pt-BR
+CLOUDINARY_CLOUD_NAME=<cloudinary-cloud-name>
+CLOUDINARY_API_KEY=<cloudinary-api-key>
+CLOUDINARY_API_SECRET=<cloudinary-api-secret>
+CLOUDINARY_UPLOAD_FOLDER=<cloudinary-folder>
+```
+
+`CONTENTFUL_DEFAULT_LOCALE=pt-BR` is supported and should be preferred for this project unless the Contentful space is intentionally moved to another default locale.
+
+## Blog Admin
+
+`/admin` is a compact CMS-style area for article drafting, review, and owner lifecycle actions. It is not a generic Contentful console. Contentful remains the content repository, Cloudinary remains the image host, and the website backend provides a narrow workflow-oriented API.
+
+Admin authentication uses Netlify Identity in deployed environments. Registration should stay invite-only. Authorization is represented by server-verified roles:
+
+| Role | Allowed workflow |
+| --- | --- |
+| `writer` | Create and edit permitted drafts or submissions, select or upload Cloudinary thumbnail images through the admin API, submit drafts for owner review, and request unpublication for eligible published articles. |
+| `owner` | All writer workflows, plus publish, unpublish, archive, and permanently delete articles through owner-only server routes. |
+
+Frontend role checks only shape the UI. The admin backend must still reject unauthenticated requests and writer attempts to run owner-only lifecycle actions before calling Contentful or Cloudinary.
+
+The admin dashboard is the first `/admin` screen. It loads real article rows, status cards, and owner review queues from `/api/admin/contentful/articles`. The dashboard should not use static sample articles at runtime; fixtures belong in deterministic tests only. Page-view metrics are optional and may remain unavailable until a free-compatible analytics source is connected.
+
+Editorial workflow records are stored separately from public `article` entries, using the admin-only workflow content type selected for this change. That separation keeps writer identity and review state out of the public blog read API.
+
+Cloudinary media management is backend-mediated. The browser can request image listing or upload through the admin API, but Cloudinary API credentials and upload signatures stay server-side. The returned Cloudinary metadata is saved to the article thumbnail field, while alt text remains a separate article field.
+
+### Guest Writer Access
+
+Do not grant normal guest writers broad Contentful Editor access on the Free plan. Contentful Free plan roles are too coarse for this workflow and can allow actions outside the custom admin permission model. Guest writers should normally receive website admin access only, with the `writer` role represented in Netlify Identity and enforced by the server-side admin API.
+
+The owner account may retain broad Contentful access for direct maintenance. If a temporary Contentful invitation is ever needed for a collaborator, treat it as an exceptional manual operation and remove it when the task is done.
 
 ## Local Development
 
@@ -164,9 +222,25 @@ Optional live admin smoke checks are separate from routine automated validation.
 
 Do not paste live Contentful, Cloudinary, or Netlify Identity tokens into local files, docs, GitHub artifacts, OpenSpec artifacts, or smoke-check notes.
 
+## Admin Rollback
+
+The public blog read path is independent from the admin path, so rollback should preserve `/api/contentful/*` and public article rendering.
+
+To disable the admin surface without changing public blog reads:
+
+1. Hide or remove the `/admin` navigation entry in the frontend.
+2. Disable or remove the `/admin` route from the frontend router if the route should be unreachable.
+3. Remove or comment the `/api/admin/contentful/*` redirect in `app/netlify.toml`, leaving `/api/contentful/*` unchanged.
+4. Remove the admin-only server-side runtime variables from Netlify if they are no longer needed.
+5. Keep `CONTENTFUL_SPACE_ID` and `CONTENTFUL_DELIVERY_KEY` configured so public blog pages continue reading published entries.
+
+If only the UI is being rolled back temporarily, keeping the admin Function code deployed is acceptable only when Netlify Identity still protects it and the route is not advertised. For a stronger rollback, remove the admin redirect so requests cannot reach the Function path through the public admin API prefix.
+
 ## Netlify Free Plan Notes
 
 This project uses standard static hosting, redirects, environment variables, and ordinary request-triggered Netlify Functions. It does not require paid add-ons, databases, blob storage, AI features, background jobs, scheduled jobs, or auto-recharge.
+
+The admin implementation is designed for free-plan operation: guest permissions are enforced in the app, editorial workflow records stay in Contentful, Cloudinary operations are request-triggered, and page-view metrics remain optional until a free-compatible source exists.
 
 If auto-recharge is disabled, unusually high usage can still exhaust free monthly credits and pause the site instead of billing automatically.
 
