@@ -471,11 +471,17 @@ export default defineComponent({
   },
   async mounted() {
     this.session = await getAdminSession();
+    this.redirectToLoginIfSignedOut();
     this.loadArticleDashboard();
   },
   methods: {
     openLogin() {
       openAdminLogin();
+    },
+    redirectToLoginIfSignedOut() {
+      if (!this.session) {
+        this.openLogin();
+      }
     },
     async loadArticleDashboard() {
       if (!this.canWrite) {
