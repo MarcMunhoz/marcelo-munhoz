@@ -5,8 +5,17 @@ const isWriter = (session) => hasRole(session, "writer") || isOwner(session);
 const ownsArticle = (article = {}, session = {}) =>
   Boolean(
     (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
-      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
+      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId) ||
+      (isOwner(session) && normalize(article.author || article.authorName) && normalize(article.author || article.authorName) === normalize(session.name))
   );
+
+export const slugFromTitle = (title = "") =>
+  String(title || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 const humanDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",

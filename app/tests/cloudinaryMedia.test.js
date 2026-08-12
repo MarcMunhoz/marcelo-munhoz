@@ -123,6 +123,45 @@ describe("cloudinary media facade", () => {
     ]);
   });
 
+  it("continues Cloudinary listing while empty pages return a next cursor", async () => {
+    const calls = [];
+    const facade = createCloudinaryMediaFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (calls.length === 1) {
+          return createResponse(200, { resources: [], next_cursor: "cursor-1" });
+        }
+
+        return createResponse(200, {
+          resources: [
+            {
+              public_id: "marcelo-munhoz-website/cursor-cover",
+              secure_url: "https://res.cloudinary.com/demo-cloud/image/upload/cursor-cover.jpg",
+            },
+          ],
+        });
+      },
+    });
+
+    const result = await facade.listMedia({ query: { max_results: "12" } });
+
+    assert.equal(calls.length, 2);
+    assert.equal(new URL(calls[1].url).searchParams.get("next_cursor"), "cursor-1");
+    assert.deepEqual(result.assets, [
+      {
+        public_id: "marcelo-munhoz-website/cursor-cover",
+        secure_url: "https://res.cloudinary.com/demo-cloud/image/upload/cursor-cover.jpg",
+        url: "https://res.cloudinary.com/demo-cloud/image/upload/cursor-cover.jpg",
+        width: undefined,
+        height: undefined,
+        format: undefined,
+        created_at: undefined,
+      },
+    ]);
+  });
+
   it("uploads image data with a server-generated signature and folder scope", async () => {
     const calls = [];
     const facade = createCloudinaryMediaFacade({

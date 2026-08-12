@@ -688,6 +688,57 @@ describe("contentful admin handler", () => {
     assert.deepEqual(calls.map((call) => call.method), ["GET", "PUT"]);
   });
 
+  it("allows owner draft updates for legacy articles when the resolved author name matches the session", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method, body: options.body });
+
+      if (String(url).endsWith("/entries/article-1") && options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              sys: { id: "article-1", version: 8, contentType: { sys: { id: "article" } } },
+              fields: {
+                author: { "pt-BR": { fields: { name: { "pt-BR": "Marcelo Munhoz" } }, sys: { id: "author-1" } } },
+              },
+            };
+          },
+        };
+      }
+
+      if (String(url).endsWith("/entries/article-1") && options.method === "PUT") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { sys: { id: "article-1", version: 9 } };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected Contentful URL: ${url}`);
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const response = await facade.updateArticleDraft({
+      articleId: "article-1",
+      data: { title: "Changed", version: 8 },
+      session: createSession(["owner"], { name: "Marcelo Munhoz" }),
+    });
+
+    assert.deepEqual(response, { sys: { id: "article-1", version: 9 } });
+    assert.deepEqual(calls.map((call) => call.method), ["GET", "PUT"]);
+  });
+
   it("allows writer sessions to record submit-for-review workflow requests", async () => {
     const handler = createContentfulAdminHandler({
       getSession() {
