@@ -70,8 +70,13 @@ describe("admin frontend writer workflow", () => {
   it("redirects signed-out production visitors to Netlify Identity login", () => {
     const page = read("../src/pages/Admin.vue");
 
+    assert.match(page, /v-if="showAdminSurface"/);
+    assert.match(page, /loginRedirecting:\s*false/);
+    assert.match(page, /sessionResolved:\s*false/);
+    assert.match(page, /showAdminSurface\(\)/);
     assert.match(page, /redirectToLoginIfSignedOut/);
     assert.match(page, /if\s*\(!this\.session\)\s*{/);
+    assert.match(page, /this\.loginRedirecting\s*=\s*true/);
     assert.match(page, /this\.openLogin\(\)/);
   });
 

@@ -75,6 +75,54 @@ describe("cloudinary media facade", () => {
     ]);
   });
 
+  it("falls back to default and unscoped image listing when the configured folder has no assets", async () => {
+    const calls = [];
+    const facade = createCloudinaryMediaFacade({
+      env: {
+        ...createEnv(),
+        CLOUDINARY_UPLOAD_FOLDER: "staging-only-folder",
+      },
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (calls.length < 3) {
+          return createResponse(200, { resources: [] });
+        }
+
+        return createResponse(200, {
+          resources: [
+            {
+              public_id: "legacy-cover",
+              secure_url: "https://res.cloudinary.com/demo-cloud/image/upload/legacy-cover.jpg",
+              width: 1200,
+              height: 800,
+              format: "jpg",
+              created_at: "2026-08-11T12:00:00Z",
+            },
+          ],
+        });
+      },
+    });
+
+    const result = await facade.listMedia({ query: { max_results: "12" } });
+
+    assert.equal(calls.length, 3);
+    assert.equal(new URL(calls[0].url).searchParams.get("prefix"), "staging-only-folder");
+    assert.equal(new URL(calls[1].url).searchParams.get("prefix"), "marcelo-munhoz-website");
+    assert.equal(new URL(calls[2].url).searchParams.has("prefix"), false);
+    assert.deepEqual(result.assets, [
+      {
+        public_id: "legacy-cover",
+        secure_url: "https://res.cloudinary.com/demo-cloud/image/upload/legacy-cover.jpg",
+        url: "https://res.cloudinary.com/demo-cloud/image/upload/legacy-cover.jpg",
+        width: 1200,
+        height: 800,
+        format: "jpg",
+        created_at: "2026-08-11T12:00:00Z",
+      },
+    ]);
+  });
+
   it("uploads image data with a server-generated signature and folder scope", async () => {
     const calls = [];
     const facade = createCloudinaryMediaFacade({
