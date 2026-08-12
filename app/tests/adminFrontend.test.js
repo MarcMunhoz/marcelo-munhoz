@@ -25,8 +25,11 @@ import {
   canOwnerUnpublishAction,
   canPrepareReviewAction,
   canRequestUnpublicationAction,
+  createEmptyArticleForm,
   filterAdminArticles,
+  mediaLibraryState,
   normalizeAdminArticleDisplay,
+  normalizeMediaAssetDisplay,
   ownerReviewQueues,
   removeArticleById,
   reconcileAdminDashboardData,
@@ -311,7 +314,7 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
-  it("builds article payloads with real Contentful fields and hidden version state", () => {
+  it("builds article payloads with hidden technical author, thumbnail, tag, and version state", () => {
     const payload = buildArticlePayload({
       title: "  New Admin  ",
       slug: "new-admin",
@@ -320,8 +323,9 @@ describe("admin frontend writer workflow", () => {
       createAt: "2026-08-11",
       thumbnail: { public_id: "marcelo-munhoz-website/image", secure_url: "https://example.test/image.jpg" },
       alt: "Admin screenshot",
-      author: "authorEntry",
-      tags: "admin, contentful",
+      authorName: "Marcelo Munhoz",
+      authorEntryId: "authorEntry",
+      tagList: ["admin", "contentful"],
       version: 7,
       reviewNotes: "do not send",
     });
@@ -340,7 +344,19 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
-  it("hydrates writer edit forms from existing articles without exposing review notes", () => {
+  it("creates new article forms with focused-editor display fields and internal technical state", () => {
+    const form = createEmptyArticleForm();
+
+    assert.equal(form.authorName, "");
+    assert.equal(form.authorEntryId, "");
+    assert.equal(form.thumbnailPublicId, "");
+    assert.equal(form.thumbnailUrl, "");
+    assert.deepEqual(form.tagList, []);
+    assert.equal(form.tagInput, "");
+    assert.equal(form.version, null);
+  });
+
+  it("hydrates writer edit forms with display controls without exposing review notes", () => {
     const form = articleToForm({
       id: "article-1",
       title: "Existing article",
@@ -354,6 +370,7 @@ describe("admin frontend writer workflow", () => {
       },
       alt: "Existing image",
       authorEntryId: "author-1",
+      authorName: "Marcelo Munhoz",
       tags: ["admin", "review"],
       version: 12,
       reviewNotes: "owner-only note",
@@ -370,9 +387,25 @@ describe("admin frontend writer workflow", () => {
       thumbnailUrl: "https://example.test/existing.jpg",
       alt: "Existing image",
       author: "author-1",
+      authorEntryId: "author-1",
+      authorName: "Marcelo Munhoz",
       tags: "admin, review",
+      tagList: ["admin", "review"],
+      tagInput: "",
       version: 12,
     });
+  });
+
+  it("hydrates editor date inputs from Contentful timestamps", () => {
+    const form = articleToForm({
+      id: "article-1",
+      createAt: "2026-06-25T14:38:24.390Z",
+      author: "Marcelo Munhoz",
+      authorEntryId: "author-1",
+    });
+
+    assert.equal(form.createAt, "2026-06-25");
+    assert.equal(form.authorName, "Marcelo Munhoz");
   });
 
   it("stores returned Contentful id and version after a successful draft save", () => {
@@ -415,32 +448,38 @@ describe("admin frontend writer workflow", () => {
   });
 
   it("shows row lifecycle actions only for article states supported by backend routes", () => {
-    assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft" }), true);
-    assert.equal(canPrepareReviewAction({ id: "published-1", status: "published" }), false);
-    assert.equal(canPrepareReviewAction({ id: "", status: "draft" }), false);
+    const writer = { subject: "writer-1", roles: ["writer"] };
 
-    assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }), true);
-    assert.equal(canRequestUnpublicationAction({ id: "draft-1", status: "draft" }), false);
-    assert.equal(canRequestUnpublicationAction({ id: "review-1", status: "review" }), false);
+    assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
+    assert.equal(canPrepareReviewAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), false);
+    assert.equal(canPrepareReviewAction({ id: "", status: "draft", writerSubject: "writer-1" }, writer), false);
+
+    assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), true);
+    assert.equal(canRequestUnpublicationAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), false);
+    assert.equal(canRequestUnpublicationAction({ id: "review-1", status: "review", writerSubject: "writer-1" }, writer), false);
   });
 
   it("shows writer actions only for writer-eligible article states", () => {
-    const writer = { roles: ["writer"] };
+    const writer = { subject: "writer-1", roles: ["writer"], authorEntryId: "author-1" };
 
-    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft" }, writer), true);
-    assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft" }, writer), true);
-    assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }, writer), true);
+    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
+    assert.equal(canEditArticleAction({ id: "draft-2", status: "draft", authorEntryId: "author-1" }, writer), true);
+    assert.equal(canEditArticleAction({ id: "draft-3", status: "draft", writerSubject: "writer-2", authorEntryId: "author-2" }, writer), false);
+    assert.equal(canEditArticleAction({ id: "draft-4", status: "draft" }, writer), false);
+    assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
+    assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), true);
 
-    assert.equal(canPrepareReviewAction({ id: "published-1", status: "published" }, writer), false);
+    assert.equal(canPrepareReviewAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), false);
     assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, writer), false);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, writer), false);
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, writer), false);
   });
 
   it("shows owner lifecycle actions directly instead of writer request actions", () => {
-    const owner = { roles: ["owner"] };
+    const owner = { subject: "owner-1", roles: ["owner"], authorEntryId: "author-1" };
 
-    assert.equal(canEditArticleAction({ id: "published-1", status: "published" }, owner), true);
+    assert.equal(canEditArticleAction({ id: "published-1", status: "published", authorEntryId: "author-1" }, owner), true);
+    assert.equal(canEditArticleAction({ id: "published-2", status: "published", authorEntryId: "author-2" }, owner), false);
     assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, owner), true);
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, owner), true);
@@ -468,19 +507,80 @@ describe("admin frontend writer workflow", () => {
     );
   });
 
-  it("renders the dashboard-first shell, article table, editor fields, and workflow controls", () => {
+  it("normalizes media assets for visual selection without using raw ids as primary labels", () => {
+    assert.deepEqual(
+      normalizeMediaAssetDisplay({
+        public_id: "marcelo-munhoz-website/blog/admin-dashboard",
+        secure_url: "https://example.test/admin-dashboard.jpg",
+        width: 1600,
+        height: 900,
+        context: { custom: { alt: "Admin dashboard thumbnail" } },
+      }),
+      {
+        publicId: "marcelo-munhoz-website/blog/admin-dashboard",
+        thumbnailUrl: "https://example.test/admin-dashboard.jpg",
+        title: "Admin dashboard thumbnail",
+        alt: "Admin dashboard thumbnail",
+        dimensions: "1600 x 900",
+      }
+    );
+    assert.equal(normalizeMediaAssetDisplay({ public_id: "folder/public-id-only" }).title, "public-id-only");
+  });
+
+  it("derives user-safe media library states for loading, empty, error, and ready responses", () => {
+    assert.deepEqual(mediaLibraryState({ isLoading: true }), {
+      status: "loading",
+      message: "Loading media library.",
+      assets: [],
+    });
+    assert.deepEqual(mediaLibraryState({ assets: [] }), {
+      status: "empty",
+      message: "No images are available in the selected media folder.",
+      assets: [],
+    });
+    assert.deepEqual(mediaLibraryState({ error: "Cloudinary API secret leaked raw diagnostic" }), {
+      status: "error",
+      message: "Media request failed.",
+      assets: [],
+    });
+    assert.deepEqual(mediaLibraryState({ assets: [{ public_id: "folder/photo", url: "https://example.test/photo.jpg" }] }), {
+      status: "ready",
+      message: "",
+      assets: [
+        {
+          publicId: "folder/photo",
+          thumbnailUrl: "https://example.test/photo.jpg",
+          title: "photo",
+          alt: "photo",
+          dimensions: "",
+        },
+      ],
+    });
+  });
+
+  it("renders the dashboard-first shell, article table, focused editor, and workflow controls", () => {
     const page = read("../src/pages/Admin.vue");
 
     for (const text of ["Editorial dashboard", "Published", "Drafts", "In review", "Article queue", "Owner review", "Media library", "Page views pending"]) {
       assert.match(page, new RegExp(text));
     }
 
-    for (const field of ["title", "slug", "description", "body", "createAt", "thumbnailPublicId", "thumbnailUrl", "alt", "author", "tags"]) {
+    for (const field of ["title", "slug", "description", "body", "createAt", "alt", "authorName", "tagInput"]) {
       assert.match(page, new RegExp(`v-model="articleForm\\.${field}"`));
     }
 
+    assert.match(page, /<q-drawer[\s\S]*v-model="editorOpen"/);
+    assert.match(page, /class="editor-drawer"/);
+    assert.match(page, /openEditorForNewArticle/);
+    assert.match(page, /openEditorForArticle/);
+    assert.match(page, /closeEditor/);
+    assert.doesNotMatch(page, /<aside class="editor-panel"/);
     assert.doesNotMatch(page, /v-model="articleForm\.version"/);
     assert.doesNotMatch(page, /v-model="articleForm\.notes"/);
+    assert.doesNotMatch(page, /label="Author entry ID"/);
+    assert.doesNotMatch(page, /label="Selected image ID"/);
+    assert.doesNotMatch(page, /label="Selected image URL"/);
+    assert.doesNotMatch(page, /Comma-separated Contentful tag IDs/);
     assert.doesNotMatch(page, /Review notes/);
     assert.match(page, /Save draft/);
     assert.match(page, /Submit for review/);
@@ -494,8 +594,20 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /isOwnerSession\(this\.session\)/);
     assert.match(page, /Select image/);
     assert.match(page, /Upload image/);
+    assert.match(page, /thumbnail-preview/);
+    assert.match(page, /articleForm\.thumbnailUrl/);
+    assert.match(page, /articleForm\.tagList/);
+    assert.match(page, /addTagToArticleForm/);
+    assert.match(page, /removeTagFromArticleForm/);
     assert.match(page, /applySelectedMedia/);
     assert.match(page, /handleMediaFile/);
+    assert.match(page, /mediaState/);
+    assert.match(page, /media-empty-state/);
+    assert.match(page, /media-dialog-toolbar/);
+    assert.match(page, /media-asset-title/);
+    assert.match(page, /asset\.thumbnailUrl/);
+    assert.match(page, /asset\.title/);
+    assert.doesNotMatch(page, /\{\{\s*asset\.public_id\s*\}\}/);
     assert.doesNotMatch(page, /admin-sidebar/);
     assert.match(page, /admin-filter-tabs/);
     assert.match(page, /article-table/);
@@ -509,9 +621,10 @@ describe("admin frontend writer workflow", () => {
     const page = read("../src/pages/Admin.vue");
     const layout = read("../src/layouts/MainLayout.vue");
 
-    assert.match(page, /sessionDisplay\.name/);
-    assert.match(page, /sessionDisplay\.role/);
-    assert.match(page, /sessionDisplay\.context/);
+    assert.doesNotMatch(page, /class="admin-session"/);
+    assert.doesNotMatch(page, /sessionDisplay\.name/);
+    assert.doesNotMatch(page, /sessionDisplay\.role\s*\}\}/);
+    assert.doesNotMatch(page, /sessionDisplay\.context\s*\}\}/);
     assert.match(page, /signOut/);
     assert.doesNotMatch(page, /verified_user/);
     assert.doesNotMatch(page, /Owner preview"\s*:\s*"Writer preview/);
@@ -519,6 +632,15 @@ describe("admin frontend writer workflow", () => {
     assert.match(layout, /adminSessionDisplay/);
     assert.match(layout, /adminNavLabel/);
     assert.match(layout, /signOut/);
+  });
+
+  it("keeps editor workflow buttons compact", () => {
+    const page = read("../src/pages/Admin.vue");
+
+    assert.match(page, /label="Save draft"[\s\S]*dense[\s\S]*no-caps/);
+    assert.match(page, /label="Submit for review"[\s\S]*dense[\s\S]*no-caps/);
+    assert.match(page, /label="Request unpublication"[\s\S]*dense[\s\S]*no-caps/);
+    assert.match(page, /\.editor-actions[\s\S]*gap:\s*8px/);
   });
 
   it("keeps admin layout responsive without relying on a horizontally oversized table shell", () => {
@@ -530,6 +652,11 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /\.admin-main-grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
     assert.match(page, /@media \(max-width:\s*900px\)/);
     assert.match(page, /\.article-table[\s\S]*overflow-x:\s*auto/);
+    assert.match(page, /\.status-cell[\s\S]*justify-content:\s*flex-start/);
+    assert.match(page, /\.table-actions[\s\S]*display:\s*flex/);
+    assert.match(page, /\.editor-drawer[\s\S]*width:\s*min\(560px,\s*100vw\)/);
+    assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*\.editor-drawer/);
+    assert.doesNotMatch(page, /letter-spacing:\s*-/);
   });
 
   it("handles save, validation, authorization, media, and conflict states in the writer UI", () => {

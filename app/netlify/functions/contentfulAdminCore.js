@@ -40,15 +40,21 @@ const rolesFromUser = (user = {}) => {
   return Array.isArray(roles) ? roles : [roles];
 };
 
+const authorEntryIdFromUser = (user = {}) =>
+  user.app_metadata?.authorEntryId || user.app_metadata?.author_entry_id || user.user_metadata?.authorEntryId || user.user_metadata?.author_entry_id || "";
+
 export const sessionFromNetlifyUser = (user) => {
   if (!user) {
     return null;
   }
 
+  const authorEntryId = authorEntryIdFromUser(user);
+
   return {
     subject: user.sub || user.id,
     name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Authenticated user",
     roles: rolesFromUser(user).filter(Boolean),
+    ...(authorEntryId ? { authorEntryId } : {}),
   };
 };
 
@@ -118,6 +124,15 @@ export class ContentfulAdminNotImplementedError extends Error {
     this.name = "ContentfulAdminNotImplementedError";
     this.statusCode = 501;
     this.publicError = "Admin operation not implemented";
+  }
+}
+
+export class ContentfulAdminAuthorizationError extends Error {
+  constructor(message = "Your account cannot perform this action.") {
+    super(message);
+    this.name = "ContentfulAdminAuthorizationError";
+    this.statusCode = 403;
+    this.publicError = message;
   }
 }
 
@@ -332,9 +347,19 @@ const normalizedEntryStatus = (sys = {}) => {
   return "draft";
 };
 
-const normalizedAuthor = (author) => {
+const entryId = (entry = {}) => entry.sys?.id || "";
+
+const contentfulLinkId = (value = {}) => (value?.sys?.type === "Link" && value?.sys?.linkType === "Entry" ? value.sys.id : "");
+
+const entriesById = (entries = []) => new Map(entries.map((entry) => [entryId(entry), entry]).filter(([id]) => id));
+
+const resolvedEntry = (value, entryMap = new Map()) => entryMap.get(contentfulLinkId(value)) || value;
+
+const linkedAuthorIdFromArticle = (entry = {}, locale) => contentfulLinkId(firstLocalizedValue(entry.fields || {}, "author", locale));
+
+const normalizedAuthor = (author, locale) => {
   const fields = author?.fields || {};
-  const name = firstLocalizedValue(fields, "name", DEFAULT_CONTENTFUL_LOCALE);
+  const name = firstLocalizedValue(fields, "name", locale);
 
   return {
     author: name || author?.sys?.id || "",
@@ -342,9 +367,9 @@ const normalizedAuthor = (author) => {
   };
 };
 
-const normalizedArticle = (entry = {}, locale) => {
+const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
   const fields = entry.fields || {};
-  const authorData = normalizedAuthor(firstLocalizedValue(fields, "author", locale));
+  const authorData = normalizedAuthor(resolvedEntry(firstLocalizedValue(fields, "author", locale), entryMap), locale);
 
   return {
     id: entry.sys?.id || "",
@@ -356,11 +381,24 @@ const normalizedArticle = (entry = {}, locale) => {
     thumbnail: firstLocalizedValue(fields, "thumbnail", locale) || firstLocalizedValue(fields, "cloudinary", locale)?.[0],
     alt: firstLocalizedValue(fields, "alt", locale) || "",
     ...authorData,
+    writerSubject: firstLocalizedValue(fields, "writerSubject", locale) || "",
     tags: normalizedTags(entry.metadata),
     status: normalizedEntryStatus(entry.sys),
     version: entry.sys?.version || null,
     updatedAt: entry.sys?.updatedAt || "",
   };
+};
+
+const sessionOwnsArticle = (article = {}, session = {}) =>
+  Boolean(
+    (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
+      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
+  );
+
+const ensureCanEditArticle = (article = {}, session = {}) => {
+  if (!sessionOwnsArticle(article, session)) {
+    throw new ContentfulAdminAuthorizationError("Your account cannot edit this article.");
+  }
 };
 
 const normalizedEditorialRequest = (entry = {}, locale) => {
@@ -550,14 +588,25 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       });
       const entryPayload = await request({ method: "GET", path: `/entries?${entryParams}` });
       const entries = entryPayload.items || [];
+      const entryMap = entriesById(entries);
       const articleEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "article");
+      const missingAuthorIds = [
+        ...new Set(articleEntries.map((entry) => linkedAuthorIdFromArticle(entry, config.locale)).filter((authorId) => authorId && !entryMap.has(authorId))),
+      ];
+
+      const linkedAuthors = await Promise.all(missingAuthorIds.map((authorId) => request({ method: "GET", path: articlePath(authorId) })));
+      linkedAuthors.forEach((entry) => {
+        if (entryId(entry)) {
+          entryMap.set(entryId(entry), entry);
+        }
+      });
       const workflowEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "blogEditorialRequest");
       const allReviewRequests = workflowEntries.map((entry) => normalizedEditorialRequest(entry, config.locale));
       const reviewRequests = allReviewRequests.filter((request) => isOwner(session) || request.writerSubject === session?.subject);
       const requestsByArticle = requestByArticleId(reviewRequests);
       const articles = articleEntries
         .map((entry) => {
-          const article = normalizedArticle(entry, config.locale);
+          const article = normalizedArticle(entry, config.locale, entryMap);
           const request = requestsByArticle.get(article.id);
           const requestStatus = statusFromRequest(request);
 
@@ -577,14 +626,19 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         reviewRequests,
       };
     },
-    async updateArticleDraft({ articleId, data }) {
+    async updateArticleDraft({ articleId, data, session }) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const version = requiredVersion(data);
+      const existingEntry = await request({ method: "GET", path: articlePath(articleId) });
+      ensureCanEditArticle(normalizedArticle(existingEntry, config.locale), session);
+
       return request({
         method: "PUT",
         path: articlePath(articleId),
         headers: {
-          "x-contentful-version": requiredVersion(data),
+          "x-contentful-version": version,
         },
-        body: articlePayloadFromData(data, env.CONTENTFUL_DEFAULT_LOCALE || DEFAULT_CONTENTFUL_LOCALE),
+        body: articlePayloadFromData(data, config.locale),
       });
     },
     async publishArticle({ articleId, data }) {

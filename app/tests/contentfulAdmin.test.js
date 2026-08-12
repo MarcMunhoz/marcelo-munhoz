@@ -10,14 +10,16 @@ import {
   createContentfulAdminHandler,
   createContentfulManagementFacade,
   devPreviewSessionFromHeaders,
+  sessionFromNetlifyUser,
 } from "../middleware/contentfulAdmin.js";
 
 const parse = (response) => JSON.parse(response.body);
 
-const createSession = (roles = []) => ({
+const createSession = (roles = [], overrides = {}) => ({
   subject: "user-123",
   name: "Guest Writer",
   roles,
+  ...overrides,
 });
 
 describe("contentful admin handler", () => {
@@ -31,6 +33,25 @@ describe("contentful admin handler", () => {
     assert.deepEqual(devPreviewSessionFromHeaders({ "x-admin-preview-role": "writer" }, { nodeEnv: "development" }).roles, ["writer"]);
     assert.equal(devPreviewSessionFromHeaders({ "x-admin-preview-role": "owner" }, { nodeEnv: "production" }), null);
     assert.equal(devPreviewSessionFromHeaders({ "x-admin-preview-role": "admin" }, { nodeEnv: "development" }), null);
+  });
+
+  it("loads the Contentful author profile id from Netlify user metadata", () => {
+    assert.deepEqual(
+      sessionFromNetlifyUser({
+        sub: "user-123",
+        email: "writer@example.test",
+        app_metadata: {
+          roles: ["writer"],
+          authorEntryId: "author-1",
+        },
+      }),
+      {
+        subject: "user-123",
+        name: "writer@example.test",
+        roles: ["writer"],
+        authorEntryId: "author-1",
+      }
+    );
   });
 
   it("rejects unauthenticated admin API requests without running an operation", async () => {
@@ -292,7 +313,8 @@ describe("contentful admin handler", () => {
     assert.match(calls[0].url, /\/entries\?/);
     assert.match(calls[0].url, /limit=100/);
     assert.doesNotMatch(calls[0].url, /content_type=|include=|order=/);
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 2);
+    assert.match(calls[1].url, /\/entries\/author-2$/);
     assert.equal(calls[0].options.headers.authorization, "Bearer management-token");
   });
 
@@ -468,6 +490,202 @@ describe("contentful admin handler", () => {
 
     assert.equal(dashboard.articles[0].author, "Marcelo Munhoz");
     assert.equal(dashboard.articles[0].authorEntryId, "author-1");
+  });
+
+  it("resolves admin article author names from sibling author entries when articles contain author links", async () => {
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          items: [
+            {
+              sys: { id: "article-1", version: 3, publishedVersion: 2, contentType: { sys: { id: "article" } } },
+              fields: {
+                title: { "pt-BR": "Published" },
+                author: {
+                  "pt-BR": {
+                    sys: { type: "Link", linkType: "Entry", id: "author-1" },
+                  },
+                },
+              },
+            },
+            {
+              sys: { id: "author-1", version: 11, contentType: { sys: { id: "author" } } },
+              fields: {
+                name: { "pt-BR": "Marcelo Munhoz" },
+              },
+            },
+          ],
+        };
+      },
+    });
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const dashboard = await facade.listAdminArticles({ session: createSession(["owner"]) });
+
+    assert.equal(dashboard.articles[0].author, "Marcelo Munhoz");
+    assert.equal(dashboard.articles[0].authorEntryId, "author-1");
+  });
+
+  it("resolves admin article author names by fetching linked authors missing from the dashboard payload", async () => {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(String(url));
+
+      if (String(url).endsWith("/entries?limit=100")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              items: [
+                {
+                  sys: { id: "article-1", version: 3, publishedVersion: 2, contentType: { sys: { id: "article" } } },
+                  fields: {
+                    title: { "pt-BR": "Published" },
+                    author: { "pt-BR": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+                  },
+                },
+              ],
+            };
+          },
+        };
+      }
+
+      if (String(url).endsWith("/entries/author-1")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              sys: { id: "author-1", version: 11, contentType: { sys: { id: "author" } } },
+              fields: { name: { "pt-BR": "Marcelo Munhoz" } },
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected Contentful URL: ${url}`);
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const dashboard = await facade.listAdminArticles({ session: createSession(["owner"]) });
+
+    assert.equal(dashboard.articles[0].author, "Marcelo Munhoz");
+    assert.equal(dashboard.articles[0].authorEntryId, "author-1");
+    assert.equal(calls.some((url) => url.endsWith("/entries/author-1")), true);
+  });
+
+  it("rejects article draft updates when the session is not the article creator", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method });
+
+      if (String(url).endsWith("/entries/article-1")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              sys: { id: "article-1", version: 8, contentType: { sys: { id: "article" } } },
+              fields: {
+                author: { "pt-BR": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+              },
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected Contentful URL: ${url}`);
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    await assert.rejects(
+      () =>
+        facade.updateArticleDraft({
+          articleId: "article-1",
+          data: { title: "Changed", version: 8 },
+          session: createSession(["owner"], { authorEntryId: "author-2" }),
+        }),
+      {
+        statusCode: 403,
+        publicError: "Your account cannot edit this article.",
+      }
+    );
+    assert.deepEqual(calls.map((call) => call.method), ["GET"]);
+  });
+
+  it("allows article draft updates when the session matches the article author profile", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method, body: options.body });
+
+      if (String(url).endsWith("/entries/article-1") && options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              sys: { id: "article-1", version: 8, contentType: { sys: { id: "article" } } },
+              fields: {
+                author: { "pt-BR": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+              },
+            };
+          },
+        };
+      }
+
+      if (String(url).endsWith("/entries/article-1") && options.method === "PUT") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { sys: { id: "article-1", version: 9 } };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected Contentful URL: ${url}`);
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const response = await facade.updateArticleDraft({
+      articleId: "article-1",
+      data: { title: "Changed", version: 8 },
+      session: createSession(["owner"], { authorEntryId: "author-1" }),
+    });
+
+    assert.deepEqual(response, { sys: { id: "article-1", version: 9 } });
+    assert.deepEqual(calls.map((call) => call.method), ["GET", "PUT"]);
   });
 
   it("allows writer sessions to record submit-for-review workflow requests", async () => {

@@ -88,6 +88,8 @@ Owners execute lifecycle operations directly. Writers request owner review. Publ
 
 Rationale: this preserves the authorization model and makes the UI match editorial language.
 
+Editing is stricter than moderation: an article can only be edited when the authenticated account matches the article's trusted creator metadata, such as the Netlify subject stored with the article workflow or the linked Contentful author profile ID associated with the authenticated account. Owners can still moderate other authors' articles by publishing, unpublishing, archiving, or deleting where eligible, but they should not rewrite another author's article body through the editor.
+
 ### Treat Dev Preview As Development State, Not Identity
 
 In local development, the UI may show `Local preview` and the selected role, but it should not mimic a real authenticated user too strongly. In production-like environments, the UI should show the real Netlify Identity user name/email and role.

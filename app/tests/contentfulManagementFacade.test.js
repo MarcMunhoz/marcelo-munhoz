@@ -80,6 +80,16 @@ describe("contentful management facade", () => {
       env: createEnv(),
       async fetchImpl(url, options) {
         calls.push({ url: url.toString(), options });
+
+        if (options.method === "GET") {
+          return createResponse(200, {
+            sys: { id: "article-1", version: 7 },
+            fields: {
+              author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+            },
+          });
+        }
+
         return createResponse(200, { sys: { id: "article-1", version: 8 } });
       },
     });
@@ -92,11 +102,12 @@ describe("contentful management facade", () => {
           title: { "en-US": "Updated title" },
         },
       },
+      session: { authorEntryId: "author-1" },
     });
 
-    assert.equal(calls[0].options.method, "PUT");
-    assert.equal(calls[0].options.headers["x-contentful-version"], "7");
-    assert.equal(new URL(calls[0].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
+    assert.deepEqual(calls.map((call) => call.options.method), ["GET", "PUT"]);
+    assert.equal(calls[1].options.headers["x-contentful-version"], "7");
+    assert.equal(new URL(calls[1].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
   });
 
   it("performs owner lifecycle operations with version headers", async () => {

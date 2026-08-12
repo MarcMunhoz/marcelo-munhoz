@@ -2,6 +2,7 @@ export {
   canWriteDrafts,
   CloudinaryMediaConfigurationError,
   CloudinaryMediaRequestError,
+  ContentfulAdminAuthorizationError,
   ContentfulAdminConfigurationError,
   ContentfulAdminNotImplementedError,
   contentfulAdminHandler,

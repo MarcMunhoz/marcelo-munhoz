@@ -77,8 +77,17 @@ The system SHALL show article actions that match the current admin role and arti
 
 #### Scenario: Owner views published article actions
 - **WHEN** an authenticated owner views a published article
-- **THEN** the system offers direct owner actions such as edit, unpublish, archive, or permanent delete where eligible
+- **THEN** the system offers direct owner moderation actions such as unpublish, archive, or permanent delete where eligible
 - **AND** the system does not require the owner to request unpublication
+
+#### Scenario: Admin views an article created by another author
+- **WHEN** an authenticated owner or writer views an article without a trusted creator match to their account
+- **THEN** the system does not offer article editing for that article
+- **AND** owner moderation actions remain available where the owner role and article state allow them
+
+#### Scenario: Admin edits an article they created
+- **WHEN** an authenticated owner or writer views an article with a trusted creator match to their account
+- **THEN** the system may offer article editing where the article state supports editing
 
 ### Requirement: Article Editing Opens In A Focused Surface
 The system SHALL open article creation and editing in an explicit focused surface rather than silently populating a persistent editor elsewhere on the dashboard.

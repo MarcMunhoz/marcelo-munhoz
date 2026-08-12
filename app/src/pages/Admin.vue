@@ -14,18 +14,6 @@
                 <q-icon name="search" />
               </template>
             </q-input>
-
-            <div class="admin-session" :class="{ preview: sessionDisplay.preview }">
-              <q-icon :name="session ? 'account_circle' : 'lock'" size="22px" />
-              <div>
-                <strong>{{ sessionDisplay.name }}</strong>
-                <span>{{ sessionDisplay.role }} · {{ sessionDisplay.context }}</span>
-              </div>
-              <q-btn v-if="!session" outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
-              <q-btn v-if="sessionDisplay.canSignOut" flat round color="blue-grey-7" icon="logout" size="sm" @click="signOut">
-                <q-tooltip>Sign out</q-tooltip>
-              </q-btn>
-            </div>
           </div>
         </header>
 
@@ -34,6 +22,7 @@
           <div>
             <h2>Writer access required</h2>
             <p>Sign in with an invited writer account to manage blog drafts.</p>
+            <q-btn outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
           </div>
         </section>
 
@@ -79,7 +68,7 @@
                   <p class="admin-kicker">Article queue</p>
                   <h2>Articles</h2>
                 </div>
-                <q-btn unelevated color="blue-grey-8" icon="add" label="New article" @click="startNewArticle" />
+                <q-btn unelevated color="blue-grey-8" icon="add" label="New article" @click="openEditorForNewArticle" />
               </div>
 
               <q-banner v-if="dashboardError" class="feedback-error dashboard-feedback" rounded>{{ dashboardError }}</q-banner>
@@ -103,7 +92,9 @@
               >
                 <template #body-cell-status="props">
                   <q-td :props="props">
-                    <q-badge outline :color="statusColor(props.row.status)">{{ statusLabel(props.row.status) }}</q-badge>
+                    <span class="status-cell">
+                      <q-badge outline :color="statusColor(props.row.status)">{{ statusLabel(props.row.status) }}</q-badge>
+                    </span>
                   </q-td>
                 </template>
 
@@ -117,10 +108,10 @@
 
                 <template #body-cell-actions="props">
                   <q-td :props="props" class="table-actions">
-                    <q-btn v-if="canEditArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="edit" @click="editArticle(props.row)">
+                    <q-btn v-if="canEditArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="edit" @click="openEditorForArticle(props.row)">
                       <q-tooltip>Edit article</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canPrepareReviewAction(props.row, session)" dense flat round color="blue-grey-7" icon="rate_review" @click="editArticle(props.row)">
+                    <q-btn v-if="canPrepareReviewAction(props.row, session)" dense flat round color="blue-grey-7" icon="rate_review" @click="openEditorForArticle(props.row)">
                       <q-tooltip>Submit draft for review</q-tooltip>
                     </q-btn>
                     <q-btn v-if="canRequestUnpublicationAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" @click="requestUnpublicationFromRow(props.row)">
@@ -182,69 +173,98 @@
                 </article>
               </div>
             </section>
-
-            <aside class="editor-panel">
-              <div class="panel-heading compact">
-                <div>
-                  <p class="admin-kicker">Article editor</p>
-                  <h2>{{ articleForm.id ? "Edit article" : "Create article" }}</h2>
-                </div>
-                <q-badge outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
-              </div>
-
-              <q-form class="editor-form" @submit.prevent="saveDraft">
-                <q-input v-model="articleForm.title" label="Title" outlined dense :error="Boolean(errors.title)" :error-message="errors.title" />
-                <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" />
-                <q-input v-model="articleForm.description" label="Description" outlined dense type="textarea" autogrow :error="Boolean(errors.description)" :error-message="errors.description" />
-                <q-input v-model="articleForm.body" label="Body" outlined type="textarea" :rows="8" :error="Boolean(errors.body)" :error-message="errors.body" />
-
-                <div class="form-row">
-                  <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
-                  <q-input v-model="articleForm.author" label="Author entry ID" outlined dense :error="Boolean(errors.author)" :error-message="errors.author" />
-                </div>
-
-                <div class="media-fields">
-                  <div class="media-fields-title">
-                    <q-icon name="cloud_upload" />
-                    <span>Thumbnail</span>
-                  </div>
-                  <div class="media-actions">
-                    <q-btn outline color="blue-grey-7" icon="perm_media" label="Select image" :loading="loadingAction === 'media-list'" @click="openMediaLibrary" />
-                    <q-file
-                      v-model="mediaUploadFile"
-                      dense
-                      outlined
-                      accept="image/*"
-                      label="Upload image"
-                      class="media-upload"
-                      :loading="loadingAction === 'media-upload'"
-                      @update:model-value="handleMediaFile"
-                    >
-                      <template #prepend>
-                        <q-icon name="upload" />
-                      </template>
-                    </q-file>
-                  </div>
-                  <q-input v-model="articleForm.thumbnailPublicId" label="Selected image ID" outlined dense readonly :error="Boolean(errors.thumbnail)" :error-message="errors.thumbnail" />
-                  <q-input v-model="articleForm.thumbnailUrl" label="Selected image URL" outlined dense readonly />
-                  <q-input v-model="articleForm.alt" label="Alt text" outlined dense />
-                </div>
-
-                <q-input v-model="articleForm.tags" label="Tags" outlined dense hint="Comma-separated Contentful tag IDs" />
-
-                <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
-
-                <div class="editor-actions">
-                  <q-btn unelevated color="blue-grey-8" icon="save" label="Save draft" type="submit" :loading="loadingAction === 'save'" />
-                  <q-btn outline color="blue-grey-7" icon="rate_review" label="Submit for review" :disable="!articleForm.id" :loading="loadingAction === 'review'" @click="submitReview" />
-                  <q-btn outline color="amber-9" icon="visibility_off" label="Request unpublication" :disable="!articleForm.id" :loading="loadingAction === 'unpublish'" @click="requestUnpublication" />
-                </div>
-              </q-form>
-            </aside>
           </section>
         </template>
       </section>
     </section>
+
+    <q-drawer v-model="editorOpen" side="right" overlay bordered class="editor-drawer" :width="560">
+      <div class="editor-drawer-body">
+        <div class="panel-heading compact editor-drawer-header">
+          <div>
+            <p class="admin-kicker">Article editor</p>
+            <h2>{{ articleForm.id ? "Edit article" : "Create article" }}</h2>
+          </div>
+          <div class="editor-drawer-actions">
+            <q-badge outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
+            <q-btn flat round dense color="blue-grey-7" icon="close" @click="closeEditor">
+              <q-tooltip>Close editor</q-tooltip>
+            </q-btn>
+          </div>
+        </div>
+
+        <q-form class="editor-form" @submit.prevent="saveDraft">
+          <q-input v-model="articleForm.title" label="Title" outlined dense :error="Boolean(errors.title)" :error-message="errors.title" />
+          <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" />
+          <q-input v-model="articleForm.description" label="Description" outlined dense type="textarea" autogrow :error="Boolean(errors.description)" :error-message="errors.description" />
+          <q-input v-model="articleForm.body" label="Body" outlined type="textarea" :rows="8" :error="Boolean(errors.body)" :error-message="errors.body" />
+
+          <div class="form-row">
+            <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
+            <q-input v-model="articleForm.authorName" label="Author" outlined dense readonly :error="Boolean(errors.author)" :error-message="errors.author">
+              <template #prepend>
+                <q-icon name="person" />
+              </template>
+            </q-input>
+          </div>
+
+          <div class="media-fields">
+            <div class="media-fields-title">
+              <q-icon name="cloud_upload" />
+              <span>Thumbnail</span>
+            </div>
+            <div v-if="articleForm.thumbnailUrl" class="thumbnail-preview">
+              <img :src="articleForm.thumbnailUrl" :alt="articleForm.alt || 'Article thumbnail preview'" />
+            </div>
+            <div v-else class="thumbnail-preview empty">
+              <q-icon name="image" size="34px" />
+              <span>No thumbnail selected</span>
+            </div>
+            <div class="media-actions">
+              <q-btn outline color="blue-grey-7" icon="perm_media" label="Select image" :loading="loadingAction === 'media-list'" @click="openMediaLibrary" />
+              <q-file
+                v-model="mediaUploadFile"
+                dense
+                outlined
+                accept="image/*"
+                label="Upload image"
+                class="media-upload"
+                :loading="loadingAction === 'media-upload'"
+                @update:model-value="handleMediaFile"
+              >
+                <template #prepend>
+                  <q-icon name="upload" />
+                </template>
+              </q-file>
+            </div>
+            <q-input v-model="articleForm.alt" label="Alt text" outlined dense />
+          </div>
+
+          <div class="tag-editor">
+            <q-input v-model="articleForm.tagInput" label="Tags" outlined dense @keyup.enter.prevent="addTagToArticleForm">
+              <template #append>
+                <q-btn flat round dense color="blue-grey-7" icon="add" @click="addTagToArticleForm">
+                  <q-tooltip>Add tag</q-tooltip>
+                </q-btn>
+              </template>
+            </q-input>
+            <div class="tag-chip-list">
+              <q-chip v-for="tag in articleForm.tagList" :key="tag" removable outline color="blue-grey-7" @remove="removeTagFromArticleForm(tag)">
+                {{ tag }}
+              </q-chip>
+            </div>
+          </div>
+
+          <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
+
+          <div class="editor-actions">
+            <q-btn unelevated color="blue-grey-8" icon="save" label="Save draft" dense no-caps size="sm" type="submit" :loading="loadingAction === 'save'" />
+            <q-btn outline color="blue-grey-7" icon="rate_review" label="Submit for review" dense no-caps size="sm" :disable="!articleForm.id" :loading="loadingAction === 'review'" @click="submitReview" />
+            <q-btn outline color="amber-9" icon="visibility_off" label="Request unpublication" dense no-caps size="sm" :disable="!articleForm.id" :loading="loadingAction === 'unpublish'" @click="requestUnpublication" />
+          </div>
+        </q-form>
+      </div>
+    </q-drawer>
 
     <q-dialog v-model="mediaDialogOpen">
       <q-card class="media-dialog">
@@ -257,15 +277,38 @@
         </q-card-section>
 
         <q-card-section>
-          <q-banner v-if="mediaError" class="feedback-error" rounded>{{ mediaError }}</q-banner>
+          <div class="media-dialog-toolbar">
+            <q-file
+              v-model="mediaUploadFile"
+              dense
+              outlined
+              accept="image/*"
+              label="Upload image"
+              class="media-upload"
+              :loading="loadingAction === 'media-upload'"
+              @update:model-value="handleMediaFile"
+            >
+              <template #prepend>
+                <q-icon name="upload" />
+              </template>
+            </q-file>
+          </div>
+
+          <q-banner v-if="mediaState.status === 'error'" class="feedback-error media-state-banner" rounded>{{ mediaState.message }}</q-banner>
+          <div v-if="mediaState.status === 'empty'" class="media-empty-state">
+            <q-icon name="image_not_supported" size="38px" />
+            <strong>No images available</strong>
+            <span>{{ mediaState.message }}</span>
+          </div>
           <q-inner-loading :showing="loadingAction === 'media-list'">
             <q-spinner color="blue-grey-7" size="42px" />
           </q-inner-loading>
 
-          <div class="media-grid">
-            <button v-for="asset in mediaAssets" :key="asset.public_id" type="button" class="media-asset" @click="applySelectedMedia(asset)">
-              <img :src="asset.secure_url || asset.url" :alt="asset.public_id" />
-              <span>{{ asset.public_id }}</span>
+          <div v-if="mediaState.status === 'ready'" class="media-grid">
+            <button v-for="asset in mediaState.assets" :key="asset.publicId" type="button" class="media-asset" @click="applySelectedMedia(asset)">
+              <img :src="asset.thumbnailUrl" :alt="asset.alt" />
+              <strong class="media-asset-title">{{ asset.title }}</strong>
+              <span v-if="asset.dimensions">{{ asset.dimensions }}</span>
             </button>
           </div>
         </q-card-section>
@@ -329,13 +372,14 @@ import {
   canRequestUnpublicationAction,
   createEmptyArticleForm,
   filterAdminArticles,
+  mediaLibraryState,
   ownerReviewQueues,
   removeArticleById,
   reconcileAdminDashboardData,
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
-import { adminSessionDisplay, getAdminSession, isOwnerSession, isWriterSession, openAdminLogin, signOutAdmin } from "../utils/adminAuth.js";
+import { getAdminSession, isOwnerSession, isWriterSession, openAdminLogin, signOutAdmin } from "../utils/adminAuth.js";
 
 export default defineComponent({
   name: "AdminPage",
@@ -346,6 +390,7 @@ export default defineComponent({
       articles: [],
       adminSummary: summarizeArticleStatuses([]),
       reviewRequests: [],
+      editorOpen: false,
       articleForm: createEmptyArticleForm(),
       filters: {
         search: "",
@@ -394,9 +439,6 @@ export default defineComponent({
     canWrite() {
       return isWriterSession(this.session);
     },
-    sessionDisplay() {
-      return adminSessionDisplay(this.session);
-    },
     isOwner() {
       return isOwnerSession(this.session);
     },
@@ -411,6 +453,13 @@ export default defineComponent({
     },
     filteredArticles() {
       return filterAdminArticles(this.articles, this.filters);
+    },
+    mediaState() {
+      return mediaLibraryState({
+        assets: this.mediaAssets,
+        error: this.mediaError,
+        isLoading: this.loadingAction === "media-list",
+      });
     },
     feedbackClass() {
       return {
@@ -454,17 +503,31 @@ export default defineComponent({
       this.filters.status = this.filters.status === status ? "" : status || "";
       this.activeSection = "dashboard";
     },
-    startNewArticle() {
+    openEditorForNewArticle() {
       this.articleForm = createEmptyArticleForm();
       this.errors = {};
       this.statusMessage = "New draft";
       this.showFeedback("", "info");
+      this.editorOpen = true;
     },
-    editArticle(article) {
+    openEditorForArticle(article) {
       this.articleForm = articleToForm(article);
       this.errors = {};
       this.statusMessage = "Loaded";
       this.showFeedback("", "info");
+      this.editorOpen = true;
+    },
+    closeEditor() {
+      this.editorOpen = false;
+      this.errors = {};
+      this.statusMessage = "";
+      this.showFeedback("", "info");
+    },
+    startNewArticle() {
+      this.openEditorForNewArticle();
+    },
+    editArticle(article) {
+      this.openEditorForArticle(article);
     },
     statusColor(status) {
       return {
@@ -505,8 +568,8 @@ export default defineComponent({
         errors.body = "Body is required";
       }
 
-      if (!this.articleForm.author.trim()) {
-        errors.author = "Author entry ID is required";
+      if (!String(this.articleForm.authorEntryId || this.articleForm.author || "").trim()) {
+        errors.author = "Author profile is required";
       }
 
       if (this.articleForm.thumbnailUrl && !this.articleForm.thumbnailPublicId) {
@@ -527,6 +590,7 @@ export default defineComponent({
         this.articles = [];
         this.adminSummary = summarizeArticleStatuses([]);
         this.reviewRequests = [];
+        this.editorOpen = false;
       }
     },
     canEditArticleAction,
@@ -550,10 +614,30 @@ export default defineComponent({
       }
     },
     applySelectedMedia(asset = {}) {
-      this.articleForm.thumbnailPublicId = asset.public_id || "";
-      this.articleForm.thumbnailUrl = asset.secure_url || asset.url || "";
+      this.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || "";
+      this.articleForm.thumbnailUrl = asset.thumbnailUrl || asset.secure_url || asset.url || "";
+      this.articleForm.alt = this.articleForm.alt || asset.alt || asset.title || "";
       this.mediaDialogOpen = false;
       this.showFeedback("Image selected.", "success");
+    },
+    syncArticleTags() {
+      this.articleForm.tags = this.articleForm.tagList.join(", ");
+    },
+    addTagToArticleForm() {
+      const tag = String(this.articleForm.tagInput || "").trim();
+
+      if (!tag || this.articleForm.tagList.includes(tag)) {
+        this.articleForm.tagInput = "";
+        return;
+      }
+
+      this.articleForm.tagList = [...this.articleForm.tagList, tag];
+      this.articleForm.tagInput = "";
+      this.syncArticleTags();
+    },
+    removeTagFromArticleForm(tag) {
+      this.articleForm.tagList = this.articleForm.tagList.filter((item) => item !== tag);
+      this.syncArticleTags();
     },
     async handleMediaFile(file) {
       if (!file) {
@@ -633,7 +717,7 @@ export default defineComponent({
       }
     },
     requestUnpublicationFromRow(article) {
-      this.editArticle(article);
+      this.openEditorForArticle(article);
       return this.requestUnpublication();
     },
     async requestUnpublication() {
@@ -811,26 +895,6 @@ export default defineComponent({
   margin: 0 0 14px;
 }
 
-.admin-session {
-  align-items: center;
-  background: #ffffff;
-  border: 1px solid #cfd8dc;
-  display: flex;
-  gap: 10px;
-  min-height: 46px;
-  padding: 8px 10px;
-
-  span {
-    color: #607d8b;
-    display: block;
-    font-size: 0.8rem;
-  }
-}
-
-.admin-session.preview {
-  background: #eef3f5;
-}
-
 .admin-blocked {
   align-items: center;
   background: #ffffff;
@@ -849,8 +913,7 @@ export default defineComponent({
 
 .status-card,
 .article-queue-panel,
-.owner-review-panel,
-.editor-panel {
+.owner-review-panel {
   background: #ffffff;
   border: 1px solid #cfd8dc;
 }
@@ -885,8 +948,7 @@ export default defineComponent({
 }
 
 .article-queue-panel,
-.owner-review-panel,
-.editor-panel {
+.owner-review-panel {
   min-width: 0;
   padding: 16px;
 }
@@ -972,6 +1034,7 @@ export default defineComponent({
 }
 
 .tag-list {
+  align-items: center;
   color: #455a64;
   display: flex;
   flex-wrap: wrap;
@@ -979,8 +1042,44 @@ export default defineComponent({
   gap: 6px;
 }
 
+.status-cell {
+  align-items: center;
+  display: flex;
+  justify-content: flex-start;
+  min-height: 32px;
+}
+
 .table-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
   white-space: nowrap;
+}
+
+.editor-drawer {
+  background: #ffffff;
+  max-width: 100vw;
+  width: min(560px, 100vw);
+}
+
+.editor-drawer-body {
+  display: grid;
+  gap: 14px;
+  min-height: 100%;
+  overflow-y: auto;
+  padding: 18px;
+}
+
+.editor-drawer-header {
+  border-bottom: 1px solid #e0e6e8;
+  padding-bottom: 12px;
+}
+
+.editor-drawer-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
 }
 
 .editor-form {
@@ -1017,8 +1116,73 @@ export default defineComponent({
   min-width: 0;
 }
 
+.thumbnail-preview {
+  align-items: center;
+  background: #eef3f5;
+  border: 1px solid #dbe3e6;
+  display: flex;
+  gap: 12px;
+  min-height: 148px;
+  overflow: hidden;
+
+  img {
+    aspect-ratio: 16 / 9;
+    display: block;
+    object-fit: cover;
+    width: 100%;
+  }
+}
+
+.thumbnail-preview.empty {
+  color: #607d8b;
+  justify-content: center;
+}
+
+.tag-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.tag-chip-list {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 32px;
+}
+
 .media-dialog {
   min-width: min(920px, 92vw);
+}
+
+.media-dialog-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+
+  .media-upload {
+    max-width: 360px;
+    width: min(360px, 100%);
+  }
+}
+
+.media-state-banner {
+  margin-bottom: 14px;
+}
+
+.media-empty-state {
+  align-items: center;
+  border: 1px dashed #b0bec5;
+  color: #607d8b;
+  display: grid;
+  justify-items: center;
+  min-height: 180px;
+  padding: 24px;
+  text-align: center;
+
+  strong {
+    color: #37474f;
+  }
 }
 
 .delete-dialog {
@@ -1057,6 +1221,7 @@ export default defineComponent({
   cursor: pointer;
   display: grid;
   gap: 8px;
+  grid-template-rows: auto auto 1fr;
   padding: 8px;
   text-align: left;
 
@@ -1078,6 +1243,12 @@ export default defineComponent({
     border-color: #607d8b;
     outline: 2px solid rgba(96, 125, 139, 0.24);
   }
+}
+
+.media-asset-title {
+  color: #263238;
+  font-size: 0.88rem;
+  line-height: 1.25;
 }
 
 .editor-actions {
@@ -1112,6 +1283,10 @@ export default defineComponent({
   .form-row,
   .media-actions {
     grid-template-columns: 1fr;
+  }
+
+  .editor-drawer {
+    width: min(520px, 100vw);
   }
 
   .panel-heading,
@@ -1161,6 +1336,14 @@ export default defineComponent({
   .article-filters,
   .media-actions {
     grid-template-columns: 1fr;
+  }
+
+  .editor-drawer {
+    width: 100vw;
+  }
+
+  .table-actions {
+    justify-content: flex-start;
   }
 }
 </style>

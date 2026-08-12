@@ -2,6 +2,11 @@ const normalize = (value) => String(value || "").trim().toLowerCase();
 const hasRole = (session, role) => Boolean(session?.roles?.includes(role));
 const isOwner = (session) => hasRole(session, "owner");
 const isWriter = (session) => hasRole(session, "writer") || isOwner(session);
+const ownsArticle = (article = {}, session = {}) =>
+  Boolean(
+    (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
+      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
+  );
 
 const humanDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
@@ -31,6 +36,22 @@ export const displayArticleDate = (value) => {
   return humanDateFormatter.format(date);
 };
 
+export const articleDateInputValue = (value) => {
+  const text = String(value || "").trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text;
+  }
+
+  const date = new Date(text);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
 export const displayAuthorName = (article = {}) => {
   const author = String(article.authorName || article.author || "").trim();
 
@@ -47,9 +68,68 @@ export const displayTags = (tags = []) =>
     .filter(Boolean)
     .map((tag) => ({ id: tag, label: tag }));
 
+export const normalizeTagList = (tags = []) =>
+  (Array.isArray(tags) ? tags : String(tags || "").split(","))
+    .map((tag) => String(tag || "").trim())
+    .filter(Boolean);
+
 export const thumbnailPreviewUrl = (article = {}) => {
   const thumbnail = article.thumbnail || {};
   return thumbnail.secure_url || thumbnail.url || article.thumbnailUrl || "";
+};
+
+const assetTitleFromPublicId = (publicId = "") => {
+  const leaf = String(publicId || "").split("/").filter(Boolean).pop() || "Image";
+  return leaf;
+};
+
+export const normalizeMediaAssetDisplay = (asset = {}) => {
+  const customContext = asset.context?.custom || {};
+  const title = String(asset.display_name || customContext.alt || customContext.caption || assetTitleFromPublicId(asset.public_id)).trim();
+  const width = Number(asset.width);
+  const height = Number(asset.height);
+
+  return {
+    publicId: asset.public_id || "",
+    thumbnailUrl: asset.secure_url || asset.url || asset.thumbnail_url || "",
+    title,
+    alt: title || "Media asset",
+    dimensions: width > 0 && height > 0 ? `${width} x ${height}` : "",
+  };
+};
+
+export const mediaLibraryState = ({ assets = [], error = "", isLoading = false } = {}) => {
+  if (isLoading) {
+    return {
+      status: "loading",
+      message: "Loading media library.",
+      assets: [],
+    };
+  }
+
+  if (error) {
+    return {
+      status: "error",
+      message: "Media request failed.",
+      assets: [],
+    };
+  }
+
+  const displayAssets = (Array.isArray(assets) ? assets : []).map(normalizeMediaAssetDisplay);
+
+  if (displayAssets.length === 0) {
+    return {
+      status: "empty",
+      message: "No images are available in the selected media folder.",
+      assets: [],
+    };
+  }
+
+  return {
+    status: "ready",
+    message: "",
+    assets: displayAssets,
+  };
 };
 
 export const statusLabel = (status) =>
@@ -82,7 +162,11 @@ export const createEmptyArticleForm = () => ({
   thumbnailUrl: "",
   alt: "",
   author: "",
+  authorEntryId: "",
+  authorName: "",
   tags: "",
+  tagList: [],
+  tagInput: "",
   version: null,
 });
 
@@ -143,21 +227,30 @@ export const ownerReviewQueues = (articles = []) => ({
   unpublicationRequests: articles.filter((article) => normalize(article.status) === "unpublicationrequested"),
 });
 
-export const articleToForm = (article = {}) => ({
-  ...createEmptyArticleForm(),
-  id: article.id || "",
-  title: article.title || "",
-  slug: article.slug || "",
-  description: article.description || "",
-  body: article.body || "",
-  createAt: article.createAt || new Date().toISOString().slice(0, 10),
-  thumbnailPublicId: article.thumbnail?.public_id || article.thumbnailPublicId || "",
-  thumbnailUrl: article.thumbnail?.secure_url || article.thumbnail?.url || article.thumbnailUrl || "",
-  alt: article.alt || "",
-  author: article.authorEntryId || article.author || "",
-  tags: Array.isArray(article.tags) ? article.tags.join(", ") : article.tags || "",
-  version: article.version || null,
-});
+export const articleToForm = (article = {}) => {
+  const tagList = normalizeTagList(article.tags);
+  const authorEntryId = article.authorEntryId || (looksLikeEntryId(article.author) ? article.author : "");
+
+  return {
+    ...createEmptyArticleForm(),
+    id: article.id || "",
+    title: article.title || "",
+    slug: article.slug || "",
+    description: article.description || "",
+    body: article.body || "",
+    createAt: articleDateInputValue(article.createAt),
+    thumbnailPublicId: article.thumbnail?.public_id || article.thumbnailPublicId || "",
+    thumbnailUrl: article.thumbnail?.secure_url || article.thumbnail?.url || article.thumbnailUrl || "",
+    alt: article.alt || "",
+    author: authorEntryId,
+    authorEntryId,
+    authorName: article.authorName || displayAuthorName(article),
+    tags: tagList.join(", "),
+    tagList,
+    tagInput: "",
+    version: article.version || null,
+  };
+};
 
 export const applyArticleResponseToForm = (form = {}, payload = {}) => {
   const sys = payload.sys || payload.draft?.sys;
@@ -177,19 +270,15 @@ export const removeArticleById = (articles = [], articleId) => articles.filter((
 export const canConfirmArticleDeletion = (article, confirmation) => Boolean(article?.title && confirmation === article.title);
 
 export const canEditArticleAction = (article = {}, session) => {
-  if (!article.id || !isWriter(session)) {
+  if (!article.id || !isWriter(session) || !ownsArticle(article, session)) {
     return false;
   }
 
-  if (isOwner(session)) {
-    return normalize(article.status) !== "archived";
-  }
-
-  return ["draft", "review", "unpublished", "unpublicationrequested"].includes(normalize(article.status));
+  return ["draft", "review", "published", "unpublished", "unpublicationrequested"].includes(normalize(article.status));
 };
 
 export const canPrepareReviewAction = (article = {}, session = { roles: ["writer"] }) => {
-  if (!article.id || !hasRole(session, "writer") || isOwner(session)) {
+  if (!article.id || !hasRole(session, "writer") || isOwner(session) || !ownsArticle(article, session)) {
     return false;
   }
 
@@ -197,7 +286,7 @@ export const canPrepareReviewAction = (article = {}, session = { roles: ["writer
 };
 
 export const canRequestUnpublicationAction = (article = {}, session = { roles: ["writer"] }) =>
-  Boolean(article.id && hasRole(session, "writer") && !isOwner(session) && normalize(article.status) === "published");
+  Boolean(article.id && hasRole(session, "writer") && !isOwner(session) && ownsArticle(article, session) && normalize(article.status) === "published");
 
 export const canOwnerPublishAction = (article = {}, session) => Boolean(article.id && isOwner(session) && normalize(article.status) === "review");
 
@@ -213,6 +302,7 @@ export const buildArticlePayload = (form = {}) => {
         secure_url: String(form.thumbnailUrl || "").trim(),
       }
     : undefined);
+  const tagList = normalizeTagList(Array.isArray(form.tagList) && form.tagList.length > 0 ? form.tagList : form.tags);
 
   return {
     title: String(form.title || "").trim(),
@@ -222,11 +312,8 @@ export const buildArticlePayload = (form = {}) => {
     createAt: form.createAt || "",
     ...(thumbnail ? { thumbnail } : {}),
     alt: String(form.alt || "").trim(),
-    author: String(form.author || "").trim(),
-    tags: String(form.tags || "")
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean),
+    author: String(form.authorEntryId || form.author || "").trim(),
+    tags: tagList,
     version: form.version,
   };
 };

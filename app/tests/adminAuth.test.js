@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { adminSessionDisplay, createPreviewSession, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
+import { adminSessionDisplay, createPreviewSession, getAdminSession, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
 
 describe("admin auth preview sessions", () => {
   it("uses owner as the default local preview role for full admin testing", () => {
@@ -55,6 +55,39 @@ describe("admin auth preview sessions", () => {
       preview: false,
       canSignOut: true,
     });
+  });
+
+  it("loads the Contentful author profile id from authenticated user metadata", async () => {
+    const previousIdentity = globalThis.netlifyIdentity;
+
+    globalThis.netlifyIdentity = {
+      currentUser() {
+        return {
+          id: "user-123",
+          email: "writer@example.test",
+          app_metadata: {
+            roles: ["writer"],
+            authorEntryId: "author-1",
+          },
+          async jwt() {
+            return "token";
+          },
+        };
+      },
+    };
+
+    try {
+      assert.deepEqual(await getAdminSession(), {
+        subject: "user-123",
+        name: "writer@example.test",
+        roles: ["writer"],
+        authorEntryId: "author-1",
+        token: "token",
+        preview: false,
+      });
+    } finally {
+      globalThis.netlifyIdentity = previousIdentity;
+    }
   });
 
   it("formats local preview as development context instead of a real identity", () => {

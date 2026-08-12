@@ -26,17 +26,22 @@ const rolesFromUser = (user = {}) => {
   return Array.isArray(roles) ? roles : [roles];
 };
 
+const authorEntryIdFromUser = (user = {}) =>
+  user.app_metadata?.authorEntryId || user.app_metadata?.author_entry_id || user.user_metadata?.authorEntryId || user.user_metadata?.author_entry_id || "";
+
 const sessionFromUser = async (user) => {
   if (!user) {
     return null;
   }
 
   const token = typeof user.jwt === "function" ? await user.jwt() : null;
+  const authorEntryId = authorEntryIdFromUser(user);
 
   return {
     subject: user.id || user.sub,
     name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Authenticated user",
     roles: rolesFromUser(user).filter(Boolean),
+    ...(authorEntryId ? { authorEntryId } : {}),
     token,
     preview: false,
   };
