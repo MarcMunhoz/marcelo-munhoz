@@ -37,7 +37,7 @@ const parseBody = (body) => {
 
 const rolesFromUser = (user = {}) => {
   const roles = user.app_metadata?.roles || user.app_metadata?.role || user.user_metadata?.roles || [];
-  return Array.isArray(roles) ? roles : [roles];
+  return (Array.isArray(roles) ? roles : [roles]).map((role) => String(role || "").trim().toLowerCase()).filter(Boolean);
 };
 
 const authorEntryIdFromUser = (user = {}) =>
@@ -247,7 +247,6 @@ const articleFieldsFromData = (data = {}, locale) =>
     ["createAt", localized(data.createAt, locale)],
     ["alt", localized(data.alt, locale)],
     ["author", data.author ? localized(contentfulLink("Entry", data.author), locale) : undefined],
-    ["writerSubject", data.writerSubject ? localized(data.writerSubject, locale) : undefined],
     ["cloudinary", localized(cloudinaryMediaFromData(data), locale)],
   ]);
 

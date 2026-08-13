@@ -1,5 +1,6 @@
 const normalize = (value) => String(value || "").trim().toLowerCase();
-const hasRole = (session, role) => Boolean(session?.roles?.includes(role));
+const sessionRoles = (session = {}) => (Array.isArray(session?.roles) ? session.roles : []).map(normalize);
+const hasRole = (session, role) => sessionRoles(session).includes(normalize(role));
 const isOwner = (session) => hasRole(session, "owner");
 const isWriter = (session) => hasRole(session, "writer") || isOwner(session);
 const ownsArticle = (article = {}, session = {}) =>
@@ -393,5 +394,21 @@ export const buildArticlePayload = (form = {}) => {
     author: String(form.authorEntryId || form.author || "").trim(),
     tags: tagList,
     version: form.version,
+  };
+};
+
+export const formatMarkdownSelection = ({ value = "", selectionStart, selectionEnd, before, after = "", placeholder = "text" } = {}) => {
+  const text = String(value || "");
+  const start = Number.isInteger(selectionStart) ? Math.max(0, Math.min(selectionStart, text.length)) : text.length;
+  const end = Number.isInteger(selectionEnd) ? Math.max(start, Math.min(selectionEnd, text.length)) : start;
+  const selected = text.slice(start, end) || placeholder;
+  const insertion = `${before || ""}${selected}${after || ""}`;
+  const nextValue = `${text.slice(0, start)}${insertion}${text.slice(end)}`;
+  const nextSelectionStart = start + String(before || "").length;
+
+  return {
+    value: nextValue,
+    selectionStart: nextSelectionStart,
+    selectionEnd: nextSelectionStart + selected.length,
   };
 };

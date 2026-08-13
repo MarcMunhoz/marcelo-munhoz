@@ -67,7 +67,7 @@ describe("contentful management facade", () => {
     assert.deepEqual(body.fields.author["en-US"], {
       sys: { type: "Link", linkType: "Entry", id: "author-1" },
     });
-    assert.equal(body.fields.writerSubject["en-US"], "writer-123");
+    assert.equal(body.fields.writerSubject, undefined);
     assert.equal(body.fields.thumbnail, undefined);
     assert.deepEqual(body.fields.cloudinary["en-US"], [{ public_id: "folder/image", secure_url: "https://example.invalid/image.jpg" }]);
     assert.equal(body.fields.alt["en-US"], "Draft thumbnail");

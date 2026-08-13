@@ -57,6 +57,34 @@ describe("admin auth preview sessions", () => {
     });
   });
 
+  it("normalizes authenticated identity roles before display and authorization checks", async () => {
+    const previousIdentity = globalThis.netlifyIdentity;
+
+    globalThis.netlifyIdentity = {
+      currentUser() {
+        return {
+          id: "user-123",
+          email: "owner@example.test",
+          app_metadata: {
+            roles: ["Owner"],
+          },
+          async jwt() {
+            return "token";
+          },
+        };
+      },
+    };
+
+    try {
+      const session = await getAdminSession();
+
+      assert.deepEqual(session.roles, ["owner"]);
+      assert.equal(adminSessionDisplay(session).role, "Owner");
+    } finally {
+      globalThis.netlifyIdentity = previousIdentity;
+    }
+  });
+
   it("loads the Contentful author profile id from authenticated user metadata", async () => {
     const previousIdentity = globalThis.netlifyIdentity;
 

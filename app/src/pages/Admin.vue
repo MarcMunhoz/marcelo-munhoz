@@ -275,7 +275,7 @@ export default defineComponent({
         { name: "tags", label: "Tags", field: "tags", align: "left" },
         { name: "createAt", label: "Date", field: "displayDate", align: "left", sortable: true },
         { name: "author", label: "Author", field: "displayAuthor", align: "left", sortable: true },
-        { name: "actions", label: "", field: "actions", align: "right" },
+        { name: "actions", label: "Actions", field: "actions", align: "right" },
       ],
       statusOptions: [
         { label: "Published", value: "published" },
@@ -788,6 +788,7 @@ export default defineComponent({
   display: flex;
   gap: 4px;
   justify-content: flex-end;
+  min-width: 120px;
   white-space: nowrap;
 }
 

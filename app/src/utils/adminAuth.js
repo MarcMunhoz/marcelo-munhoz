@@ -23,7 +23,7 @@ export const createPreviewSession = ({ role = "owner" } = {}) => ({
 
 const rolesFromUser = (user = {}) => {
   const roles = user.app_metadata?.roles || user.app_metadata?.role || user.user_metadata?.roles || [];
-  return Array.isArray(roles) ? roles : [roles];
+  return (Array.isArray(roles) ? roles : [roles]).map((role) => String(role || "").trim().toLowerCase()).filter(Boolean);
 };
 
 const authorEntryIdFromUser = (user = {}) =>

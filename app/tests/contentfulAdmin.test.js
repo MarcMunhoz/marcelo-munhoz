@@ -761,7 +761,7 @@ describe("contentful admin handler", () => {
 
     const body = JSON.parse(calls[0].body);
     assert.equal(body.fields.author["pt-BR"].sys.id, "author-1");
-    assert.equal(body.fields.writerSubject["pt-BR"], "user-123");
+    assert.equal(body.fields.writerSubject, undefined);
   });
 
   it("rejects article body edits for other authors even when the signed-in user is owner", async () => {

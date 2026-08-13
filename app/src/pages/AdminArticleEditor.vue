@@ -41,14 +41,40 @@
           <div class="markdown-editor" :class="{ 'has-error': errors.body }">
             <div class="markdown-editor-label">Body <span>(required)</span></div>
             <div class="markdown-editor-toolbar">
-              <q-btn flat dense icon="title" @click="insertMarkdown('body', '# ', '', 'Heading')" />
+              <q-btn-dropdown flat dense icon="title" dropdown-icon="arrow_drop_down">
+                <q-list dense>
+                  <q-item v-close-popup clickable @click="insertMarkdown('body', '# ', '', 'Heading 1')">
+                    <q-item-section>Heading 1</q-item-section>
+                  </q-item>
+                  <q-item v-close-popup clickable @click="insertMarkdown('body', '## ', '', 'Heading 2')">
+                    <q-item-section>Heading 2</q-item-section>
+                  </q-item>
+                  <q-item v-close-popup clickable @click="insertMarkdown('body', '### ', '', 'Heading 3')">
+                    <q-item-section>Heading 3</q-item-section>
+                  </q-item>
+                </q-list>
+                <q-tooltip>Headings</q-tooltip>
+              </q-btn-dropdown>
               <q-btn flat dense icon="format_bold" @click="insertMarkdown('body', '**', '**', 'bold text')" />
               <q-btn flat dense icon="format_italic" @click="insertMarkdown('body', '_', '_', 'italic text')" />
               <q-btn flat dense icon="format_quote" @click="insertMarkdown('body', '> ', '', 'Quote')" />
               <q-btn flat dense icon="format_list_bulleted" @click="insertMarkdown('body', '- ', '', 'List item')" />
               <q-btn flat dense icon="format_list_numbered" @click="insertMarkdown('body', '1. ', '', 'List item')" />
               <q-btn flat dense icon="link" @click="insertMarkdown('body', '[', '](https://)', 'link text')" />
-              <q-btn flat dense icon="more_horiz" @click="insertMarkdown('body', '`', '`', 'code')" />
+              <q-btn-dropdown flat dense icon="more_horiz" dropdown-icon="arrow_drop_down">
+                <q-list dense>
+                  <q-item v-close-popup clickable @click="insertMarkdown('body', '`', '`', 'code')">
+                    <q-item-section>Inline code</q-item-section>
+                  </q-item>
+                  <q-item v-close-popup clickable @click="insertMarkdown('body', '```\n', '\n```', 'code block')">
+                    <q-item-section>Code block</q-item-section>
+                  </q-item>
+                  <q-item v-close-popup clickable @click="insertMarkdown('body', '\n---\n', '', '')">
+                    <q-item-section>Divider</q-item-section>
+                  </q-item>
+                </q-list>
+                <q-tooltip>More actions</q-tooltip>
+              </q-btn-dropdown>
               <q-space />
               <q-btn-toggle v-model="bodyEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bodyEditorModeOptions" />
             </div>
@@ -270,6 +296,7 @@ import {
   canPrepareReviewAction,
   canRequestUnpublicationAction,
   createEmptyArticleForm,
+  formatMarkdownSelection,
   mediaLibraryState,
   reconcileAdminDashboardData,
   slugFromTitle,
@@ -697,9 +724,27 @@ export default defineComponent({
       this.syncArticleTags();
     },
     insertMarkdown(field, before, after = "", placeholder = "text") {
-      const value = String(this.articleForm[field] || "");
-      const insertion = `${before}${placeholder}${after}`;
-      this.articleForm[field] = value ? `${value}${value.endsWith("\n") ? "" : "\n"}${insertion}` : insertion;
+      const editor = this.$refs[`${field}Editor`];
+      const currentValue = String(this.articleForm[field] || "");
+      const result = formatMarkdownSelection({
+        value: currentValue,
+        selectionStart: editor?.selectionStart,
+        selectionEnd: editor?.selectionEnd,
+        before,
+        after,
+        placeholder,
+      });
+
+      this.articleForm[field] = result.value;
+      this.$nextTick(() => {
+        if (typeof editor?.focus === "function") {
+          editor.focus();
+        }
+
+        if (typeof editor?.setSelectionRange === "function") {
+          editor.setSelectionRange(result.selectionStart, result.selectionEnd);
+        }
+      });
     },
     async handleMediaFile(file) {
       if (!file) {

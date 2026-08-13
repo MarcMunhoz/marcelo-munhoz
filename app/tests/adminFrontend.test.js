@@ -35,6 +35,7 @@ import {
   createEmptyArticleForm,
   createEmptyAuthorProfileForm,
   filterAdminArticles,
+  formatMarkdownSelection,
   mediaLibraryState,
   normalizeAdminArticleDisplay,
   normalizeMediaAssetDisplay,
@@ -459,6 +460,40 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
+  it("formats Markdown around selected text or inserts a placeholder at the cursor", () => {
+    assert.deepEqual(
+      formatMarkdownSelection({
+        value: "Use selected words here",
+        selectionStart: 4,
+        selectionEnd: 18,
+        before: "**",
+        after: "**",
+        placeholder: "bold text",
+      }),
+      {
+        value: "Use **selected words** here",
+        selectionStart: 6,
+        selectionEnd: 20,
+      }
+    );
+
+    assert.deepEqual(
+      formatMarkdownSelection({
+        value: "Before after",
+        selectionStart: 7,
+        selectionEnd: 7,
+        before: "[",
+        after: "](https://)",
+        placeholder: "link text",
+      }),
+      {
+        value: "Before [link text](https://)after",
+        selectionStart: 8,
+        selectionEnd: 17,
+      }
+    );
+  });
+
   it("derives URL-safe slugs from new article titles", () => {
     assert.equal(slugFromTitle("Inteligência Artificial para developers e creators"), "inteligencia-artificial-para-developers-e-creators");
     assert.equal(slugFromTitle("  Vue, Contentful & Cloudinary!  "), "vue-contentful-cloudinary");
@@ -670,12 +705,14 @@ describe("admin frontend writer workflow", () => {
 
   it("keeps owner body editing scoped to owned articles while preserving moderation", () => {
     const owner = { subject: "owner-1", roles: ["owner"], authorEntryId: "author-1" };
+    const identityOwner = { subject: "owner-1", roles: ["Owner"], authorEntryId: "author-1" };
 
     assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "owner-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-1", status: "published", authorEntryId: "author-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-2", status: "published", authorEntryId: "author-2" }, owner), false);
     assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, owner), true);
+    assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, identityOwner), true);
     assert.equal(canOwnerUnpublishAction({ id: "take-down-1", status: "unpublicationRequested" }, owner), true);
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, owner), true);
 
@@ -1128,6 +1165,9 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /markdown-editor/);
     assert.match(editor, /bodyEditorMode/);
     assert.match(editor, /insertMarkdown/);
+    assert.match(editor, /formatMarkdownSelection/);
+    assert.match(editor, /q-btn-dropdown[\s\S]*Headings/);
+    assert.match(editor, /q-btn-dropdown[\s\S]*More actions/);
     assert.match(editor, /marked\.parse/);
     assert.doesNotMatch(editor, /label="Body"[\s\S]*type="textarea"/);
 
