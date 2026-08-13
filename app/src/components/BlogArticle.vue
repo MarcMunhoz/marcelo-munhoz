@@ -103,7 +103,7 @@ import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
-import { articleBylineLabels, publicArticleDates } from "../utils/articleDates.js";
+import { articleBylineLabels, articleLocaleFromArticle, publicArticleDates } from "../utils/articleDates.js";
 import { articleAuthorProfile } from "../utils/authorProfiles.js";
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
@@ -193,7 +193,7 @@ export default defineComponent({
 
         this.createAt = article.sys.createdAt;
         this.article = article.fields;
-        this.articleLocale = article.fields.locale || article.fields.language || article.fields.lang || this.articleLocale;
+        this.articleLocale = articleLocaleFromArticle(article.fields, this.articleLocale);
         const author = articleAuthorProfile(article);
         this.articleAuthor = author.name;
         this.articleAuthorSlug = author.slug;
@@ -235,7 +235,7 @@ export default defineComponent({
       return document.baseURI;
     },
     bylineLabels() {
-      return articleBylineLabels(this.articleLocale);
+      return articleBylineLabels(this.articleLocale, this.article);
     },
     articleDates() {
       return publicArticleDates({

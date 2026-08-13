@@ -1101,6 +1101,8 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(layout, /adminSessionDisplay/);
     assert.match(layout, /adminAccountInitials/);
+    assert.match(layout, /getAuthorProfile/);
+    assert.match(layout, /adminProfilePhotoUrl/);
     assert.match(layout, /adminNavLabel/);
     assert.match(layout, /Author profile/);
     assert.match(layout, /signOut/);
@@ -1168,6 +1170,22 @@ describe("admin frontend writer workflow", () => {
       }),
       { created: "June 25, 2026", updated: "June 27, 2026" }
     );
+  });
+
+  it("infers English byline labels from English article text when no locale field exists", () => {
+    const article = read("../src/components/BlogArticle.vue");
+
+    assert.match(article, /articleLocaleFromArticle/);
+    assert.deepEqual(articleBylineLabels("", { title: "During 9 years my career changed", body: "When I decide to write about software" }), {
+      by: "By",
+      on: "on",
+      updated: "Updated on",
+    });
+    assert.deepEqual(articleBylineLabels("", { title: "Trabalho remoto no mundo Linux", body: "Você precisa aprender sempre mais" }), {
+      by: "Por",
+      on: "em",
+      updated: "Atualizado em",
+    });
   });
 
   it("keeps editor workflow buttons compact", () => {

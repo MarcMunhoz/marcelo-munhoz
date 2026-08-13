@@ -20,7 +20,10 @@
           <q-list class="admin-account-list">
             <q-item class="admin-account-summary">
               <q-item-section avatar>
-                <q-avatar color="blue-grey-7" text-color="white" size="34px">{{ adminInitials }}</q-avatar>
+                <q-avatar color="blue-grey-7" text-color="white" size="34px">
+                  <img v-if="adminProfilePhotoUrl" :src="adminProfilePhotoUrl" :alt="`${adminDisplay.name} profile photo`" />
+                  <template v-else>{{ adminInitials }}</template>
+                </q-avatar>
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ adminDisplay.name }}</q-item-label>
@@ -77,6 +80,7 @@
 import { defineComponent } from "vue";
 import imageUrl from "../assets/rebellion-rebel-alliance-logo.png";
 import audioFile from "../assets/r2d2.ogg";
+import { getAuthorProfile } from "../utils/adminApi.js";
 import { adminAccountInitials, adminSessionDisplay, getAdminSession, signOutAdmin } from "../utils/adminAuth.js";
 
 export default defineComponent({
@@ -85,6 +89,7 @@ export default defineComponent({
     return {
       avatar: "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c",
       adminSession: null,
+      adminProfile: null,
     };
   },
   computed: {
@@ -100,9 +105,13 @@ export default defineComponent({
     adminInitials() {
       return adminAccountInitials(this.adminSession);
     },
+    adminProfilePhotoUrl() {
+      return this.adminProfile?.photoUrl || "";
+    },
   },
   async mounted() {
     this.adminSession = await getAdminSession();
+    await this.loadAdminProfile();
     this.bindIdentityCallbacks();
   },
   methods: {
@@ -119,10 +128,25 @@ export default defineComponent({
         }
 
         this.adminSession = await getAdminSession();
+        await this.loadAdminProfile();
       });
       identity.on("logout", () => {
         this.adminSession = null;
+        this.adminProfile = null;
       });
+    },
+    async loadAdminProfile() {
+      if (!this.adminSession) {
+        this.adminProfile = null;
+        return;
+      }
+
+      try {
+        const response = await getAuthorProfile({ session: this.adminSession });
+        this.adminProfile = response.profile || null;
+      } catch {
+        this.adminProfile = null;
+      }
     },
     async signOut() {
       const signedOut = await signOutAdmin();

@@ -1,7 +1,27 @@
 const normalizedLocale = (locale = "") => String(locale || "").trim() || "pt-BR";
 
-export const articleBylineLabels = (locale = "pt-BR") => {
-  const language = normalizedLocale(locale).toLowerCase();
+export const articleLocaleFromArticle = (article = {}, fallbackLocale = "pt-BR") => {
+  const explicitLocale = article.locale || article.language || article.lang;
+
+  if (explicitLocale) {
+    return explicitLocale;
+  }
+
+  const text = [article.title, article.description, article.body].map((value) => String(value || "")).join(" ").toLowerCase();
+  const englishSignals = /\b(the|and|when|during|career|people|software|with|about|you|your|my|in|for|to|of)\b/g;
+  const portugueseSignals = /\b(e|de|do|da|dos|das|em|para|por|com|voce|você|que|uma|um|os|as|no|na)\b/g;
+  const englishCount = (text.match(englishSignals) || []).length;
+  const portugueseCount = (text.match(portugueseSignals) || []).length;
+
+  if (englishCount >= 2 && englishCount > portugueseCount) {
+    return "en-US";
+  }
+
+  return fallbackLocale;
+};
+
+export const articleBylineLabels = (locale = "pt-BR", article = {}) => {
+  const language = normalizedLocale(articleLocaleFromArticle(article, locale)).toLowerCase();
 
   if (language.startsWith("en")) {
     return { by: "By", on: "on", updated: "Updated on" };
