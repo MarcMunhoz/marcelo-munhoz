@@ -133,6 +133,56 @@ describe("contentful admin handler", () => {
     assert.deepEqual(calls, [{ url: "https://api.contentful.com/spaces/space-id/environments/master/entries/author-1", method: "GET" }]);
   });
 
+  it("loads author biography aliases and Contentful asset photo URLs", async () => {
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          sys: { id: "author-1", version: 12, contentType: { sys: { id: "author" } } },
+          fields: {
+            name: { "pt-BR": "Marcelo Munhoz" },
+            bio: {
+              "pt-BR": {
+                nodeType: "document",
+                data: {},
+                content: [
+                  {
+                    nodeType: "paragraph",
+                    data: {},
+                    content: [{ nodeType: "text", value: "But first...", marks: [], data: {} }],
+                  },
+                ],
+              },
+            },
+            photo: {
+              "pt-BR": {
+                fields: {
+                  file: {
+                    url: "//images.ctfassets.net/space/marcelo.jpg",
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+    });
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const response = await facade.getAuthorProfile({ session: createSession(["writer"], { authorEntryId: "author-1" }) });
+
+    assert.equal(response.profile.biography, "But first...");
+    assert.equal(response.profile.photoUrl, "https://images.ctfassets.net/space/marcelo.jpg");
+  });
+
   it("resolves an owner author profile when the space has exactly one author", async () => {
     const calls = [];
     const fetchImpl = async (url, options = {}) => {

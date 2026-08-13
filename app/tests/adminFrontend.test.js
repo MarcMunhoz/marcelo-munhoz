@@ -521,7 +521,13 @@ describe("admin frontend writer workflow", () => {
         sys: { id: "cvs0Tg41EntryId" },
         fields: {
           name: "Marcelo Munhoz",
-          photo: "https://secure.gravatar.com/avatar/example",
+          photo: {
+            fields: {
+              file: {
+                url: "//images.ctfassets.net/space/marcelo.jpg",
+              },
+            },
+          },
         },
       }),
       {
@@ -529,7 +535,7 @@ describe("admin frontend writer workflow", () => {
         name: "Marcelo Munhoz",
         slug: "marcelo-munhoz",
         biography: "",
-        photoUrl: "https://secure.gravatar.com/avatar/example",
+        photoUrl: "https://images.ctfassets.net/space/marcelo.jpg",
       }
     );
   });
@@ -1011,6 +1017,7 @@ describe("admin frontend writer workflow", () => {
     let updateOptions = null;
     const editorHandlers = {};
     let shown = false;
+    let destroyed = 0;
     const windowRef = {
       cloudinary: {
         mediaEditor() {
@@ -1023,6 +1030,9 @@ describe("admin frontend writer workflow", () => {
             },
             show() {
               shown = true;
+            },
+            destroy() {
+              destroyed += 1;
             },
           };
         },
@@ -1068,14 +1078,15 @@ describe("admin frontend writer workflow", () => {
       documentRef,
     });
     editorHandlers.export({ public_id: "folder/image", url: "https://res.cloudinary.com/demo/image/upload/c_crop/folder/image.jpg" });
-    editorHandlers.cancel();
+    editorHandlers.close();
 
     assert.equal(shown, true);
+    assert.equal(destroyed, 2);
     assert.equal(updateOptions.cloudName, "demo-cloud");
     assert.deepEqual(updateOptions.publicIds, ["folder/image"]);
     assert.deepEqual(documentRef.body.style.properties, {});
     assert.deepEqual(documentRef.documentElement.style.properties, {});
-    assert.deepEqual(documentRef.body.classList.removed, ["q-body--prevent-scroll", "overflow-hidden", "q-body--prevent-scroll", "overflow-hidden", "q-body--prevent-scroll", "overflow-hidden"]);
+    assert.deepEqual(new Set(documentRef.body.classList.removed), new Set(["q-body--prevent-scroll", "overflow-hidden"]));
     assert.deepEqual(exported, [
       {
         publicId: "folder/image",

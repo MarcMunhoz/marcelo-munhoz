@@ -124,8 +124,8 @@ const createRuntimeClient = (env, fetchImpl) => {
 
 const publicAuthorProfile = (entry = {}) => {
   const fields = entry.fields || {};
-  const biography = fields.biography;
-  const photo = fields.photo || fields.avatar;
+  const biography = fields.biography || fields.bio || fields.description;
+  const photo = fields.photo || fields.avatar || fields.image || fields.picture;
   const name = fields.name || "";
   const slugFromText = (value = "") =>
     String(value || "")
@@ -153,6 +153,29 @@ const publicAuthorProfile = (entry = {}) => {
       ...(photo ? { photo } : {}),
     },
   };
+};
+
+const findAuthorBySlug = async (contentfulClient, slug) => {
+  try {
+    const authorEntries = await contentfulClient.getEntries({
+      content_type: "author",
+      "fields.slug": slug,
+      limit: 1,
+    });
+
+    if ((authorEntries.items || []).length > 0) {
+      return authorEntries.items[0];
+    }
+  } catch {
+    // The author content type may not define an optional slug field yet.
+  }
+
+  const fallbackAuthorEntries = await contentfulClient.getEntries({
+    content_type: "author",
+    limit: 100,
+  });
+
+  return (fallbackAuthorEntries.items || []).find((entry) => publicAuthorProfile(entry).fields.slug === slug);
 };
 
 const entryId = (entry = {}) => String(entry.sys?.id || entry.id || "").trim();
@@ -286,31 +309,13 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
 
       try {
         const slug = decodeURIComponent(routePath.replace("/author/", ""));
-        const authorEntries = await contentfulClient.getEntries({
-          content_type: "author",
-          "fields.slug": slug,
-          limit: 1,
-        });
+        const authorEntry = await findAuthorBySlug(contentfulClient, slug);
 
-        if (authorEntries.items.length === 0) {
-          const fallbackAuthorEntries = await contentfulClient.getEntries({
-            content_type: "author",
-            limit: 100,
-          });
-          const fallbackAuthor = (fallbackAuthorEntries.items || []).find((entry) => publicAuthorProfile(entry).fields.slug === slug);
-
-          if (!fallbackAuthor) {
-            return jsonResponse(404, { error: "Author not found" });
-          }
-
-          authorEntries.items = [fallbackAuthor];
-        }
-
-        if (authorEntries.items.length === 0) {
+        if (!authorEntry) {
           return jsonResponse(404, { error: "Author not found" });
         }
 
-        const author = publicAuthorProfile(authorEntries.items[0]);
+        const author = publicAuthorProfile(authorEntry);
         const articles = await fetchAuthorArticles(contentfulClient, entryId(author));
 
         return jsonResponse(200, {

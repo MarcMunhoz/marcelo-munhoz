@@ -27,8 +27,10 @@ export const authorBiography = (author = {}) => {
 };
 
 export const authorPhotoUrl = (author = {}) => {
-  const photo = author.fields?.photo || author.fields?.avatar || author.photo || author.avatar || {};
-  return String((typeof photo === "string" ? photo : photo.secure_url || photo.url) || author.photoUrl || "").trim();
+  const photo = author.fields?.photo || author.fields?.avatar || author.fields?.image || author.fields?.picture || author.photo || author.avatar || author.image || author.picture || {};
+  const candidate = String((typeof photo === "string" ? photo : photo.secure_url || photo.secureUrl || photo.url || photo.fields?.file?.url) || author.photoUrl || "").trim();
+
+  return candidate.startsWith("//") ? `https:${candidate}` : candidate;
 };
 
 export const publicAuthorProfile = (author = {}) => ({

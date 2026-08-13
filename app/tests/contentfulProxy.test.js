@@ -229,6 +229,115 @@ describe("contentful proxy handler", () => {
     ]);
   });
 
+  it("resolves public author routes when Contentful rejects the optional slug field filter", async () => {
+    const calls = [];
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries(query) {
+          calls.push(query);
+
+          if (query.content_type === "author" && query["fields.slug"]) {
+            throw new Error("InvalidQuery");
+          }
+
+          if (query.content_type === "author") {
+            return {
+              items: [
+                {
+                  sys: { id: "author-1" },
+                  fields: {
+                    name: "Marcelo Munhoz",
+                    bio: {
+                      nodeType: "document",
+                      data: {},
+                      content: [
+                        {
+                          nodeType: "paragraph",
+                          data: {},
+                          content: [{ nodeType: "text", value: "But first...", marks: [], data: {} }],
+                        },
+                      ],
+                    },
+                    photo: {
+                      fields: {
+                        file: {
+                          url: "//images.ctfassets.net/space/marcelo.jpg",
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+              total: 1,
+            };
+          }
+
+          return {
+            items: [
+              {
+                sys: { id: "article-1" },
+                fields: {
+                  title: "Article",
+                  slug: "article",
+                  author: { sys: { id: "author-1" } },
+                },
+              },
+            ],
+            total: 1,
+          };
+        },
+      }),
+    });
+
+    const response = await handler({ path: "/author/marcelo-munhoz", query: {} });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body), {
+      author: {
+        sys: { id: "author-1" },
+        fields: {
+          name: "Marcelo Munhoz",
+          slug: "marcelo-munhoz",
+          biography: "But first...",
+          photo: {
+            fields: {
+              file: {
+                url: "//images.ctfassets.net/space/marcelo.jpg",
+              },
+            },
+          },
+        },
+      },
+      articles: [
+        {
+          sys: { id: "article-1" },
+          fields: {
+            title: "Article",
+            slug: "article",
+            author: { sys: { id: "author-1" } },
+          },
+        },
+      ],
+    });
+    assert.deepEqual(calls, [
+      {
+        content_type: "author",
+        "fields.slug": "marcelo-munhoz",
+        limit: 1,
+      },
+      {
+        content_type: "author",
+        limit: 100,
+      },
+      {
+        content_type: "article",
+        "fields.author.sys.id": "author-1",
+        order: "-fields.createAt",
+        limit: 100,
+      },
+    ]);
+  });
+
   it("falls back to local author article matching when Contentful rejects linked author filters", async () => {
     const calls = [];
     const articleForAuthor = {

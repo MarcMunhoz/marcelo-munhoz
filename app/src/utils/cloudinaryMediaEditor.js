@@ -7,6 +7,8 @@ export class CloudinaryMediaEditorUnavailableError extends Error {
   }
 }
 
+let activeMediaEditor = null;
+
 const isBrowserMediaEditorReady = (windowRef = globalThis) => typeof windowRef.cloudinary?.mediaEditor === "function";
 
 export const buildMediaEditorOptions = ({ cloudName, publicId } = {}) => {
@@ -54,6 +56,20 @@ export const cleanupMediaEditorDocumentState = (documentRef = globalThis.documen
     element?.style?.removeProperty?.("padding-right");
     element?.classList?.remove?.("q-body--prevent-scroll", "overflow-hidden");
   }
+};
+
+const destroyMediaEditor = (editor, documentRef) => {
+  if (typeof editor?.destroy === "function") {
+    editor.destroy();
+  } else if (typeof editor?.hide === "function") {
+    editor.hide();
+  }
+
+  if (activeMediaEditor === editor) {
+    activeMediaEditor = null;
+  }
+
+  cleanupMediaEditorDocumentState(documentRef);
 };
 
 export const loadMediaEditorScript = ({ windowRef = globalThis, documentRef = globalThis.document, scriptSrc = MEDIA_EDITOR_SCRIPT_SRC } = {}) => {
@@ -108,19 +124,21 @@ export const openCloudinaryMediaEditor = async ({ cloudName, publicId, onExport,
   }
 
   const editor = mediaEditorFactory();
+  destroyMediaEditor(activeMediaEditor, documentRef);
+  activeMediaEditor = editor;
   cleanupMediaEditorDocumentState(documentRef);
   editor.update(buildMediaEditorOptions({ cloudName, publicId }));
 
   if (typeof onExport === "function" && typeof editor.on === "function") {
     editor.on("export", (event) => {
-      cleanupMediaEditorDocumentState(documentRef);
+      destroyMediaEditor(editor, documentRef);
       onExport(normalizeMediaEditorExport(event));
     });
   }
 
   if (typeof editor.on === "function") {
     for (const eventName of ["close", "cancel", "abort"]) {
-      editor.on(eventName, () => cleanupMediaEditorDocumentState(documentRef));
+      editor.on(eventName, () => destroyMediaEditor(editor, documentRef));
     }
   }
 

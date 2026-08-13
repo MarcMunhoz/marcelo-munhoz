@@ -418,11 +418,37 @@ const richTextDocumentFromPlainText = (value = "") => ({
   ],
 });
 
+const firstAvailableLocalizedValue = (fields = {}, locale, fieldIds = []) => {
+  for (const fieldId of fieldIds) {
+    const value = firstLocalizedValue(fields, fieldId, locale);
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return undefined;
+};
+
+const urlFromMediaValue = (value = {}) => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  const candidate = value.secure_url || value.secureUrl || value.url || value.fields?.file?.url || "";
+
+  if (candidate.startsWith("//")) {
+    return `https:${candidate}`;
+  }
+
+  return candidate;
+};
+
 const normalizedAuthorProfile = (entry = {}, locale) => {
   const fields = entry.fields || {};
-  const biography = firstLocalizedValue(fields, "biography", locale);
-  const photo = firstLocalizedValue(fields, "photo", locale) || firstLocalizedValue(fields, "avatar", locale);
-  const photoUrl = (typeof photo === "string" ? photo : photo?.secure_url || photo?.url) || "";
+  const biography = firstAvailableLocalizedValue(fields, locale, ["biography", "bio", "description"]);
+  const photo = firstAvailableLocalizedValue(fields, locale, ["photo", "avatar", "image", "picture"]);
+  const photoUrl = urlFromMediaValue(photo) || "";
 
   return {
     id: entry.sys?.id || "",
