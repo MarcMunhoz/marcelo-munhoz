@@ -124,8 +124,72 @@ describe("contentful admin handler", () => {
         biography: "But first...",
         photoUrl: "",
       },
+      session: {
+        authorEntryId: "author-1",
+        authorName: "Marcelo Munhoz",
+        authorSlug: "marcelo-munhoz",
+      },
     });
     assert.deepEqual(calls, [{ url: "https://api.contentful.com/spaces/space-id/environments/master/entries/author-1", method: "GET" }]);
+  });
+
+  it("resolves an owner author profile when the space has exactly one author", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method });
+
+      if (String(url).includes("/entries?content_type=author")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              items: [
+                {
+                  sys: { id: "author-1", version: 11 },
+                  fields: {
+                    name: { "pt-BR": "Marcelo Munhoz" },
+                    photo: { "pt-BR": "https://secure.gravatar.com/avatar/example" },
+                  },
+                },
+              ],
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected Contentful URL: ${url}`);
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const response = await facade.getAuthorProfile({
+      session: createSession(["owner"], { name: "Marcelo Munhoz" }),
+    });
+
+    assert.deepEqual(response, {
+      profile: {
+        id: "author-1",
+        version: 11,
+        name: "Marcelo Munhoz",
+        slug: "",
+        biography: "",
+        photo: "https://secure.gravatar.com/avatar/example",
+        photoUrl: "https://secure.gravatar.com/avatar/example",
+      },
+      session: {
+        authorEntryId: "author-1",
+        authorName: "Marcelo Munhoz",
+        authorSlug: "",
+      },
+    });
+    assert.equal(calls.length, 1);
   });
 
   it("updates only public Contentful author profile fields", async () => {
@@ -981,6 +1045,21 @@ describe("contentful admin handler", () => {
         };
       }
 
+      if (String(url).includes("/entries?content_type=author")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              items: [
+                { sys: { id: "author-1", contentType: { sys: { id: "author" } } }, fields: { name: { "pt-BR": "Marcelo Munhoz" } } },
+                { sys: { id: "author-2", contentType: { sys: { id: "author" } } }, fields: { name: { "pt-BR": "Guest Writer" } } },
+              ],
+            };
+          },
+        };
+      }
+
       throw new Error(`Unexpected Contentful URL: ${url}`);
     };
     const facade = createContentfulManagementFacade({
@@ -1001,7 +1080,7 @@ describe("contentful admin handler", () => {
         }),
       ContentfulAdminAuthorizationError
     );
-    assert.deepEqual(calls.map((call) => call.method), ["GET"]);
+    assert.deepEqual(calls.map((call) => call.method), ["GET", "GET"]);
   });
 
   it("allows writer sessions to record submit-for-review workflow requests", async () => {

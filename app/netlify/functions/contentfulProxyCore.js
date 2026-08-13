@@ -126,6 +126,14 @@ const publicAuthorProfile = (entry = {}) => {
   const fields = entry.fields || {};
   const biography = fields.biography;
   const photo = fields.photo || fields.avatar;
+  const name = fields.name || "";
+  const slugFromText = (value = "") =>
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
   const textFromNode = (node = {}) => {
     if (typeof node === "string") {
       return node;
@@ -139,8 +147,8 @@ const publicAuthorProfile = (entry = {}) => {
   return {
     sys: { id: entry.sys?.id || "" },
     fields: {
-      name: fields.name || "",
-      slug: fields.slug || entry.sys?.id || "",
+      name,
+      slug: fields.slug || slugFromText(name),
       biography: typeof biography === "string" ? biography : textFromNode(biography).trim(),
       ...(photo ? { photo } : {}),
     },
@@ -243,6 +251,20 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
           "fields.slug": slug,
           limit: 1,
         });
+
+        if (authorEntries.items.length === 0) {
+          const fallbackAuthorEntries = await contentfulClient.getEntries({
+            content_type: "author",
+            limit: 100,
+          });
+          const fallbackAuthor = (fallbackAuthorEntries.items || []).find((entry) => publicAuthorProfile(entry).fields.slug === slug);
+
+          if (!fallbackAuthor) {
+            return jsonResponse(404, { error: "Author not found" });
+          }
+
+          authorEntries.items = [fallbackAuthor];
+        }
 
         if (authorEntries.items.length === 0) {
           return jsonResponse(404, { error: "Author not found" });

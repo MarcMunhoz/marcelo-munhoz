@@ -358,7 +358,9 @@ export default defineComponent({
       this.loadingAction = "articles";
 
       try {
-        const dashboard = reconcileAdminDashboardData(await listAdminArticles({ session: this.session }));
+        const response = await listAdminArticles({ session: this.session });
+        this.applyResolvedSession(response.session);
+        const dashboard = reconcileAdminDashboardData(response);
         this.articles = dashboard.articles;
         this.adminSummary = dashboard.summary;
         this.reviewRequests = dashboard.reviewRequests;
@@ -377,6 +379,16 @@ export default defineComponent({
     },
     openEditorForNewArticle() {
       this.$router.push("/admin/articles/new");
+    },
+    applyResolvedSession(session = {}) {
+      if (!session.authorEntryId) {
+        return;
+      }
+
+      this.session = {
+        ...this.session,
+        authorEntryId: session.authorEntryId,
+      };
     },
     openEditorForArticle(article) {
       this.$router.push(`/admin/articles/${encodeURIComponent(article.id)}/edit`);

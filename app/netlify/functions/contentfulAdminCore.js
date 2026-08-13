@@ -422,7 +422,7 @@ const normalizedAuthorProfile = (entry = {}, locale) => {
   const fields = entry.fields || {};
   const biography = firstLocalizedValue(fields, "biography", locale);
   const photo = firstLocalizedValue(fields, "photo", locale) || firstLocalizedValue(fields, "avatar", locale);
-  const photoUrl = photo?.secure_url || photo?.url || "";
+  const photoUrl = (typeof photo === "string" ? photo : photo?.secure_url || photo?.url) || "";
 
   return {
     id: entry.sys?.id || "",
@@ -470,6 +470,12 @@ const ensureSessionAuthorEntryId = (session = {}) => {
 
   return session.authorEntryId;
 };
+
+const publicSessionAuthor = (profile = {}) => ({
+  authorEntryId: profile.id || "",
+  authorName: profile.name || "",
+  authorSlug: profile.slug || "",
+});
 
 const articleDataForSession = (data = {}, session = {}) => ({
   ...data,
@@ -720,9 +726,85 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
 
   const articlePath = (articleId) => `/entries/${encodeURIComponent(articleId)}`;
 
+  const resolveSessionAuthorProfile = async ({ session = {}, config, requireProfile = false } = {}) => {
+    if (session.authorEntryId) {
+      if (!requireProfile) {
+        return {
+          profile: null,
+          session,
+        };
+      }
+
+      const entry = await request({ method: "GET", path: articlePath(session.authorEntryId) });
+      const profile = normalizedAuthorProfile(entry, config.locale);
+
+      return {
+        profile,
+        session: {
+          ...session,
+          authorEntryId: profile.id,
+        },
+      };
+    }
+
+    if (!isOwner(session)) {
+      throw new ContentfulAuthorProfileResolutionError();
+    }
+
+    const params = new URLSearchParams({
+      content_type: "author",
+      limit: "2",
+    });
+    const payload = await request({ method: "GET", path: `/entries?${params}` });
+    const authors = payload.items || [];
+
+    if (authors.length !== 1) {
+      throw new ContentfulAuthorProfileResolutionError();
+    }
+
+    const profile = normalizedAuthorProfile(authors[0], config.locale);
+
+    return {
+      profile,
+      session: {
+        ...session,
+        authorEntryId: profile.id,
+      },
+    };
+  };
+
+  const resolveSessionAuthorProfileFromEntries = ({ session = {}, entries = [], config } = {}) => {
+    if (session.authorEntryId || !isOwner(session)) {
+      return {
+        profile: null,
+        session,
+      };
+    }
+
+    const authors = entries.filter((entry) => contentTypeIdFromEntry(entry) === "author");
+
+    if (authors.length !== 1) {
+      return {
+        profile: null,
+        session,
+      };
+    }
+
+    const profile = normalizedAuthorProfile(authors[0], config.locale);
+
+    return {
+      profile,
+      session: {
+        ...session,
+        authorEntryId: profile.id,
+      },
+    };
+  };
+
   return {
     async createArticleDraft({ data, session }) {
       const config = managementConfigFromEnv(env, fetchImpl);
+      const authorResolution = await resolveSessionAuthorProfile({ session, config });
 
       return request({
         method: "POST",
@@ -730,7 +812,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         headers: {
           "x-contentful-content-type": "article",
         },
-        body: articlePayloadFromData(articleDataForSession(data, session), config.locale),
+        body: articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale),
       });
     },
     async listAdminArticles({ session } = {}) {
@@ -740,6 +822,8 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       });
       const entryPayload = await request({ method: "GET", path: `/entries?${entryParams}` });
       const entries = entryPayload.items || [];
+      const authorResolution = resolveSessionAuthorProfileFromEntries({ session, entries, config });
+      const resolvedSession = authorResolution.session;
       const entryMap = entriesById(entries);
       const articleEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "article");
       const missingAuthorIds = [
@@ -754,7 +838,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       });
       const workflowEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "blogEditorialRequest");
       const allReviewRequests = workflowEntries.map((entry) => normalizedEditorialRequest(entry, config.locale));
-      const reviewRequests = allReviewRequests.filter((request) => isOwner(session) || request.writerSubject === session?.subject);
+      const reviewRequests = allReviewRequests.filter((request) => isOwner(resolvedSession) || request.writerSubject === resolvedSession?.subject);
       const requestsByArticle = requestByArticleId(reviewRequests);
       const articles = articleEntries
         .map((entry) => {
@@ -770,26 +854,28 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
             ...(request?.writerName ? { writerName: request.writerName } : {}),
           };
         })
-        .filter((article) => isOwner(session) || article.status === "published" || sessionOwnsArticle(article, session));
+        .filter((article) => isOwner(resolvedSession) || article.status === "published" || sessionOwnsArticle(article, resolvedSession));
 
       return {
         articles,
         summary: summarizeAdminArticles(articles),
         reviewRequests,
+        ...(authorResolution.profile ? { session: publicSessionAuthor(authorResolution.profile) } : {}),
       };
     },
     async getAuthorProfile({ session } = {}) {
       const config = managementConfigFromEnv(env, fetchImpl);
-      const authorEntryId = ensureSessionAuthorEntryId(session);
-      const entry = await request({ method: "GET", path: articlePath(authorEntryId) });
+      const authorResolution = await resolveSessionAuthorProfile({ session, config, requireProfile: true });
 
       return {
-        profile: normalizedAuthorProfile(entry, config.locale),
+        profile: authorResolution.profile,
+        session: publicSessionAuthor(authorResolution.profile),
       };
     },
     async updateAuthorProfile({ data, session } = {}) {
       const config = managementConfigFromEnv(env, fetchImpl);
-      const authorEntryId = ensureSessionAuthorEntryId(session);
+      const authorResolution = await resolveSessionAuthorProfile({ session, config });
+      const authorEntryId = ensureSessionAuthorEntryId(authorResolution.session);
       const version = requiredVersion(data);
       const existingEntry = await request({ method: "GET", path: articlePath(authorEntryId) });
 
@@ -812,7 +898,19 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       const config = managementConfigFromEnv(env, fetchImpl);
       const version = requiredVersion(data);
       const existingEntry = await request({ method: "GET", path: articlePath(articleId) });
-      ensureCanEditArticle(normalizedArticle(existingEntry, config.locale), session);
+      let authorResolution;
+
+      try {
+        authorResolution = await resolveSessionAuthorProfile({ session, config });
+      } catch (error) {
+        if (error instanceof ContentfulAuthorProfileResolutionError) {
+          throw new ContentfulAdminAuthorizationError("Your account cannot edit this article.");
+        }
+
+        throw error;
+      }
+
+      ensureCanEditArticle(normalizedArticle(existingEntry, config.locale), authorResolution.session);
 
       return request({
         method: "PUT",
@@ -820,7 +918,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         headers: {
           "x-contentful-version": version,
         },
-        body: articlePayloadFromData(articleDataForSession(data, session), config.locale),
+        body: articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale),
       });
     },
     async publishArticle({ articleId, data }) {

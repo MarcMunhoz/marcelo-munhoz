@@ -54,13 +54,6 @@
             </q-card-actions>
           </q-form>
         </q-card>
-
-        <aside class="identity-card">
-          <p class="admin-kicker">Signed in as</p>
-          <strong>{{ sessionDisplay.name }}</strong>
-          <span>{{ sessionDisplay.role }} · {{ sessionDisplay.context }}</span>
-          <p>Authentication and roles stay in Netlify Identity. Public author content stays in Contentful.</p>
-        </aside>
       </section>
     </section>
     <section v-else class="profile-login-shell" aria-hidden="true"></section>
@@ -153,6 +146,7 @@ export default defineComponent({
 
       try {
         const response = await getAuthorProfile({ session: this.session });
+        this.applyResolvedSession(response.session);
         this.profileForm = authorProfileToForm(response.profile);
       } catch (error) {
         this.profileForm = createEmptyAuthorProfileForm();
@@ -160,6 +154,16 @@ export default defineComponent({
       } finally {
         this.loadingAction = "";
       }
+    },
+    applyResolvedSession(session = {}) {
+      if (!session.authorEntryId) {
+        return;
+      }
+
+      this.session = {
+        ...this.session,
+        authorEntryId: session.authorEntryId,
+      };
     },
     validateProfileForm() {
       const errors = {};

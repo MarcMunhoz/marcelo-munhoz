@@ -44,6 +44,7 @@ import {
   updateArticleStatusById,
 } from "../src/utils/adminDashboard.js";
 import { buildMediaEditorOptions, normalizeMediaEditorExport, openCloudinaryMediaEditor } from "../src/utils/cloudinaryMediaEditor.js";
+import { publicAuthorProfile } from "../src/utils/authorProfiles.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -511,6 +512,25 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
+  it("derives public author slugs from names instead of exposing entry ids", () => {
+    assert.deepEqual(
+      publicAuthorProfile({
+        sys: { id: "cvs0Tg41EntryId" },
+        fields: {
+          name: "Marcelo Munhoz",
+          photo: "https://secure.gravatar.com/avatar/example",
+        },
+      }),
+      {
+        id: "cvs0Tg41EntryId",
+        name: "Marcelo Munhoz",
+        slug: "marcelo-munhoz",
+        biography: "",
+        photoUrl: "https://secure.gravatar.com/avatar/example",
+      }
+    );
+  });
+
   it("hydrates writer edit forms with display controls without exposing review notes", () => {
     const form = articleToForm({
       id: "article-1",
@@ -605,6 +625,9 @@ describe("admin frontend writer workflow", () => {
   it("shows row lifecycle actions only for article states supported by backend routes", () => {
     const writer = { subject: "writer-1", roles: ["writer"] };
 
+    assert.equal(canEditArticleAction(null, writer), false);
+    assert.equal(canPrepareReviewAction(null, writer), false);
+    assert.equal(canRequestUnpublicationAction(null, writer), false);
     assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
     assert.equal(canPrepareReviewAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), false);
     assert.equal(canPrepareReviewAction({ id: "", status: "draft", writerSubject: "writer-1" }, writer), false);

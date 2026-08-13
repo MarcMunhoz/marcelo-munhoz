@@ -213,6 +213,7 @@ import { defineComponent } from "vue";
 import {
   createArticleDraft,
   getMediaEditorConfig,
+  getAuthorProfile,
   listAdminArticles,
   listMediaAssets,
   requestArticleUnpublication,
@@ -352,9 +353,7 @@ export default defineComponent({
       if (this.isNewArticle) {
         this.articleForm = createEmptyArticleForm();
         this.loadedArticle = null;
-        this.articleForm.author = this.session?.authorEntryId || "";
-        this.articleForm.authorEntryId = this.session?.authorEntryId || "";
-        this.articleForm.authorName = this.session?.name || "";
+        await this.applyCurrentAuthorProfile();
         this.statusMessage = "New draft";
         this.slugTouched = false;
         this.snapshotForm();
@@ -365,7 +364,9 @@ export default defineComponent({
       this.dashboardError = "";
 
       try {
-        const dashboard = reconcileAdminDashboardData(await listAdminArticles({ session: this.session }));
+        const response = await listAdminArticles({ session: this.session });
+        this.applyResolvedSession(response.session);
+        const dashboard = reconcileAdminDashboardData(response);
         const article = dashboard.articles.find((item) => item.id === this.$route.params.entryId);
 
         if (!article) {
@@ -388,6 +389,31 @@ export default defineComponent({
         this.dashboardError = adminUserMessage(error);
       } finally {
         this.loadingAction = "";
+      }
+    },
+    applyResolvedSession(session = {}) {
+      if (!session.authorEntryId) {
+        return;
+      }
+
+      this.session = {
+        ...this.session,
+        authorEntryId: session.authorEntryId,
+      };
+    },
+    async applyCurrentAuthorProfile() {
+      try {
+        const response = await getAuthorProfile({ session: this.session });
+        this.applyResolvedSession(response.session);
+        const profile = response.profile || {};
+        this.articleForm.author = profile.id || this.session?.authorEntryId || "";
+        this.articleForm.authorEntryId = profile.id || this.session?.authorEntryId || "";
+        this.articleForm.authorName = profile.name || this.session?.name || "";
+      } catch (error) {
+        this.articleForm.author = this.session?.authorEntryId || "";
+        this.articleForm.authorEntryId = this.session?.authorEntryId || "";
+        this.articleForm.authorName = this.session?.name || "";
+        this.dashboardError = adminUserMessage(error);
       }
     },
     leaveEditor() {

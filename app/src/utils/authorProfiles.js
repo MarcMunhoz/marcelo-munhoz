@@ -1,6 +1,14 @@
 export const authorName = (author = {}) => String(author.fields?.name || author.name || "").trim();
 
-export const authorSlug = (author = {}) => String(author.fields?.slug || author.slug || author.sys?.id || author.id || "").trim();
+const slugFromText = (value = "") =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+export const authorSlug = (author = {}) => String(author.fields?.slug || author.slug || slugFromText(authorName(author))).trim();
 
 export const authorBiography = (author = {}) => {
   const biography = author.fields?.biography || author.biography || "";
@@ -20,7 +28,7 @@ export const authorBiography = (author = {}) => {
 
 export const authorPhotoUrl = (author = {}) => {
   const photo = author.fields?.photo || author.fields?.avatar || author.photo || author.avatar || {};
-  return String(photo.secure_url || photo.url || author.photoUrl || "").trim();
+  return String((typeof photo === "string" ? photo : photo.secure_url || photo.url) || author.photoUrl || "").trim();
 };
 
 export const publicAuthorProfile = (author = {}) => ({

@@ -324,6 +324,8 @@ export const removeArticleById = (articles = [], articleId) => articles.filter((
 export const canConfirmArticleDeletion = (article, confirmation) => Boolean(article?.title && confirmation === article.title);
 
 export const canEditArticleAction = (article = {}, session) => {
+  article = article || {};
+
   if (!article.id || !isWriter(session) || !ownsArticle(article, session)) {
     return false;
   }
@@ -332,6 +334,8 @@ export const canEditArticleAction = (article = {}, session) => {
 };
 
 export const canPrepareReviewAction = (article = {}, session = { roles: ["writer"] }) => {
+  article = article || {};
+
   if (!article.id || !isWriter(session) || isOwner(session) || !ownsArticle(article, session)) {
     return false;
   }
@@ -339,15 +343,29 @@ export const canPrepareReviewAction = (article = {}, session = { roles: ["writer
   return ["draft", "unpublished"].includes(normalize(article.status));
 };
 
-export const canRequestUnpublicationAction = (article = {}, session = { roles: ["writer"] }) =>
-  Boolean(article.id && isWriter(session) && !isOwner(session) && ownsArticle(article, session) && normalize(article.status) === "published");
+export const canRequestUnpublicationAction = (article = {}, session = { roles: ["writer"] }) => {
+  article = article || {};
 
-export const canOwnerPublishAction = (article = {}, session) => Boolean(article.id && isOwner(session) && normalize(article.status) === "review");
+  return Boolean(article.id && isWriter(session) && !isOwner(session) && ownsArticle(article, session) && normalize(article.status) === "published");
+};
 
-export const canOwnerUnpublishAction = (article = {}, session) =>
-  Boolean(article.id && isOwner(session) && ["published", "unpublicationrequested"].includes(normalize(article.status)));
+export const canOwnerPublishAction = (article = {}, session) => {
+  article = article || {};
 
-export const canArchiveArticleAction = (article = {}, session) => Boolean(article.id && isOwner(session) && normalize(article.status) !== "archived");
+  return Boolean(article.id && isOwner(session) && normalize(article.status) === "review");
+};
+
+export const canOwnerUnpublishAction = (article = {}, session) => {
+  article = article || {};
+
+  return Boolean(article.id && isOwner(session) && ["published", "unpublicationrequested"].includes(normalize(article.status)));
+};
+
+export const canArchiveArticleAction = (article = {}, session) => {
+  article = article || {};
+
+  return Boolean(article.id && isOwner(session) && normalize(article.status) !== "archived");
+};
 
 export const buildArticlePayload = (form = {}) => {
   const thumbnail = form.thumbnail || (form.thumbnailPublicId || form.thumbnailUrl
