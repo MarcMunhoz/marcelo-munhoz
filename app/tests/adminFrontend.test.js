@@ -904,6 +904,7 @@ describe("admin frontend writer workflow", () => {
         format: "jpg",
         resource_type: "image",
         type: "upload",
+        asset_folder: "marcelo-munhoz-website",
         context: { custom: { alt: "Admin dashboard thumbnail" } },
       }),
       {
@@ -921,6 +922,7 @@ describe("admin frontend writer workflow", () => {
           format: "jpg",
           resource_type: "image",
           type: "upload",
+          asset_folder: "marcelo-munhoz-website",
           context: { custom: { alt: "Admin dashboard thumbnail" } },
         },
       }

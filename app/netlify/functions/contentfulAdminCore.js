@@ -168,6 +168,7 @@ export class CloudinaryMediaRequestError extends Error {
     super(`Cloudinary API returned ${statusCode}`);
     this.name = "CloudinaryMediaRequestError";
     this.statusCode = 500;
+    this.upstreamStatusCode = statusCode;
     this.publicError = "Media request failed";
   }
 }
@@ -446,6 +447,8 @@ const normalizeCloudinaryAsset = (asset = {}) => {
     created_at: asset.created_at,
     display_name: asset.display_name,
     asset_id: asset.asset_id,
+    asset_folder: asset.asset_folder,
+    folder: asset.folder,
   };
 
   ["context", "metadata", "tags"].forEach((key) => {
@@ -754,6 +757,43 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
     };
   };
 
+  const fetchMediaResourcesByAssetFolder = async ({ config, maxResults, assetFolder, nextCursor }) => {
+    const url = new URL(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/resources/by_asset_folder`);
+
+    url.searchParams.set("asset_folder", assetFolder);
+    url.searchParams.set("max_results", String(maxResults));
+
+    if (nextCursor) {
+      url.searchParams.set("next_cursor", nextCursor);
+    }
+
+    const payload = await readCloudinaryJson(
+      await fetchImpl(url, {
+        method: "GET",
+        headers: {
+          authorization: basicAuth(config.apiKey, config.apiSecret),
+        },
+      })
+    );
+
+    return {
+      assets: Array.isArray(payload.resources) ? payload.resources.map(normalizeCloudinaryAsset) : [],
+      ...(payload.next_cursor ? { next_cursor: payload.next_cursor } : {}),
+    };
+  };
+
+  const fetchMediaResourcesByAssetFolderIfSupported = async (params) => {
+    try {
+      return await fetchMediaResourcesByAssetFolder(params);
+    } catch (error) {
+      if (error instanceof CloudinaryMediaRequestError && [400, 404].includes(error.upstreamStatusCode)) {
+        return { assets: [] };
+      }
+
+      throw error;
+    }
+  };
+
   return {
     async getMediaEditorConfig() {
       return {
@@ -764,6 +804,20 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
       const config = cloudinaryConfigFromEnv(env, fetchImpl);
       const maxResults = safeMaxResults(query.max_results);
       const prefixes = uniqueMediaPrefixes(config.folder, DEFAULT_CLOUDINARY_FOLDER);
+
+      for (const assetFolder of prefixes) {
+        let result = await fetchMediaResourcesByAssetFolderIfSupported({ config, maxResults, assetFolder });
+        let pageCount = 1;
+
+        while (result.assets.length === 0 && result.next_cursor && pageCount < 5) {
+          result = await fetchMediaResourcesByAssetFolderIfSupported({ config, maxResults, assetFolder, nextCursor: result.next_cursor });
+          pageCount += 1;
+        }
+
+        if (result.assets.length > 0) {
+          return result;
+        }
+      }
 
       for (const prefix of prefixes) {
         let result = await fetchMediaResources({ config, maxResults, prefix });

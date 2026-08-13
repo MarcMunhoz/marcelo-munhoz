@@ -118,6 +118,8 @@ const cloudinaryAssetPayload = (asset = {}) => {
     "created_at",
     "display_name",
     "asset_id",
+    "asset_folder",
+    "folder",
   ];
 
   scalarKeys.forEach((key) => {
