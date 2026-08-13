@@ -209,6 +209,11 @@ const contentfulLink = (linkType, id) => ({
 
 const localized = (value, locale) => (value === undefined ? undefined : { [locale]: value });
 
+const uniqueLocales = (locales = []) => [...new Set(locales.filter(Boolean))];
+
+const localizedForLocales = (value, locales = []) =>
+  value === undefined ? undefined : Object.fromEntries(uniqueLocales(locales).map((locale) => [locale, value]));
+
 const definedEntries = (entries) => Object.fromEntries(entries.filter(([, value]) => value !== undefined));
 
 const normalizedTagIds = (tags = []) =>
@@ -259,17 +264,46 @@ const firstLocalizedValue = (fields = {}, fieldId, locale) => {
   return Object.values(value)[0];
 };
 
-const articleFieldsFromData = (data = {}, locale) =>
-  definedEntries([
-    ["title", localized(data.title, locale)],
-    ["slug", localized(data.slug, locale)],
-    ["description", localized(data.description, locale)],
-    ["body", localized(data.body, locale)],
-    ["createAt", localized(data.createAt, locale)],
-    ["alt", localized(data.alt, locale)],
-    ["author", data.author ? localized(contentfulLink("Entry", data.author), locale) : undefined],
-    ["cloudinary", localized(cloudinaryMediaFromData(data), locale)],
+const contentfulEnvironmentLocales = async ({ request }) => {
+  const payload = await request({ method: "GET", path: "/locales" });
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return {
+    codes: items.map((locale) => locale?.code).filter(Boolean),
+    defaultCode: items.find((locale) => locale?.default)?.code || "",
+  };
+};
+
+const articleWriteLocales = async ({ locale, request }) => {
+  if (typeof request !== "function") {
+    return uniqueLocales([locale]);
+  }
+
+  try {
+    const { codes, defaultCode } = await contentfulEnvironmentLocales({ request });
+    const requestedLocales = uniqueLocales([locale, defaultCode]);
+    const availableRequestedLocales = requestedLocales.filter((requestedLocale) => codes.includes(requestedLocale));
+
+    return availableRequestedLocales.length > 0 ? availableRequestedLocales : uniqueLocales([locale]);
+  } catch {
+    return uniqueLocales([locale]);
+  }
+};
+
+const articleFieldsFromData = (data = {}, writeLocales) => {
+  const locales = uniqueLocales(writeLocales);
+
+  return definedEntries([
+    ["title", localizedForLocales(data.title, locales)],
+    ["slug", localizedForLocales(data.slug, locales)],
+    ["description", localizedForLocales(data.description, locales)],
+    ["body", localizedForLocales(data.body, locales)],
+    ["createAt", localizedForLocales(data.createAt, locales)],
+    ["alt", localizedForLocales(data.alt, locales)],
+    ["author", data.author ? localizedForLocales(contentfulLink("Entry", data.author), locales) : undefined],
+    ["cloudinary", localizedForLocales(cloudinaryMediaFromData(data), locales)],
   ]);
+};
 
 const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
   if (data.fields) {
@@ -280,9 +314,10 @@ const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
   }
 
   const tagIds = request && Array.isArray(data.tags) ? await filterExistingTagIds({ tags: data.tags, request }) : normalizedTagIds(data.tags);
+  const writeLocales = await articleWriteLocales({ locale, request });
 
   return {
-    fields: articleFieldsFromData(data, locale),
+    fields: articleFieldsFromData(data, writeLocales),
     ...(tagIds.length > 0 ? { metadata: { tags: tagsFromIds(tagIds) } } : {}),
   };
 };

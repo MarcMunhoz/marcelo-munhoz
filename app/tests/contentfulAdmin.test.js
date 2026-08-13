@@ -759,7 +759,8 @@ describe("contentful admin handler", () => {
       session: createSession(["writer"], { authorEntryId: "author-1" }),
     });
 
-    const body = JSON.parse(calls[0].body);
+    const createCall = calls.find((call) => call.method === "POST");
+    const body = JSON.parse(createCall.body);
     assert.equal(body.fields.author["pt-BR"].sys.id, "author-1");
     assert.equal(body.fields.writerSubject, undefined);
   });
@@ -1074,7 +1075,11 @@ describe("contentful admin handler", () => {
     });
 
     assert.deepEqual(response, { sys: { id: "article-1", version: 9 } });
-    assert.deepEqual(calls.map((call) => call.method), ["GET", "PUT"]);
+    assert.deepEqual(calls.map((call) => call.method), ["GET", "GET", "PUT"]);
+    assert.equal(
+      calls.some((call) => String(call.url).endsWith("/locales")),
+      true
+    );
   });
 
   it("rejects legacy owner draft updates when only the display author name matches the session", async () => {

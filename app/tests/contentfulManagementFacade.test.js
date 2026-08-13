@@ -37,6 +37,11 @@ describe("contentful management facade", () => {
             ],
           });
         }
+        if (url.toString().endsWith("/locales")) {
+          return createResponse(200, {
+            items: [{ code: "en-US", default: true }],
+          });
+        }
         return createResponse(201, { sys: { id: "article-1", version: 1 } });
       },
     });
@@ -57,18 +62,19 @@ describe("contentful management facade", () => {
     });
 
     assert.deepEqual(result, { sys: { id: "article-1", version: 1 } });
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
 
     assert.equal(new URL(calls[0].url).pathname, "/spaces/space-id/environments/staging/tags");
+    assert.equal(new URL(calls[1].url).pathname, "/spaces/space-id/environments/staging/locales");
 
-    const url = new URL(calls[1].url);
+    const url = new URL(calls[2].url);
     assert.equal(url.origin, "https://api.contentful.com");
     assert.equal(url.pathname, "/spaces/space-id/environments/staging/entries");
-    assert.equal(calls[1].options.method, "POST");
-    assert.equal(calls[1].options.headers.authorization, "Bearer management-key");
-    assert.equal(calls[1].options.headers["x-contentful-content-type"], "article");
+    assert.equal(calls[2].options.method, "POST");
+    assert.equal(calls[2].options.headers.authorization, "Bearer management-key");
+    assert.equal(calls[2].options.headers["x-contentful-content-type"], "article");
 
-    const body = JSON.parse(calls[1].options.body);
+    const body = JSON.parse(calls[2].options.body);
     assert.equal(body.fields.title["en-US"], "Draft title");
     assert.equal(body.fields.slug["en-US"], "draft-title");
     assert.equal(body.fields.description["en-US"], "Draft description");
@@ -121,6 +127,72 @@ describe("contentful management facade", () => {
     assert.deepEqual(calls.map((call) => call.options.method), ["GET", "PUT"]);
     assert.equal(calls[1].options.headers["x-contentful-version"], "7");
     assert.equal(new URL(calls[1].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
+  });
+
+  it("writes article fields to the configured locale and the Contentful default locale", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: {
+        ...createEnv(),
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (url.toString().endsWith("/locales")) {
+          return createResponse(200, {
+            items: [
+              { code: "en-US", default: true },
+              { code: "pt-BR", default: false },
+            ],
+          });
+        }
+
+        if (options.method === "GET") {
+          return createResponse(200, {
+            sys: { id: "article-1", version: 7 },
+            fields: {
+              title: { "en-US": "Old title" },
+              author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+            },
+          });
+        }
+
+        return createResponse(200, { sys: { id: "article-1", version: 8 } });
+      },
+    });
+
+    await facade.updateArticleDraft({
+      articleId: "article-1",
+      data: {
+        version: 7,
+        title: "Título atualizado",
+        slug: "titulo-atualizado",
+        description: "Descrição atualizada",
+        body: "Corpo atualizado",
+        createAt: "2026-08-13",
+        author: "author-1",
+      },
+      session: { authorEntryId: "author-1" },
+    });
+
+    const updateCall = calls.find((call) => call.options.method === "PUT");
+    const body = JSON.parse(updateCall.options.body);
+
+    assert.equal(
+      calls.some((call) => new URL(call.url).pathname === "/spaces/space-id/environments/staging/locales"),
+      true
+    );
+    assert.deepEqual(body.fields.title, {
+      "en-US": "Título atualizado",
+      "pt-BR": "Título atualizado",
+    });
+    assert.deepEqual(body.fields.author["en-US"], {
+      sys: { type: "Link", linkType: "Entry", id: "author-1" },
+    });
+    assert.deepEqual(body.fields.author["pt-BR"], {
+      sys: { type: "Link", linkType: "Entry", id: "author-1" },
+    });
   });
 
   it("performs owner lifecycle operations with version headers", async () => {
