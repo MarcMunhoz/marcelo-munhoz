@@ -37,7 +37,32 @@
           />
           <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" @update:model-value="markSlugTouched" />
           <q-input v-model="articleForm.description" label="Description" outlined dense type="textarea" autogrow :error="Boolean(errors.description)" :error-message="errors.description" />
-          <q-input v-model="articleForm.body" label="Body" outlined type="textarea" :rows="10" :error="Boolean(errors.body)" :error-message="errors.body" />
+
+          <div class="markdown-editor" :class="{ 'has-error': errors.body }">
+            <div class="markdown-editor-label">Body <span>(required)</span></div>
+            <div class="markdown-editor-toolbar">
+              <q-btn flat dense icon="title" @click="insertMarkdown('body', '# ', '', 'Heading')" />
+              <q-btn flat dense icon="format_bold" @click="insertMarkdown('body', '**', '**', 'bold text')" />
+              <q-btn flat dense icon="format_italic" @click="insertMarkdown('body', '_', '_', 'italic text')" />
+              <q-btn flat dense icon="format_quote" @click="insertMarkdown('body', '> ', '', 'Quote')" />
+              <q-btn flat dense icon="format_list_bulleted" @click="insertMarkdown('body', '- ', '', 'List item')" />
+              <q-btn flat dense icon="format_list_numbered" @click="insertMarkdown('body', '1. ', '', 'List item')" />
+              <q-btn flat dense icon="link" @click="insertMarkdown('body', '[', '](https://)', 'link text')" />
+              <q-btn flat dense icon="more_horiz" @click="insertMarkdown('body', '`', '`', 'code')" />
+              <q-space />
+              <q-btn-toggle v-model="bodyEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bodyEditorModeOptions" />
+            </div>
+            <textarea
+              v-show="bodyEditorMode === 'editor'"
+              ref="bodyEditor"
+              v-model="articleForm.body"
+              class="markdown-editor-textarea"
+              rows="14"
+              aria-label="Body"
+            ></textarea>
+            <div v-show="bodyEditorMode === 'preview'" class="markdown-editor-preview article-markdown-preview" v-html="articleBodyPreview"></div>
+            <p v-if="errors.body" class="markdown-editor-error">{{ errors.body }}</p>
+          </div>
 
           <div class="form-row">
             <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
@@ -95,7 +120,7 @@
             </q-file>
           </div>
           <q-input v-model="articleForm.alt" label="Alt text" outlined dense />
-          <q-expansion-item v-if="articleForm.thumbnailPublicId || articleForm.thumbnailUrl" v-model="showMediaDiagnostics" dense icon="bug_report" label="Image diagnostics" class="media-diagnostics">
+          <q-expansion-item v-if="articleForm.thumbnailPublicId || articleForm.thumbnailUrl" v-model="showMediaDiagnostics" dense icon="info" label="Image details" class="media-diagnostics">
             <dl>
               <div v-if="articleForm.thumbnailPublicId">
                 <dt>Cloudinary public ID</dt>
@@ -127,7 +152,7 @@
         <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
 
         <div class="editor-actions">
-          <q-btn v-if="canSaveArticle" unelevated color="blue-grey-8" icon="save" label="Save draft" dense no-caps type="submit" :loading="loadingAction === 'save'" />
+          <q-btn v-if="canSaveArticle" unelevated color="blue-grey-8" icon="save" :label="saveButtonLabel" dense no-caps type="submit" :loading="loadingAction === 'save'" />
           <q-btn
             v-if="canSubmitArticleForReview"
             outline
@@ -151,6 +176,18 @@
             :disable="!articleForm.id"
             :loading="loadingAction === 'unpublish'"
             @click="requestUnpublication"
+          />
+          <q-btn
+            v-if="canOwnerUnpublishArticle"
+            outline
+            color="amber-9"
+            icon="visibility_off"
+            label="Unpublish"
+            dense
+            no-caps
+            :disable="!articleForm.id"
+            :loading="loadingAction === 'owner-unpublish'"
+            @click="ownerUnpublish"
           />
         </div>
       </q-form>
@@ -218,6 +255,7 @@ import {
   listMediaAssets,
   requestArticleUnpublication,
   submitArticleForReview,
+  unpublishArticle,
   updateArticleDraft,
   uploadMediaAsset,
   adminUserMessage,
@@ -228,6 +266,7 @@ import {
   articleToForm,
   buildArticlePayload,
   canEditArticleAction,
+  canOwnerUnpublishAction,
   canPrepareReviewAction,
   canRequestUnpublicationAction,
   createEmptyArticleForm,
@@ -237,6 +276,7 @@ import {
 } from "../utils/adminDashboard.js";
 import { getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
 import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
+import { marked } from "marked";
 
 export default defineComponent({
   name: "AdminArticleEditor",
@@ -255,6 +295,11 @@ export default defineComponent({
       mediaEditorConfig: null,
       mediaUploadFile: null,
       showMediaDiagnostics: false,
+      bodyEditorMode: "editor",
+      bodyEditorModeOptions: [
+        { label: "Editor", value: "editor" },
+        { label: "Preview", value: "preview" },
+      ],
       loadedArticle: null,
       statusMessage: "",
       feedbackMessage: "",
@@ -298,6 +343,15 @@ export default defineComponent({
     },
     canRequestArticleUnpublication() {
       return canRequestUnpublicationAction(this.loadedArticle, this.session);
+    },
+    canOwnerUnpublishArticle() {
+      return canOwnerUnpublishAction(this.loadedArticle, this.session);
+    },
+    saveButtonLabel() {
+      return this.loadedArticle?.status === "published" ? "Save" : "Save draft";
+    },
+    articleBodyPreview() {
+      return marked.parse(this.articleForm.body || "");
     },
   },
   async mounted() {
@@ -367,7 +421,8 @@ export default defineComponent({
         const response = await listAdminArticles({ session: this.session });
         this.applyResolvedSession(response.session);
         const dashboard = reconcileAdminDashboardData(response);
-        const article = dashboard.articles.find((item) => item.id === this.$route.params.entryId);
+        const articleRouteKey = this.$route.params.entryId;
+        const article = dashboard.articles.find((item) => item.id === articleRouteKey || item.slug === articleRouteKey);
 
         if (!article) {
           this.dashboardError = "Article not found or not editable by this account.";
@@ -531,6 +586,24 @@ export default defineComponent({
         this.loadingAction = "";
       }
     },
+    async ownerUnpublish() {
+      this.loadingAction = "owner-unpublish";
+
+      try {
+        await unpublishArticle({
+          articleId: this.articleForm.id,
+          version: this.articleForm.version,
+          session: this.session,
+        });
+        this.loadedArticle = { ...(this.loadedArticle || {}), status: "unpublished" };
+        this.snapshotForm();
+        this.showFeedback("Article unpublished.", "success");
+      } catch (error) {
+        this.handleAdminError(error);
+      } finally {
+        this.loadingAction = "";
+      }
+    },
     async openMediaLibrary() {
       this.mediaDialogOpen = true;
       this.mediaError = "";
@@ -623,6 +696,11 @@ export default defineComponent({
       this.articleForm.tagList = this.articleForm.tagList.filter((item) => item !== tag);
       this.syncArticleTags();
     },
+    insertMarkdown(field, before, after = "", placeholder = "text") {
+      const value = String(this.articleForm[field] || "");
+      const insertion = `${before}${placeholder}${after}`;
+      this.articleForm[field] = value ? `${value}${value.endsWith("\n") ? "" : "\n"}${insertion}` : insertion;
+    },
     async handleMediaFile(file) {
       if (!file) {
         return;
@@ -700,8 +778,7 @@ export default defineComponent({
 }
 
 .editor-shell {
-  margin: 0 auto;
-  max-width: 980px;
+  max-width: none;
   padding: 22px;
 }
 
@@ -767,6 +844,65 @@ export default defineComponent({
   display: grid;
   gap: 12px;
   padding: 16px;
+}
+
+.markdown-editor {
+  background: #ffffff;
+  border: 1px solid #b0bec5;
+  display: grid;
+}
+
+.markdown-editor.has-error {
+  border-color: #c62828;
+}
+
+.markdown-editor-label {
+  color: #263238;
+  font-weight: 700;
+  padding: 12px 14px 0;
+
+  span {
+    color: #607d8b;
+    font-weight: 400;
+  }
+}
+
+.markdown-editor-toolbar {
+  align-items: center;
+  border-bottom: 1px solid #cfd8dc;
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.markdown-editor-textarea,
+.markdown-editor-preview {
+  border: 0;
+  color: #263238;
+  font: 1rem/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  min-height: 320px;
+  padding: 18px;
+  width: 100%;
+}
+
+.markdown-editor-textarea {
+  resize: vertical;
+
+  &:focus {
+    outline: 2px solid #78909c;
+    outline-offset: -2px;
+  }
+}
+
+.markdown-editor-preview {
+  background: #fbfcfc;
+  overflow-wrap: anywhere;
+}
+
+.markdown-editor-error {
+  color: #c62828;
+  margin: 0;
+  padding: 0 14px 12px;
 }
 
 .form-row {

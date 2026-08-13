@@ -277,7 +277,7 @@ export const filterAdminArticles = (articles = [], filters = {}) => {
 };
 
 export const ownerReviewQueues = (articles = []) => ({
-  submissions: articles.filter((article) => normalize(article.status) === "review"),
+  submissions: articles.filter((article) => ["draft", "review"].includes(normalize(article.status))),
   unpublicationRequests: articles.filter((article) => normalize(article.status) === "unpublicationrequested"),
 });
 

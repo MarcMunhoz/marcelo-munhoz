@@ -415,7 +415,10 @@ describe("admin frontend writer workflow", () => {
     ]);
 
     assert.deepEqual(queues, {
-      submissions: [{ id: "review-1", title: "Ready article", status: "review", version: 4 }],
+      submissions: [
+        { id: "review-1", title: "Ready article", status: "review", version: 4 },
+        { id: "draft-1", title: "Draft article", status: "draft", version: 2 },
+      ],
       unpublicationRequests: [{ id: "take-down-1", title: "Published article", status: "unpublicationRequested", version: 9 }],
     });
   });
@@ -801,7 +804,7 @@ describe("admin frontend writer workflow", () => {
     }
 
     assert.match(page, /this\.\$router\.push\("\/admin\/articles\/new"\)/);
-    assert.match(page, /\/admin\/articles\/\$\{encodeURIComponent\(article\.id\)\}\/edit/);
+    assert.match(page, /\/admin\/articles\/\$\{encodeURIComponent\(article\.slug \|\| article\.id\)\}\/edit/);
     assert.doesNotMatch(page, /<q-drawer/);
     assert.doesNotMatch(page, /class="editor-drawer"/);
     assert.doesNotMatch(page, /v-model="articleForm\./);
@@ -838,7 +841,8 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /Replace image/);
     assert.match(editor, /Clear image/);
     assert.match(editor, /Edit image/);
-    assert.match(editor, /Image diagnostics/);
+    assert.match(editor, /Image details/);
+    assert.doesNotMatch(editor, /bug_report/);
     assert.match(editor, /showMediaDiagnostics/);
     assert.match(editor, /clearThumbnail/);
     assert.match(editor, /editThumbnailImage/);
@@ -897,7 +901,9 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /Netlify Identity/);
     assert.match(page, /Contentful/);
     assert.match(page, /Profile photo URL/);
+    assert.match(page, /profile-photo-panel/);
     assert.match(page, /profileInitials/);
+    assert.doesNotMatch(page, /label="Author slug"/);
     assert.doesNotMatch(page, /v-model="session/);
     assert.doesNotMatch(page, /app_metadata|user_metadata|identity.*email/i);
   });
@@ -916,15 +922,18 @@ describe("admin frontend writer workflow", () => {
     assert.match(authorPage, /\/api\/contentful\/author\/\$\{this\.\$route\.params\.slug\}/);
     assert.match(authorPage, /publicAuthorProfile/);
     assert.match(authorPage, /authorInitials/);
+    assert.match(authorPage, /\.author-profile[\s\S]*max-width:\s*none/);
     assert.doesNotMatch(authorPage, /Identity|app_metadata|user_metadata|roles|invite|email/i);
   });
 
   it("keeps editor workflow buttons compact", () => {
     const page = read("../src/pages/AdminArticleEditor.vue");
 
-    assert.match(page, /label="Save draft"[\s\S]*dense[\s\S]*no-caps/);
+    assert.match(page, /:label="saveButtonLabel"[\s\S]*dense[\s\S]*no-caps/);
+    assert.match(page, /return this\.loadedArticle\?\.status === "published" \? "Save" : "Save draft"/);
     assert.match(page, /label="Submit for review"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /label="Request unpublication"[\s\S]*dense[\s\S]*no-caps/);
+    assert.match(page, /label="Unpublish"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /\.editor-actions[\s\S]*gap:\s*8px/);
   });
 
@@ -940,7 +949,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /\.article-table[\s\S]*overflow-x:\s*auto/);
     assert.match(page, /\.status-cell[\s\S]*justify-content:\s*flex-start/);
     assert.match(page, /\.table-actions[\s\S]*display:\s*flex/);
-    assert.match(editor, /\.editor-shell[\s\S]*max-width:\s*980px/);
+    assert.match(editor, /\.editor-shell[\s\S]*max-width:\s*none/);
     assert.match(editor, /@media \(max-width:\s*720px\)/);
     assert.doesNotMatch(page, /letter-spacing:\s*-/);
     assert.doesNotMatch(editor, /letter-spacing:\s*-/);
@@ -1000,7 +1009,7 @@ describe("admin frontend writer workflow", () => {
     });
 
     let updateOptions = null;
-    let exportHandler = null;
+    const editorHandlers = {};
     let shown = false;
     const windowRef = {
       cloudinary: {
@@ -1010,14 +1019,42 @@ describe("admin frontend writer workflow", () => {
               updateOptions = options;
             },
             on(eventName, handler) {
-              if (eventName === "export") {
-                exportHandler = handler;
-              }
+              editorHandlers[eventName] = handler;
             },
             show() {
               shown = true;
             },
           };
+        },
+      },
+    };
+    const documentRef = {
+      body: {
+        style: {
+          properties: { overflow: "hidden", "padding-right": "15px" },
+          removeProperty(name) {
+            delete this.properties[name];
+          },
+        },
+        classList: {
+          removed: [],
+          remove(...classNames) {
+            this.removed.push(...classNames);
+          },
+        },
+      },
+      documentElement: {
+        style: {
+          properties: { overflow: "hidden" },
+          removeProperty(name) {
+            delete this.properties[name];
+          },
+        },
+        classList: {
+          removed: [],
+          remove(...classNames) {
+            this.removed.push(...classNames);
+          },
         },
       },
     };
@@ -1028,12 +1065,17 @@ describe("admin frontend writer workflow", () => {
       publicId: "folder/image",
       onExport: (asset) => exported.push(asset),
       windowRef,
+      documentRef,
     });
-    exportHandler({ public_id: "folder/image", url: "https://res.cloudinary.com/demo/image/upload/c_crop/folder/image.jpg" });
+    editorHandlers.export({ public_id: "folder/image", url: "https://res.cloudinary.com/demo/image/upload/c_crop/folder/image.jpg" });
+    editorHandlers.cancel();
 
     assert.equal(shown, true);
     assert.equal(updateOptions.cloudName, "demo-cloud");
     assert.deepEqual(updateOptions.publicIds, ["folder/image"]);
+    assert.deepEqual(documentRef.body.style.properties, {});
+    assert.deepEqual(documentRef.documentElement.style.properties, {});
+    assert.deepEqual(documentRef.body.classList.removed, ["q-body--prevent-scroll", "overflow-hidden", "q-body--prevent-scroll", "overflow-hidden", "q-body--prevent-scroll", "overflow-hidden"]);
     assert.deepEqual(exported, [
       {
         publicId: "folder/image",
@@ -1042,5 +1084,30 @@ describe("admin frontend writer workflow", () => {
       },
     ]);
     assert.doesNotMatch(JSON.stringify(updateOptions), /api.?key|secret/i);
+  });
+
+  it("opens article editors with slug URLs while preserving ID fallback loading", () => {
+    const admin = read("../src/pages/Admin.vue");
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+
+    assert.match(admin, /article\.slug\s*\|\|\s*article\.id/);
+    assert.match(editor, /item\.id\s*===\s*articleRouteKey/);
+    assert.match(editor, /item\.slug\s*===\s*articleRouteKey/);
+  });
+
+  it("uses Contentful-like Markdown editing surfaces for article body and author biography", () => {
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+    const profile = read("../src/pages/AdminProfile.vue");
+
+    assert.match(editor, /markdown-editor/);
+    assert.match(editor, /bodyEditorMode/);
+    assert.match(editor, /insertMarkdown/);
+    assert.match(editor, /marked\.parse/);
+    assert.doesNotMatch(editor, /label="Body"[\s\S]*type="textarea"/);
+
+    assert.match(profile, /markdown-editor/);
+    assert.match(profile, /bioEditorMode/);
+    assert.match(profile, /insertBiographyMarkdown/);
+    assert.match(profile, /marked\.parse/);
   });
 });

@@ -45,6 +45,17 @@ export const normalizeMediaEditorExport = (event = {}) => {
   };
 };
 
+export const cleanupMediaEditorDocumentState = (documentRef = globalThis.document) => {
+  const body = documentRef?.body;
+  const root = documentRef?.documentElement;
+
+  for (const element of [body, root]) {
+    element?.style?.removeProperty?.("overflow");
+    element?.style?.removeProperty?.("padding-right");
+    element?.classList?.remove?.("q-body--prevent-scroll", "overflow-hidden");
+  }
+};
+
 export const loadMediaEditorScript = ({ windowRef = globalThis, documentRef = globalThis.document, scriptSrc = MEDIA_EDITOR_SCRIPT_SRC } = {}) => {
   if (isBrowserMediaEditorReady(windowRef)) {
     return Promise.resolve();
@@ -97,10 +108,20 @@ export const openCloudinaryMediaEditor = async ({ cloudName, publicId, onExport,
   }
 
   const editor = mediaEditorFactory();
+  cleanupMediaEditorDocumentState(documentRef);
   editor.update(buildMediaEditorOptions({ cloudName, publicId }));
 
   if (typeof onExport === "function" && typeof editor.on === "function") {
-    editor.on("export", (event) => onExport(normalizeMediaEditorExport(event)));
+    editor.on("export", (event) => {
+      cleanupMediaEditorDocumentState(documentRef);
+      onExport(normalizeMediaEditorExport(event));
+    });
+  }
+
+  if (typeof editor.on === "function") {
+    for (const eventName of ["close", "cancel", "abort"]) {
+      editor.on(eventName, () => cleanupMediaEditorDocumentState(documentRef));
+    }
   }
 
   if (typeof editor.show !== "function") {

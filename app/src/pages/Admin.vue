@@ -391,7 +391,7 @@ export default defineComponent({
       };
     },
     openEditorForArticle(article) {
-      this.$router.push(`/admin/articles/${encodeURIComponent(article.id)}/edit`);
+      this.$router.push(`/admin/articles/${encodeURIComponent(article.slug || article.id)}/edit`);
     },
     startNewArticle() {
       this.openEditorForNewArticle();

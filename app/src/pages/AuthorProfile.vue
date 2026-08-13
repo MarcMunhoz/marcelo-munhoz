@@ -112,8 +112,7 @@ export default defineComponent({
 }
 
 .author-profile {
-  margin: 0 auto;
-  max-width: 980px;
+  max-width: none;
 }
 
 .author-header {

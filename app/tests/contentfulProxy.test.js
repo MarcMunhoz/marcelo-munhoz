@@ -229,6 +229,78 @@ describe("contentful proxy handler", () => {
     ]);
   });
 
+  it("falls back to local author article matching when Contentful rejects linked author filters", async () => {
+    const calls = [];
+    const articleForAuthor = {
+      sys: { id: "article-1" },
+      fields: {
+        title: "Article",
+        slug: "article",
+        author: { sys: { id: "author-1" }, fields: { name: "Marcelo Munhoz" } },
+      },
+    };
+    const articleForOtherAuthor = {
+      sys: { id: "article-2" },
+      fields: {
+        title: "Other",
+        slug: "other",
+        author: { sys: { id: "author-2" }, fields: { name: "Guest Writer" } },
+      },
+    };
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries(query) {
+          calls.push(query);
+
+          if (query.content_type === "author") {
+            return {
+              items: [
+                {
+                  sys: { id: "author-1" },
+                  fields: {
+                    name: "Marcelo Munhoz",
+                    slug: "marcelo-munhoz",
+                  },
+                },
+              ],
+              total: 1,
+            };
+          }
+
+          if (query["fields.author.sys.id"]) {
+            throw new Error("InvalidQuery");
+          }
+
+          return { items: [articleForAuthor, articleForOtherAuthor], total: 2 };
+        },
+      }),
+    });
+
+    const response = await handler({ path: "/author/marcelo-munhoz", query: {} });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body).articles, [articleForAuthor]);
+    assert.deepEqual(calls, [
+      {
+        content_type: "author",
+        "fields.slug": "marcelo-munhoz",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.author.sys.id": "author-1",
+        order: "-fields.createAt",
+        limit: 100,
+      },
+      {
+        content_type: "article",
+        include: 2,
+        order: "-fields.createAt",
+        limit: 100,
+      },
+    ]);
+  });
+
   it("returns 404 JSON when author slug is not found", async () => {
     const handler = createContentfulHandler({ client: createClient() });
 

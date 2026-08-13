@@ -155,6 +155,46 @@ const publicAuthorProfile = (entry = {}) => {
   };
 };
 
+const entryId = (entry = {}) => String(entry.sys?.id || entry.id || "").trim();
+
+const articleAuthorEntryId = (article = {}) => {
+  const author = article.fields?.author || article.author || {};
+
+  if (author.sys?.id) {
+    return String(author.sys.id);
+  }
+
+  if (author.sys?.type === "Link" && author.sys?.linkType === "Entry") {
+    return String(author.sys.id || "");
+  }
+
+  return String(article.fields?.authorEntryId || article.authorEntryId || "");
+};
+
+const filterArticlesByAuthor = (articles = [], authorId = "") => articles.filter((article) => articleAuthorEntryId(article) === authorId);
+
+const fetchAuthorArticles = async (contentfulClient, authorId) => {
+  try {
+    const articles = await contentfulClient.getEntries({
+      content_type: "article",
+      "fields.author.sys.id": authorId,
+      order: "-fields.createAt",
+      limit: 100,
+    });
+
+    return articles.items || [];
+  } catch {
+    const fallbackArticles = await contentfulClient.getEntries({
+      content_type: "article",
+      include: 2,
+      order: "-fields.createAt",
+      limit: 100,
+    });
+
+    return filterArticlesByAuthor(fallbackArticles.items || [], authorId);
+  }
+};
+
 export const createContentfulHandler = ({ client, env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) => {
   const getClient = () => client || createRuntimeClient(env, fetchImpl);
 
@@ -271,16 +311,11 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
         }
 
         const author = publicAuthorProfile(authorEntries.items[0]);
-        const articles = await contentfulClient.getEntries({
-          content_type: "article",
-          "fields.author.sys.id": author.sys.id,
-          order: "-fields.createAt",
-          limit: 100,
-        });
+        const articles = await fetchAuthorArticles(contentfulClient, entryId(author));
 
         return jsonResponse(200, {
           author,
-          articles: articles.items || [],
+          articles,
         });
       } catch (error) {
         logger.error("Contentful proxy request failed:", error?.message || error);

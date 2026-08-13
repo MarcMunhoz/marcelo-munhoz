@@ -32,18 +32,28 @@
           <q-form class="profile-form" @submit.prevent="saveProfile">
             <q-card-section class="profile-form-fields">
               <q-input v-model="profileForm.name" label="Name" outlined dense :error="Boolean(errors.name)" :error-message="errors.name" />
-              <q-input v-model="profileForm.slug" label="Author slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" />
-              <q-input v-model="profileForm.biography" label="Biography" outlined type="textarea" autogrow :rows="6" />
 
-              <div class="profile-photo-field">
-                <div class="profile-photo-preview">
-                  <img v-if="profileForm.photoUrl" :src="profileForm.photoUrl" :alt="`${profileForm.name || 'Author'} profile photo`" />
-                  <q-avatar v-else color="blue-grey-7" text-color="white" size="72px">{{ profileInitials }}</q-avatar>
+              <div class="markdown-editor">
+                <div class="markdown-editor-label">Biography</div>
+                <div class="markdown-editor-toolbar">
+                  <q-btn flat dense icon="format_bold" @click="insertBiographyMarkdown('**', '**', 'bold text')" />
+                  <q-btn flat dense icon="format_italic" @click="insertBiographyMarkdown('_', '_', 'italic text')" />
+                  <q-btn flat dense icon="link" @click="insertBiographyMarkdown('[', '](https://)', 'link text')" />
+                  <q-btn flat dense icon="format_list_bulleted" @click="insertBiographyMarkdown('- ', '', 'List item')" />
+                  <q-btn flat dense icon="format_list_numbered" @click="insertBiographyMarkdown('1. ', '', 'List item')" />
+                  <q-btn flat dense icon="format_quote" @click="insertBiographyMarkdown('> ', '', 'Quote')" />
+                  <q-space />
+                  <q-btn-toggle v-model="bioEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bioEditorModeOptions" />
                 </div>
-                <div class="profile-photo-controls">
-                  <q-input v-model="profileForm.photoUrl" label="Profile photo URL" outlined dense />
-                  <p>Optional. Leave empty to use the text fallback.</p>
-                </div>
+                <textarea
+                  v-show="bioEditorMode === 'editor'"
+                  ref="bioEditor"
+                  v-model="profileForm.biography"
+                  class="markdown-editor-textarea"
+                  rows="10"
+                  aria-label="Biography"
+                ></textarea>
+                <div v-show="bioEditorMode === 'preview'" class="markdown-editor-preview" v-html="biographyPreview"></div>
               </div>
             </q-card-section>
 
@@ -54,6 +64,16 @@
             </q-card-actions>
           </q-form>
         </q-card>
+
+        <aside class="profile-photo-panel">
+          <p class="admin-kicker">Photo</p>
+          <div class="profile-photo-preview">
+            <img v-if="profileForm.photoUrl" :src="profileForm.photoUrl" :alt="`${profileForm.name || 'Author'} profile photo`" />
+            <q-avatar v-else color="blue-grey-7" text-color="white" size="96px">{{ profileInitials }}</q-avatar>
+          </div>
+          <q-input v-model="profileForm.photoUrl" label="Profile photo URL" outlined dense />
+          <p>Optional. Leave empty to use the text fallback.</p>
+        </aside>
       </section>
     </section>
     <section v-else class="profile-login-shell" aria-hidden="true"></section>
@@ -65,6 +85,7 @@ import { defineComponent } from "vue";
 import { getAuthorProfile, updateAuthorProfile, adminUserMessage } from "../utils/adminApi.js";
 import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
 import { authorProfileToForm, buildAuthorProfilePayload, createEmptyAuthorProfileForm, slugFromTitle } from "../utils/adminDashboard.js";
+import { marked } from "marked";
 
 export default defineComponent({
   name: "AdminProfilePage",
@@ -79,6 +100,11 @@ export default defineComponent({
       feedbackMessage: "",
       feedbackTone: "info",
       loadingAction: "",
+      bioEditorMode: "editor",
+      bioEditorModeOptions: [
+        { label: "Editor", value: "editor" },
+        { label: "Preview", value: "preview" },
+      ],
     };
   },
   computed: {
@@ -100,6 +126,9 @@ export default defineComponent({
         "feedback-error": this.feedbackTone === "error",
         "feedback-info": this.feedbackTone === "info",
       };
+    },
+    biographyPreview() {
+      return marked.parse(this.profileForm.biography || "");
     },
   },
   async mounted() {
@@ -204,6 +233,11 @@ export default defineComponent({
         this.loadingAction = "";
       }
     },
+    insertBiographyMarkdown(before, after = "", placeholder = "text") {
+      const value = String(this.profileForm.biography || "");
+      const insertion = `${before}${placeholder}${after}`;
+      this.profileForm.biography = value ? `${value}${value.endsWith("\n") ? "" : "\n"}${insertion}` : insertion;
+    },
     showFeedback(message, tone = "info") {
       this.feedbackMessage = message;
       this.feedbackTone = tone;
@@ -267,18 +301,17 @@ export default defineComponent({
 }
 
 .profile-grid {
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
 }
 
 .profile-card,
-.identity-card {
+.profile-photo-panel {
   background: #ffffff;
 }
 
 .profile-caption,
-.identity-card p,
-.identity-card span,
-.profile-photo-controls p {
+.profile-photo-panel p {
   color: #607d8b;
 }
 
@@ -287,41 +320,71 @@ export default defineComponent({
   gap: 14px;
 }
 
-.profile-photo-field {
-  align-items: center;
-  border: 1px solid #d8e1e5;
+.markdown-editor {
+  background: #ffffff;
+  border: 1px solid #b0bec5;
   display: grid;
-  gap: 16px;
-  grid-template-columns: auto minmax(0, 1fr);
-  padding: 14px;
+}
+
+.markdown-editor-label {
+  color: #263238;
+  font-weight: 700;
+  padding: 12px 14px 0;
+}
+
+.markdown-editor-toolbar {
+  align-items: center;
+  border-bottom: 1px solid #cfd8dc;
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.markdown-editor-textarea,
+.markdown-editor-preview {
+  border: 0;
+  color: #263238;
+  font: 1rem/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  min-height: 280px;
+  padding: 18px;
+  width: 100%;
+}
+
+.markdown-editor-textarea {
+  resize: vertical;
+
+  &:focus {
+    outline: 2px solid #78909c;
+    outline-offset: -2px;
+  }
+}
+
+.markdown-editor-preview {
+  background: #fbfcfc;
+  overflow-wrap: anywhere;
 }
 
 .profile-photo-preview {
   align-items: center;
   display: flex;
-  height: 88px;
+  height: 132px;
   justify-content: center;
-  width: 88px;
+  width: 132px;
 
   img {
     border-radius: 50%;
-    height: 72px;
+    height: 112px;
     object-fit: cover;
-    width: 72px;
+    width: 112px;
   }
 }
 
-.identity-card {
+.profile-photo-panel {
   align-self: start;
   border: 1px solid #cfd8dc;
   display: grid;
-  gap: 8px;
+  gap: 14px;
   padding: 16px;
-
-  strong,
-  span {
-    display: block;
-  }
 }
 
 .feedback-success {
@@ -344,8 +407,7 @@ export default defineComponent({
 }
 
 @media (max-width: 900px) {
-  .profile-grid,
-  .profile-photo-field {
+  .profile-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
