@@ -107,6 +107,35 @@ The system SHALL open article creation and editing in explicit route-level pages
 - **WHEN** an admin attempts to leave an article editor page with unsaved changes
 - **THEN** the system asks for confirmation or otherwise prevents accidental loss of the unsaved edits
 
+### Requirement: Article Dates Are Persisted Safely And Rendered As Localized Dates
+The system SHALL persist article creation and update timestamps as timezone-safe instants while rendering public article dates as localized date-only values.
+
+#### Scenario: Admin saves a newly created article
+- **WHEN** an authenticated author saves a new article draft
+- **THEN** the system stores the article creation timestamp as an unambiguous instant
+- **AND** the stored value preserves the intended editorial calendar date regardless of the author's browser timezone, Netlify runtime timezone, or Contentful storage timezone
+
+#### Scenario: Admin saves an edited article
+- **WHEN** an authenticated author saves changes to an existing article
+- **THEN** the system stores or updates an article update timestamp as an unambiguous instant when the content model supports it
+- **AND** the update timestamp does not replace the original creation timestamp
+
+#### Scenario: Public article displays creation date
+- **WHEN** a public article renders a byline
+- **THEN** the system displays the article creation date without time
+- **AND** the displayed date is localized for the article or site locale
+
+#### Scenario: Public article displays updated date only when useful
+- **WHEN** a public article has both creation and update timestamps
+- **AND** the localized creation date and localized update date are different calendar days
+- **THEN** the system displays both the creation date and an updated date without time
+- **AND** the system omits the updated date when both timestamps resolve to the same localized calendar day
+
+#### Scenario: Public byline language matches content locale
+- **WHEN** a public article renders an author byline
+- **THEN** labels such as "By", "on", "Por", and "em" match the article or site locale
+- **AND** an English article does not render Portuguese byline labels
+
 ### Requirement: Article Editor Hides Technical Contentful And Cloudinary Fields
 The system SHALL keep technical Contentful and Cloudinary identifiers out of primary article editing controls.
 

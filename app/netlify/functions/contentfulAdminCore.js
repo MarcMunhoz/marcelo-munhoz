@@ -305,15 +305,51 @@ const articleWriteLocales = async ({ locale, request }) => {
   }
 };
 
-const articleFieldsFromData = (data = {}, writeLocales) => {
+const contentTypeFieldIds = async ({ contentTypeId, request }) => {
+  if (typeof request !== "function") {
+    return null;
+  }
+
+  try {
+    const payload = await request({ method: "GET", path: `/content_types/${encodeURIComponent(contentTypeId)}` });
+    const fields = Array.isArray(payload.fields) ? payload.fields : [];
+
+    return new Set(fields.map((field) => field?.id).filter(Boolean));
+  } catch {
+    return null;
+  }
+};
+
+const contentTypeSupportsField = (fieldIds, fieldId) => !fieldIds || fieldIds.has(fieldId);
+
+const articleDateTimeValue = (value) => {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return undefined;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return `${text}T12:00:00.000Z`;
+  }
+
+  const date = new Date(text);
+
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
+const articleFieldsFromData = (data = {}, writeLocales, { supportedFieldIds = null } = {}) => {
   const locales = uniqueLocales(writeLocales);
+  const createAt = articleDateTimeValue(data.createAt);
+  const updatedAt = articleDateTimeValue(data.updatedAt);
 
   return definedEntries([
     ["title", localizedForLocales(data.title, locales)],
     ["slug", localizedForLocales(data.slug, locales)],
     ["description", localizedForLocales(data.description, locales)],
     ["body", localizedForLocales(data.body, locales)],
-    ["createAt", localizedForLocales(data.createAt, locales)],
+    ["createAt", localizedForLocales(createAt, locales)],
+    ["updatedAt", updatedAt && contentTypeSupportsField(supportedFieldIds, "updatedAt") ? localizedForLocales(updatedAt, locales) : undefined],
     ["alt", localizedForLocales(data.alt, locales)],
     ["author", data.author ? localizedForLocales(contentfulLink("Entry", data.author), locales) : undefined],
     ["cloudinary", localizedForLocales(cloudinaryMediaFromData(data), locales)],
@@ -330,9 +366,10 @@ const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
 
   const tagIds = request && Array.isArray(data.tags) ? await filterExistingTagIds({ tags: data.tags, request }) : normalizedTagIds(data.tags);
   const writeLocales = await articleWriteLocales({ locale, request });
+  const supportedFieldIds = data.updatedAt ? await contentTypeFieldIds({ contentTypeId: "article", request }) : null;
 
   return {
-    fields: articleFieldsFromData(data, writeLocales),
+    fields: articleFieldsFromData(data, writeLocales, { supportedFieldIds }),
     ...(tagIds.length > 0 ? { metadata: { tags: tagsFromIds(tagIds) } } : {}),
   };
 };

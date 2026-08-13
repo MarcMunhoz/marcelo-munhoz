@@ -13,6 +13,8 @@ Netlify Identity remains the authentication source for e-mail, account identity,
 - Make article bylines link to author information on the public site.
 - Move article creation and editing into dedicated pages.
 - Keep edit permission tied to the article creator while preserving owner moderation controls.
+- Persist article creation and update instants correctly regardless of the author's local timezone, while keeping public rendering date-only.
+- Localize public byline labels to the article/site language instead of hard-coding Portuguese labels.
 - Improve image workflows with visual thumbnail interaction, replacement, and a path for Cloudinary widget-based editing.
 - Keep Contentful and Cloudinary secrets server-side.
 
@@ -39,6 +41,20 @@ Alternative considered: store public author profile data in Netlify Identity use
 Article creation and editing should move to route-level surfaces, for example `/admin/articles/new` and `/admin/articles/:entryId/edit`. The dashboard remains a list, queue, and navigation surface.
 
 Alternative considered: keep the inline/dashboard editor and polish it. That keeps the confusing "click row, edit below" workflow and makes validation, unsaved-state handling, and mobile layout harder.
+
+### Persist Editorial Dates As Instants, Render Public Dates Only
+
+The article editor must save creation and update timestamps as unambiguous instants, including timezone context where user-entered date and time values are involved. This prevents an author in a different timezone, the browser, Netlify Functions, or Contentful from shifting the intended editorial date.
+
+Public article pages should not expose the saved time. They should display the creation date as a localized date-only value. If an article was updated on a different calendar day than its creation date, the page should also display a localized updated date-only value. If creation and update resolve to the same displayed day, the updated label should be omitted.
+
+Alternative considered: save only date strings. That is simpler but makes legacy import, timezone conversion, and future sorting ambiguous once authors can work from different locales.
+
+### Localize Public Bylines
+
+Byline labels such as "By", "on", "Por", and "em" must come from the article/site locale instead of being hard-coded. An English article should not render Portuguese labels, and Portuguese content should keep Portuguese labels.
+
+Alternative considered: use Portuguese labels everywhere because the owner is Brazilian. That breaks English articles and makes the public blog look inconsistent.
 
 ### Preserve Creator-Scoped Editing
 

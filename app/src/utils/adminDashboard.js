@@ -61,6 +61,40 @@ export const articleDateInputValue = (value) => {
   return date.toISOString().slice(0, 10);
 };
 
+export const articleDateTimeValue = (value) => {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return `${text}T12:00:00.000Z`;
+  }
+
+  const date = new Date(text);
+
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+};
+
+export const localDateInputValue = (date = new Date(), timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone,
+  })
+    .formatToParts(date)
+    .reduce((acc, part) => {
+      if (part.type !== "literal") {
+        acc[part.type] = part.value;
+      }
+      return acc;
+    }, {});
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+
 export const displayAuthorName = (article = {}) => {
   const author = String(article.authorName || article.author || "").trim();
 
@@ -210,13 +244,13 @@ export const normalizeAdminArticleDisplay = (article = {}) => ({
   thumbnailPreviewUrl: thumbnailPreviewUrl(article),
 });
 
-export const createEmptyArticleForm = () => ({
+export const createEmptyArticleForm = ({ now = () => new Date(), timeZone } = {}) => ({
   id: "",
   title: "",
   slug: "",
   description: "",
   body: "",
-  createAt: new Date().toISOString().slice(0, 10),
+  createAt: localDateInputValue(now(), timeZone),
   thumbnailPublicId: "",
   thumbnailUrl: "",
   thumbnail: null,
@@ -416,7 +450,7 @@ export const canUnarchiveArticleAction = (article = {}, session) => {
   return Boolean(article.id && isOwner(session) && normalize(article.status) === "archived");
 };
 
-export const buildArticlePayload = (form = {}) => {
+export const buildArticlePayload = (form = {}, { now = () => new Date() } = {}) => {
   const thumbnail = form.thumbnail || (form.thumbnailPublicId || form.thumbnailUrl
     ? {
         public_id: String(form.thumbnailPublicId || "").trim(),
@@ -425,13 +459,16 @@ export const buildArticlePayload = (form = {}) => {
       }
     : undefined);
   const tagList = normalizeTagList(Array.isArray(form.tagList) && form.tagList.length > 0 ? form.tagList : form.tags);
+  const createAt = articleDateTimeValue(form.createAt);
+  const updatedAt = form.id ? now().toISOString() : "";
 
   return {
     title: String(form.title || "").trim(),
     slug: String(form.slug || "").trim(),
     description: String(form.description || "").trim(),
     body: form.body || "",
-    createAt: form.createAt || "",
+    createAt,
+    ...(updatedAt ? { updatedAt } : {}),
     ...(thumbnail ? { cloudinary: [thumbnail] } : {}),
     alt: String(form.alt || "").trim(),
     author: String(form.authorEntryId || form.author || "").trim(),

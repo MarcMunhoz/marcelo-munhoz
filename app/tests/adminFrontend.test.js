@@ -50,6 +50,7 @@ import {
 } from "../src/utils/adminDashboard.js";
 import { buildMediaEditorOptions, normalizeMediaEditorExport, openCloudinaryMediaEditor } from "../src/utils/cloudinaryMediaEditor.js";
 import { publicAuthorProfile } from "../src/utils/authorProfiles.js";
+import { articleBylineLabels, publicArticleDates } from "../src/utils/articleDates.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -498,13 +499,47 @@ describe("admin frontend writer workflow", () => {
       slug: "new-admin",
       description: "Dashboard work",
       body: "# Body",
-      createAt: "2026-08-11",
+      createAt: "2026-08-11T12:00:00.000Z",
       cloudinary: [{ public_id: "marcelo-munhoz-website/image", secure_url: "https://example.test/image.jpg" }],
       alt: "Admin screenshot",
       author: "authorEntry",
       tags: ["admin", "contentful"],
       version: 7,
     });
+  });
+
+  it("adds timezone-safe update timestamps only when saving existing article edits", () => {
+    const newArticlePayload = buildArticlePayload({
+      title: "New article",
+      slug: "new-article",
+      description: "Description",
+      body: "Body",
+      createAt: "2026-08-11",
+      authorEntryId: "authorEntry",
+    }, { now: () => new Date("2026-08-13T18:20:30.000Z") });
+    const editPayload = buildArticlePayload({
+      id: "article-1",
+      title: "Existing article",
+      slug: "existing-article",
+      description: "Description",
+      body: "Body",
+      createAt: "2026-08-11",
+      authorEntryId: "authorEntry",
+      version: 7,
+    }, { now: () => new Date("2026-08-13T18:20:30.000Z") });
+
+    assert.equal(newArticlePayload.updatedAt, undefined);
+    assert.equal(editPayload.createAt, "2026-08-11T12:00:00.000Z");
+    assert.equal(editPayload.updatedAt, "2026-08-13T18:20:30.000Z");
+  });
+
+  it("defaults new article dates from the writer local calendar day", () => {
+    const form = createEmptyArticleForm({
+      now: () => new Date("2026-08-12T02:30:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    });
+
+    assert.equal(form.createAt, "2026-08-11");
   });
 
   it("preserves complete Cloudinary asset metadata when building article payloads", () => {
@@ -1097,9 +1132,11 @@ describe("admin frontend writer workflow", () => {
     assert.match(routes, /path:\s*"\/blog\/authors\/:slug"/);
     assert.match(routes, /pages\/AuthorProfile\.vue/);
     assert.match(article, /articleAuthorProfile/);
+    assert.doesNotMatch(article, /article\.sys\.updatedAt/);
+    assert.doesNotMatch(article, /updatedAt:\s*this\.article\.updatedAt\s*\|\|\s*this\.updatedAt/);
     assert.match(article, /name:\s*'Author'|name:\s*"Author"/);
     assert.match(article, /articleAuthorSlug/);
-    assert.match(article, /Por[\s\S]*<router-link/);
+    assert.match(article, /bylineLabels\.by[\s\S]*<router-link/);
     assert.match(authorPage, /\/api\/contentful\/author\/\$\{this\.\$route\.params\.slug\}/);
     assert.match(authorPage, /publicAuthorProfile/);
     assert.match(authorPage, /authorInitials/);
@@ -1110,6 +1147,27 @@ describe("admin frontend writer workflow", () => {
     assert.doesNotMatch(authorPage, /articleCardImageUrl/);
     assert.doesNotMatch(authorPage, /article-grid/);
     assert.doesNotMatch(authorPage, /Identity|app_metadata|user_metadata|roles|invite|email/i);
+  });
+
+  it("localizes public article byline labels and date-only update display", () => {
+    assert.deepEqual(articleBylineLabels("en-US"), { by: "By", on: "on", updated: "Updated on" });
+    assert.deepEqual(articleBylineLabels("pt-BR"), { by: "Por", on: "em", updated: "Atualizado em" });
+    assert.deepEqual(
+      publicArticleDates({
+        createAt: "2026-06-25T12:00:00.000Z",
+        updatedAt: "2026-06-25T22:00:00.000Z",
+        locale: "en-US",
+      }),
+      { created: "June 25, 2026", updated: "" }
+    );
+    assert.deepEqual(
+      publicArticleDates({
+        createAt: "2026-06-25T12:00:00.000Z",
+        updatedAt: "2026-06-27T08:00:00.000Z",
+        locale: "en-US",
+      }),
+      { created: "June 25, 2026", updated: "June 27, 2026" }
+    );
   });
 
   it("keeps editor workflow buttons compact", () => {

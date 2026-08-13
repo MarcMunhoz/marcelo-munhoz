@@ -45,17 +45,26 @@
 - [x] 7.2 Hide raw Cloudinary IDs and URLs from primary editor controls while keeping diagnostics intentional.
 - [x] 7.3 Keep media library selection visual and ensure selected assets update the article thumbnail preview.
 - [x] 7.4 Add fallback states for empty media, missing configuration, and upstream media failures.
+- [x] 7.5 Support Cloudinary dynamic folders and paginated asset responses in the media library so existing assets are not dropped from selection.
 
 ## 8. Cloudinary Editing Integration
 
 - [x] 8.1 Evaluate Cloudinary Media Editor widget integration behind a small adapter loaded only when image editing is requested.
 - [x] 8.2 Implement widget configuration for supported existing-image edits without exposing Cloudinary secrets.
 - [x] 8.3 Decide whether edited images create a derived asset, update article transformation metadata, or store a new asset reference.
-- [ ] 8.4 Validate Upload Widget and Media Editor behavior in staging before relying on either path as the primary editing workflow.
+- [x] 8.4 Validate Upload Widget and Media Editor behavior in staging before relying on either path as the primary editing workflow.
 
-## 9. Verification
+## 9. Article Dates And Localized Bylines
 
-- [x] 9.1 Run unit tests covering admin session controls, author mapping, profile APIs, editor routes, and action permissions.
-- [x] 9.2 Run build and credential scans to confirm Contentful and Cloudinary secrets are not bundled or exposed.
-- [ ] 9.3 Smoke test staging with Netlify Identity login/logout, Contentful author profile data, article editing permissions, public byline links, and Cloudinary image workflows.
-- [x] 9.4 Update operational documentation for required Contentful author fields, Cloudinary permissions, and staging smoke steps.
+- [x] 9.1 Audit the Contentful Article content model for creation and update date fields without reading secret files.
+- [x] 9.2 Persist article creation timestamps as timezone-safe instants when creating drafts, preserving the intended editorial date.
+- [x] 9.3 Persist article update timestamps as timezone-safe instants when saving edits if the content model supports an update field.
+- [x] 9.4 Render public article dates without time, showing an updated date only when it differs from the creation date by localized calendar day.
+- [x] 9.5 Localize public byline labels so English articles do not render Portuguese labels and Portuguese articles keep Portuguese labels.
+
+## 10. Verification
+
+- [x] 10.1 Run unit tests covering admin session controls, author mapping, profile APIs, editor routes, and action permissions.
+- [x] 10.2 Run build and credential scans to confirm Contentful and Cloudinary secrets are not bundled or exposed.
+- [ ] 10.3 Smoke test staging with Netlify Identity login/logout, Contentful author profile data, article editing permissions, public byline links, date rendering, and Cloudinary image workflows.
+- [x] 10.4 Update operational documentation for required Contentful author fields, Cloudinary permissions, and staging smoke steps.

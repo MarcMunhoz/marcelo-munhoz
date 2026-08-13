@@ -79,7 +79,7 @@ describe("contentful management facade", () => {
     assert.equal(body.fields.slug["en-US"], "draft-title");
     assert.equal(body.fields.description["en-US"], "Draft description");
     assert.equal(body.fields.body["en-US"], "# Draft");
-    assert.equal(body.fields.createAt["en-US"], "2026-08-11");
+    assert.equal(body.fields.createAt["en-US"], "2026-08-11T12:00:00.000Z");
     assert.deepEqual(body.fields.author["en-US"], {
       sys: { type: "Link", linkType: "Entry", id: "author-1" },
     });
@@ -91,6 +91,71 @@ describe("contentful management facade", () => {
       { sys: { type: "Link", linkType: "Tag", id: "vue" } },
       { sys: { type: "Link", linkType: "Tag", id: "contentful" } },
     ]);
+  });
+
+  it("writes updated article timestamps only when the Contentful article model supports the field", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (url.toString().endsWith("/locales")) {
+          return createResponse(200, {
+            items: [{ code: "en-US", default: true }],
+          });
+        }
+
+        if (url.toString().endsWith("/content_types/article")) {
+          return createResponse(200, {
+            fields: [
+              { id: "title" },
+              { id: "slug" },
+              { id: "description" },
+              { id: "body" },
+              { id: "createAt" },
+              { id: "author" },
+            ],
+          });
+        }
+
+        if (options.method === "GET") {
+          return createResponse(200, {
+            sys: { id: "article-1", version: 7 },
+            fields: {
+              author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+            },
+          });
+        }
+
+        return createResponse(200, { sys: { id: "article-1", version: 8 } });
+      },
+    });
+
+    await facade.updateArticleDraft({
+      articleId: "article-1",
+      data: {
+        version: 7,
+        title: "Updated title",
+        slug: "updated-title",
+        description: "Updated description",
+        body: "Updated body",
+        createAt: "2026-08-11T12:00:00.000Z",
+        updatedAt: "2026-08-13T18:20:30.000Z",
+        author: "author-1",
+      },
+      session: { authorEntryId: "author-1" },
+    });
+
+    const updateCall = calls.find((call) => call.options.method === "PUT");
+    const body = JSON.parse(updateCall.options.body);
+
+    assert.equal(
+      calls.some((call) => new URL(call.url).pathname === "/spaces/space-id/environments/staging/content_types/article"),
+      true
+    );
+    assert.equal(body.fields.createAt["en-US"], "2026-08-11T12:00:00.000Z");
+    assert.equal(body.fields.updatedAt, undefined);
   });
 
   it("updates article drafts with the supplied version header", async () => {

@@ -9,13 +9,17 @@
         {{ article.description }}
       </div>
       <cite class="block not-italic">
-        Por
+        {{ bylineLabels.by }}
         <router-link v-if="articleAuthorSlug" :to="{ name: 'Author', params: { slug: articleAuthorSlug } }" class="author-link">
           <strong>{{ articleAuthor }}</strong>
         </router-link>
         <strong v-else>{{ articleAuthor }}</strong>
         <br />
-        em {{ formatDate(article.createAt, "pt-br") }}
+        {{ bylineLabels.on }} {{ articleDates.created }}
+        <template v-if="articleDates.updated">
+          <br />
+          {{ bylineLabels.updated }} {{ articleDates.updated }}
+        </template>
       </cite>
 
       <section class="flex justify-end">
@@ -99,6 +103,7 @@ import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
+import { articleBylineLabels, publicArticleDates } from "../utils/articleDates.js";
 import { articleAuthorProfile } from "../utils/authorProfiles.js";
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
@@ -112,6 +117,7 @@ export default defineComponent({
       articleAuthorSlug: "",
       articleTags: [],
       createAt: null,
+      articleLocale: "pt-BR",
       progress: true,
     };
   },
@@ -187,6 +193,7 @@ export default defineComponent({
 
         this.createAt = article.sys.createdAt;
         this.article = article.fields;
+        this.articleLocale = article.fields.locale || article.fields.language || article.fields.lang || this.articleLocale;
         const author = articleAuthorProfile(article);
         this.articleAuthor = author.name;
         this.articleAuthorSlug = author.slug;
@@ -222,18 +229,21 @@ export default defineComponent({
         console.error("Erro ao carregar artigo:", err);
       }
     },
-    formatDate(date, language) {
-      const finalDate = date || this.createAt;
-      return new Date(finalDate).toLocaleDateString(language, {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-      });
-    },
   },
   computed: {
     getUrlToShare() {
       return document.baseURI;
+    },
+    bylineLabels() {
+      return articleBylineLabels(this.articleLocale);
+    },
+    articleDates() {
+      return publicArticleDates({
+        createAt: this.article.createAt,
+        updatedAt: this.article.updatedAt,
+        fallbackCreatedAt: this.createAt,
+        locale: this.articleLocale,
+      });
     },
   },
 });
