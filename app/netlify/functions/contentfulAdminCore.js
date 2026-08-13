@@ -136,6 +136,15 @@ export class ContentfulAdminAuthorizationError extends Error {
   }
 }
 
+export class ContentfulAdminLifecycleError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ContentfulAdminLifecycleError";
+    this.statusCode = 400;
+    this.publicError = message;
+  }
+}
+
 export class ContentfulAuthorProfileResolutionError extends Error {
   constructor() {
     super("Author profile could not be resolved for the authenticated user");
@@ -206,6 +215,15 @@ const tagsFromIds = (tags = []) => tags.map((id) => contentfulLink("Tag", id));
 
 const thumbnailFromData = (data = {}) => data.thumbnail || (Array.isArray(data.cloudinary) ? data.cloudinary[0] : undefined);
 
+const cloudinaryMediaFromData = (data = {}) => {
+  if (Array.isArray(data.cloudinary)) {
+    return data.cloudinary;
+  }
+
+  const thumbnail = thumbnailFromData(data);
+  return thumbnail ? [thumbnail] : undefined;
+};
+
 const firstLocalizedValue = (fields = {}, fieldId, locale) => {
   const value = fields[fieldId];
 
@@ -227,11 +245,10 @@ const articleFieldsFromData = (data = {}, locale) =>
     ["description", localized(data.description, locale)],
     ["body", localized(data.body, locale)],
     ["createAt", localized(data.createAt, locale)],
-    ["thumbnail", localized(thumbnailFromData(data), locale)],
     ["alt", localized(data.alt, locale)],
     ["author", data.author ? localized(contentfulLink("Entry", data.author), locale) : undefined],
     ["writerSubject", data.writerSubject ? localized(data.writerSubject, locale) : undefined],
-    ["cloudinary", Array.isArray(data.cloudinary) ? localized(data.cloudinary, locale) : undefined],
+    ["cloudinary", localized(cloudinaryMediaFromData(data), locale)],
   ]);
 
 const articlePayloadFromData = (data = {}, locale) => {
@@ -966,8 +983,24 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       });
     },
     async archiveArticle({ articleId, data }) {
+      const existingEntry = await request({ method: "GET", path: articlePath(articleId) });
+      const currentStatus = normalizedEntryStatus(existingEntry.sys);
+
+      if (currentStatus === "published") {
+        throw new ContentfulAdminLifecycleError("Published articles must be unpublished before archiving.");
+      }
+
       return request({
         method: "PUT",
+        path: `${articlePath(articleId)}/archived`,
+        headers: {
+          "x-contentful-version": requiredVersion(data),
+        },
+      });
+    },
+    async unarchiveArticle({ articleId, data }) {
+      return request({
+        method: "DELETE",
         path: `${articlePath(articleId)}/archived`,
         headers: {
           "x-contentful-version": requiredVersion(data),
@@ -1187,6 +1220,15 @@ export const createContentfulAdminHandler = ({
         role: "owner",
         operation: adminOperations.unpublishArticle,
         payload: { articleId: articleIdFromPath(routePath, "/unpublish"), data },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath.endsWith("/unarchive")) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.unarchiveArticle,
+        payload: { articleId: articleIdFromPath(routePath, "/unarchive"), data },
       });
     }
 

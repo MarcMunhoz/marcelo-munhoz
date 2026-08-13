@@ -107,15 +107,15 @@ describe("admin auth preview sessions", () => {
     assert.equal(adminAccountInitials(null), "AD");
   });
 
-  it("falls back to the Netlify Identity login route when the widget is unavailable", () => {
+  it("does not navigate to the Netlify Identity route when the widget is unavailable", () => {
     const previousIdentity = globalThis.netlifyIdentity;
     const location = { href: "" };
 
     globalThis.netlifyIdentity = undefined;
 
     try {
-      assert.equal(openAdminLogin({ location }), true);
-      assert.equal(location.href, "/.netlify/identity/login");
+      assert.equal(openAdminLogin({ location }), false);
+      assert.equal(location.href, "");
     } finally {
       globalThis.netlifyIdentity = previousIdentity;
     }

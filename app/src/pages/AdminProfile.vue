@@ -367,15 +367,16 @@ export default defineComponent({
 .profile-photo-preview {
   align-items: center;
   display: flex;
-  height: 132px;
+  min-height: 180px;
   justify-content: center;
-  width: 132px;
+  width: 100%;
 
   img {
-    border-radius: 50%;
-    height: 112px;
+    border-radius: 4px;
+    display: block;
+    max-height: 220px;
     object-fit: cover;
-    width: 112px;
+    width: 100%;
   }
 }
 

@@ -419,6 +419,7 @@ describe("contentful admin handler", () => {
       ["POST", "/articles/article-1/publish", "publishArticle"],
       ["POST", "/articles/article-1/unpublish", "unpublishArticle"],
       ["POST", "/articles/article-1/archive", "archiveArticle"],
+      ["POST", "/articles/article-1/unarchive", "unarchiveArticle"],
       ["DELETE", "/articles/article-1", "deleteArticle"],
     ]) {
       let operationRan = false;
@@ -446,6 +447,7 @@ describe("contentful admin handler", () => {
       ["POST", "/articles/article-1/publish", "publishArticle"],
       ["POST", "/articles/article-1/unpublish", "unpublishArticle"],
       ["POST", "/articles/article-1/archive", "archiveArticle"],
+      ["POST", "/articles/article-1/unarchive", "unarchiveArticle"],
       ["DELETE", "/articles/article-1", "deleteArticle"],
     ]) {
       const handler = createContentfulAdminHandler({

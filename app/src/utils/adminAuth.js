@@ -60,15 +60,8 @@ export const getAdminSession = async () => {
 };
 
 export const openAdminLogin = ({ identity = globalThis.netlifyIdentity, location = globalThis.location } = {}) => {
-  const loginPath = "/.netlify/identity/login";
-
   if (typeof identity?.open === "function") {
     identity.open("login");
-    return true;
-  }
-
-  if (location && typeof location === "object") {
-    location.href = loginPath;
     return true;
   }
 

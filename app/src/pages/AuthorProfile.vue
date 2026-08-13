@@ -18,16 +18,20 @@
       <section class="author-articles">
         <h2>Articles</h2>
         <p v-if="articles.length === 0" class="empty-state">No published articles found for this author.</p>
-        <div class="article-grid">
-          <q-card v-for="article in articles" :key="article.sys.id" flat bordered class="article-card">
+        <div v-else class="article-list">
+          <article v-for="article in displayedArticles" :key="article.sys.id" class="article-row">
             <router-link :to="{ name: 'Artigo', params: { slug: article.fields.slug } }">
-              <img :src="articleCardImageUrl(article.fields)" :alt="article.fields.alt || article.fields.title" />
-              <q-card-section>
+              <div>
                 <h3>{{ article.fields.title }}</h3>
                 <p>{{ article.fields.description }}</p>
-              </q-card-section>
+              </div>
+              <span>{{ readingTimeLabel(article) }}</span>
             </router-link>
-          </q-card>
+          </article>
+        </div>
+        <div v-if="articles.length > articlePageSize" class="article-pagination">
+          <q-btn v-if="canLoadMore" outline color="blue-grey-7" label="Load more" no-caps @click="loadMoreArticles" />
+          <q-btn v-if="visibleArticleCount > articlePageSize" flat color="blue-grey-7" label="Show less" no-caps @click="showLessArticles" />
         </div>
       </section>
     </section>
@@ -39,7 +43,9 @@ import { defineComponent } from "vue";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { publicAuthorProfile } from "../utils/authorProfiles.js";
-import { articleCardImageUrl } from "../utils/contentfulImages.js";
+
+const WORDS_PER_MINUTE = 220;
+const ARTICLE_PAGE_SIZE = 8;
 
 export default defineComponent({
   name: "AuthorProfile",
@@ -47,6 +53,8 @@ export default defineComponent({
     return {
       author: publicAuthorProfile(),
       articles: [],
+      articlePageSize: ARTICLE_PAGE_SIZE,
+      visibleArticleCount: ARTICLE_PAGE_SIZE,
       progress: true,
     };
   },
@@ -73,12 +81,31 @@ export default defineComponent({
         .join("")
         .toUpperCase();
     },
+    displayedArticles() {
+      return this.articles.slice(0, this.visibleArticleCount);
+    },
+    canLoadMore() {
+      return this.visibleArticleCount < this.articles.length;
+    },
   },
   async mounted() {
     await this.loadAuthor();
   },
   methods: {
-    articleCardImageUrl,
+    readingTimeLabel(article = {}) {
+      const fields = article.fields || {};
+      const text = [fields.title, fields.description, fields.body].filter(Boolean).join(" ");
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      const minutes = Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
+
+      return `${minutes} min read`;
+    },
+    loadMoreArticles() {
+      this.visibleArticleCount = Math.min(this.visibleArticleCount + this.articlePageSize, this.articles.length);
+    },
+    showLessArticles() {
+      this.visibleArticleCount = this.articlePageSize;
+    },
     async loadAuthor() {
       this.progress = true;
 
@@ -92,6 +119,7 @@ export default defineComponent({
         const payload = await response.json();
         this.author = publicAuthorProfile(payload.author);
         this.articles = payload.articles || [];
+        this.visibleArticleCount = this.articlePageSize;
       } catch (error) {
         console.error("Erro ao carregar autor:", error);
         this.author = publicAuthorProfile();
@@ -176,24 +204,26 @@ export default defineComponent({
   }
 }
 
-.article-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+.article-list {
+  background: #ffffff;
+  border: 1px solid #d8e1e5;
 }
 
-.article-card {
-  overflow: hidden;
+.article-row {
+  border-bottom: 1px solid #d8e1e5;
 
-  a {
-    color: inherit;
-    text-decoration: none;
+  &:last-child {
+    border-bottom: 0;
   }
 
-  img {
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
-    width: 100%;
+  a {
+    align-items: center;
+    color: inherit;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 18px 20px;
+    text-decoration: none;
   }
 
   h3 {
@@ -203,8 +233,22 @@ export default defineComponent({
 
   p {
     color: #607d8b;
+    line-height: 1.45;
     margin: 0;
   }
+
+  span {
+    color: #607d8b;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+}
+
+.article-pagination {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  margin-top: 14px;
 }
 
 .empty-state {
@@ -213,6 +257,11 @@ export default defineComponent({
 
 @media (max-width: 640px) {
   .author-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .article-row a {
+    align-items: flex-start;
     grid-template-columns: minmax(0, 1fr);
   }
 }

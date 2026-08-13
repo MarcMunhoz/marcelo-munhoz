@@ -127,6 +127,12 @@
                     <q-btn v-if="canArchiveArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="archive" @click="archiveSelectedArticle(props.row)">
                       <q-tooltip>Archive</q-tooltip>
                     </q-btn>
+                    <q-btn v-if="canUnarchiveArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="unarchive" @click="unarchiveSelectedArticle(props.row)">
+                      <q-tooltip>Unarchive</q-tooltip>
+                    </q-btn>
+                    <q-btn v-if="canUnarchiveArticleAction(props.row, session)" dense flat round color="negative" icon="delete_forever" @click="openDeleteConfirmation(props.row)">
+                      <q-tooltip>Delete permanently</q-tooltip>
+                    </q-btn>
                   </q-td>
                 </template>
               </q-table>
@@ -152,7 +158,7 @@
                     </div>
                     <div class="owner-actions">
                       <q-btn dense unelevated color="blue-grey-8" icon="publish" label="Publish" :loading="loadingAction === `publish-${article.id}`" @click="publishSelectedArticle(article)" />
-                      <q-btn dense outline color="blue-grey-7" icon="archive" label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="archiveSelectedArticle(article)" />
+                      <q-btn v-if="canArchiveArticleAction(article, session)" dense outline color="blue-grey-7" icon="archive" label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="archiveSelectedArticle(article)" />
                     </div>
                   </div>
                 </article>
@@ -167,8 +173,6 @@
                     </div>
                     <div class="owner-actions">
                       <q-btn dense unelevated color="amber-9" icon="visibility_off" label="Unpublish" :loading="loadingAction === `unpublish-${article.id}`" @click="unpublishSelectedArticle(article)" />
-                      <q-btn dense outline color="blue-grey-7" icon="archive" label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="archiveSelectedArticle(article)" />
-                      <q-btn dense outline color="negative" icon="delete_forever" label="Delete permanently" @click="openDeleteConfirmation(article)" />
                     </div>
                   </div>
                 </article>
@@ -216,6 +220,7 @@ import {
   listAdminArticles,
   publishArticle,
   requestArticleUnpublication,
+  unarchiveArticle,
   unpublishArticle,
   adminUserMessage,
   AdminApiError,
@@ -228,6 +233,7 @@ import {
   canPrepareReviewAction,
   canConfirmArticleDeletion,
   canRequestUnpublicationAction,
+  canUnarchiveArticleAction,
   filterAdminArticles,
   ownerReviewQueues,
   removeArticleById,
@@ -260,6 +266,7 @@ export default defineComponent({
       deleteConfirmation: "",
       feedbackMessage: "",
       feedbackTone: "info",
+      feedbackTimer: null,
       dashboardError: "",
       loadingAction: "",
       articleColumns: [
@@ -276,12 +283,14 @@ export default defineComponent({
         { label: "Unpublished", value: "unpublished" },
         { label: "Unpublication requested", value: "unpublicationRequested" },
         { label: "In review", value: "review" },
+        { label: "Archived", value: "archived" },
       ],
       filterTabOptions: [
         { label: "All", value: "" },
         { label: "Drafts", value: "draft" },
         { label: "Review", value: "review" },
         { label: "Published", value: "published" },
+        { label: "Archived", value: "archived" },
       ],
     };
   },
@@ -321,6 +330,11 @@ export default defineComponent({
     this.sessionResolved = true;
     this.redirectToLoginIfSignedOut();
     this.loadArticleDashboard();
+  },
+  beforeUnmount() {
+    if (this.feedbackTimer) {
+      clearTimeout(this.feedbackTimer);
+    }
   },
   methods: {
     bindIdentityCallbacks() {
@@ -491,6 +505,9 @@ export default defineComponent({
     archiveSelectedArticle(article) {
       return this.runOwnerLifecycleAction(article, "archive", archiveArticle, "Article archived.", () => this.updateArticleStatus(article.id, "archived"));
     },
+    unarchiveSelectedArticle(article) {
+      return this.runOwnerLifecycleAction(article, "unarchive", unarchiveArticle, "Article unarchived.", () => this.updateArticleStatus(article.id, "draft"));
+    },
     openDeleteConfirmation(article) {
       if (!this.isOwner) {
         this.showFeedback("Only owners can perform this action.", "error");
@@ -522,8 +539,16 @@ export default defineComponent({
       this.showFeedback(adminUserMessage(error), "error");
     },
     showFeedback(message, tone = "info") {
+      if (this.feedbackTimer) {
+        clearTimeout(this.feedbackTimer);
+      }
+
       this.feedbackMessage = message;
       this.feedbackTone = tone;
+      this.feedbackTimer = setTimeout(() => {
+        this.feedbackMessage = "";
+        this.feedbackTimer = null;
+      }, 5000);
     },
   },
 });

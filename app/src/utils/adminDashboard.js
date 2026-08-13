@@ -364,7 +364,13 @@ export const canOwnerUnpublishAction = (article = {}, session) => {
 export const canArchiveArticleAction = (article = {}, session) => {
   article = article || {};
 
-  return Boolean(article.id && isOwner(session) && normalize(article.status) !== "archived");
+  return Boolean(article.id && isOwner(session) && ["draft", "review", "unpublished"].includes(normalize(article.status)));
+};
+
+export const canUnarchiveArticleAction = (article = {}, session) => {
+  article = article || {};
+
+  return Boolean(article.id && isOwner(session) && normalize(article.status) === "archived");
 };
 
 export const buildArticlePayload = (form = {}) => {
@@ -382,7 +388,7 @@ export const buildArticlePayload = (form = {}) => {
     description: String(form.description || "").trim(),
     body: form.body || "",
     createAt: form.createAt || "",
-    ...(thumbnail ? { thumbnail } : {}),
+    ...(thumbnail ? { cloudinary: [thumbnail] } : {}),
     alt: String(form.alt || "").trim(),
     author: String(form.authorEntryId || form.author || "").trim(),
     tags: tagList,

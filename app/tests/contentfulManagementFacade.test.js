@@ -68,7 +68,8 @@ describe("contentful management facade", () => {
       sys: { type: "Link", linkType: "Entry", id: "author-1" },
     });
     assert.equal(body.fields.writerSubject["en-US"], "writer-123");
-    assert.deepEqual(body.fields.thumbnail["en-US"], { public_id: "folder/image", secure_url: "https://example.invalid/image.jpg" });
+    assert.equal(body.fields.thumbnail, undefined);
+    assert.deepEqual(body.fields.cloudinary["en-US"], [{ public_id: "folder/image", secure_url: "https://example.invalid/image.jpg" }]);
     assert.equal(body.fields.alt["en-US"], "Draft thumbnail");
     assert.deepEqual(body.metadata.tags, [
       { sys: { type: "Link", linkType: "Tag", id: "vue" } },
@@ -125,7 +126,8 @@ describe("contentful management facade", () => {
     await facade.publishArticle({ articleId: "article-1", data: { version: 10 } });
     await facade.unpublishArticle({ articleId: "article-1", data: { version: 11 } });
     await facade.archiveArticle({ articleId: "article-1", data: { version: 12 } });
-    await facade.deleteArticle({ articleId: "article-1", data: { version: 13 } });
+    await facade.unarchiveArticle({ articleId: "article-1", data: { version: 13 } });
+    await facade.deleteArticle({ articleId: "article-1", data: { version: 14 } });
 
     assert.equal(calls[0].options.method, "PUT");
     assert.equal(new URL(calls[0].url).pathname, "/spaces/space-id/environments/staging/entries/article-1/published");
@@ -135,13 +137,20 @@ describe("contentful management facade", () => {
     assert.equal(new URL(calls[1].url).pathname, "/spaces/space-id/environments/staging/entries/article-1/published");
     assert.equal(calls[1].options.headers["x-contentful-version"], "11");
 
-    assert.equal(calls[2].options.method, "PUT");
-    assert.equal(new URL(calls[2].url).pathname, "/spaces/space-id/environments/staging/entries/article-1/archived");
-    assert.equal(calls[2].options.headers["x-contentful-version"], "12");
+    assert.equal(calls[2].options.method, "GET");
+    assert.equal(new URL(calls[2].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
 
-    assert.equal(calls[3].options.method, "DELETE");
-    assert.equal(new URL(calls[3].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
-    assert.equal(calls[3].options.headers["x-contentful-version"], "13");
+    assert.equal(calls[3].options.method, "PUT");
+    assert.equal(new URL(calls[3].url).pathname, "/spaces/space-id/environments/staging/entries/article-1/archived");
+    assert.equal(calls[3].options.headers["x-contentful-version"], "12");
+
+    assert.equal(calls[4].options.method, "DELETE");
+    assert.equal(new URL(calls[4].url).pathname, "/spaces/space-id/environments/staging/entries/article-1/archived");
+    assert.equal(calls[4].options.headers["x-contentful-version"], "13");
+
+    assert.equal(calls[5].options.method, "DELETE");
+    assert.equal(new URL(calls[5].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
+    assert.equal(calls[5].options.headers["x-contentful-version"], "14");
   });
 
   it("creates editorial workflow request entries for review and unpublication", async () => {

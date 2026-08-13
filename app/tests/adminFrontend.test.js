@@ -13,6 +13,7 @@ import {
   publishArticle,
   requestArticleUnpublication,
   submitArticleForReview,
+  unarchiveArticle,
   unpublishArticle,
   updateAuthorProfile,
   updateArticleDraft,
@@ -30,6 +31,7 @@ import {
   canOwnerUnpublishAction,
   canPrepareReviewAction,
   canRequestUnpublicationAction,
+  canUnarchiveArticleAction,
   createEmptyArticleForm,
   createEmptyAuthorProfileForm,
   filterAdminArticles,
@@ -115,6 +117,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(netlifyConfig, /script-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
     assert.match(netlifyConfig, /connect-src[^"]*https:\/\/identity\.netlify\.com/);
     assert.match(netlifyConfig, /frame-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
+    assert.match(netlifyConfig, /img-src[^"]*https:\/\/secure\.gravatar\.com/);
   });
 
   it("provides admin API helpers for draft and workflow requests", () => {
@@ -134,6 +137,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /publishArticle/);
     assert.match(api, /unpublishArticle/);
     assert.match(api, /archiveArticle/);
+    assert.match(api, /unarchiveArticle/);
     assert.match(api, /deleteArticle/);
     assert.match(api, /listMediaAssets/);
     assert.match(api, /getMediaEditorConfig/);
@@ -158,7 +162,8 @@ describe("admin frontend writer workflow", () => {
     await publishArticle({ articleId: "article-1", version: 7, session, fetchImpl });
     await unpublishArticle({ articleId: "article-1", version: 8, session, fetchImpl });
     await archiveArticle({ articleId: "article-1", version: 9, session, fetchImpl });
-    await deleteArticle({ articleId: "article-1", version: 10, session, fetchImpl });
+    await unarchiveArticle({ articleId: "article-1", version: 10, session, fetchImpl });
+    await deleteArticle({ articleId: "article-1", version: 11, session, fetchImpl });
 
     assert.deepEqual(
       calls.map((call) => [call.url, call.options.method, JSON.parse(call.options.body)]),
@@ -166,7 +171,8 @@ describe("admin frontend writer workflow", () => {
         ["/api/admin/contentful/articles/article-1/publish", "POST", { version: 7 }],
         ["/api/admin/contentful/articles/article-1/unpublish", "POST", { version: 8 }],
         ["/api/admin/contentful/articles/article-1/archive", "POST", { version: 9 }],
-        ["/api/admin/contentful/articles/article-1", "DELETE", { version: 10 }],
+        ["/api/admin/contentful/articles/article-1/unarchive", "POST", { version: 10 }],
+        ["/api/admin/contentful/articles/article-1", "DELETE", { version: 11 }],
       ]
     );
     assert.equal(calls[0].options.headers.Authorization, "Bearer owner-token");
@@ -423,7 +429,7 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
-  it("builds article payloads with hidden technical author, thumbnail, tag, and version state", () => {
+  it("builds article payloads with hidden technical author, Cloudinary media, tag, and version state", () => {
     const payload = buildArticlePayload({
       title: "  New Admin  ",
       slug: "new-admin",
@@ -445,7 +451,7 @@ describe("admin frontend writer workflow", () => {
       description: "Dashboard work",
       body: "# Body",
       createAt: "2026-08-11",
-      thumbnail: { public_id: "marcelo-munhoz-website/image", secure_url: "https://example.test/image.jpg" },
+      cloudinary: [{ public_id: "marcelo-munhoz-website/image", secure_url: "https://example.test/image.jpg" }],
       alt: "Admin screenshot",
       author: "authorEntry",
       tags: ["admin", "contentful"],
@@ -691,6 +697,7 @@ describe("admin frontend writer workflow", () => {
       { id: "own-draft", status: "draft", authorEntryId: "author-1" },
       { id: "own-review", status: "review", writerSubject: "writer-1" },
       { id: "own-published", status: "published", writerSubject: "writer-1" },
+      { id: "archived", status: "archived", writerSubject: "writer-1" },
       { id: "other-draft", status: "draft", authorEntryId: "author-2" },
     ];
 
@@ -705,6 +712,7 @@ describe("admin frontend writer workflow", () => {
         { id: "own-draft", edit: true, review: true, requestUnpublication: false },
         { id: "own-review", edit: true, review: false, requestUnpublication: false },
         { id: "own-published", edit: true, review: false, requestUnpublication: true },
+        { id: "archived", edit: false, review: false, requestUnpublication: false },
         { id: "other-draft", edit: false, review: false, requestUnpublication: false },
       ]
     );
@@ -716,12 +724,14 @@ describe("admin frontend writer workflow", () => {
         publish: canOwnerPublishAction(row, owner),
         unpublish: canOwnerUnpublishAction(row, owner),
         archive: canArchiveArticleAction(row, owner),
+        unarchive: canUnarchiveArticleAction(row, owner),
       })),
       [
-        { id: "own-draft", edit: false, publish: false, unpublish: false, archive: true },
-        { id: "own-review", edit: false, publish: true, unpublish: false, archive: true },
-        { id: "own-published", edit: false, publish: false, unpublish: true, archive: true },
-        { id: "other-draft", edit: false, publish: false, unpublish: false, archive: true },
+        { id: "own-draft", edit: false, publish: false, unpublish: false, archive: true, unarchive: false },
+        { id: "own-review", edit: false, publish: true, unpublish: false, archive: true, unarchive: false },
+        { id: "own-published", edit: false, publish: false, unpublish: true, archive: false, unarchive: false },
+        { id: "archived", edit: false, publish: false, unpublish: false, archive: false, unarchive: true },
+        { id: "other-draft", edit: false, publish: false, unpublish: false, archive: true, unarchive: false },
       ]
     );
   });
@@ -929,6 +939,11 @@ describe("admin frontend writer workflow", () => {
     assert.match(authorPage, /publicAuthorProfile/);
     assert.match(authorPage, /authorInitials/);
     assert.match(authorPage, /\.author-profile[\s\S]*max-width:\s*none/);
+    assert.match(authorPage, /displayedArticles/);
+    assert.match(authorPage, /readingTimeLabel/);
+    assert.match(authorPage, /Load more/);
+    assert.doesNotMatch(authorPage, /articleCardImageUrl/);
+    assert.doesNotMatch(authorPage, /article-grid/);
     assert.doesNotMatch(authorPage, /Identity|app_metadata|user_metadata|roles|invite|email/i);
   });
 

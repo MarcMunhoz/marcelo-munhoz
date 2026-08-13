@@ -34,6 +34,10 @@ export const adminUserMessage = (error, { media = false } = {}) => {
     return media ? "Your account cannot select media." : "Your account cannot perform this action.";
   }
 
+  if (!media && error.status === 400 && error.message) {
+    return error.message;
+  }
+
   if (media && error.status === 500 && /configuration|config/i.test(error.message || error.payload?.error || "")) {
     return "Media service is not configured for this environment.";
   }
@@ -185,6 +189,15 @@ export const unpublishArticle = ({ articleId, version, session, fetchImpl }) =>
 export const archiveArticle = ({ articleId, version, session, fetchImpl }) =>
   adminRequest({
     path: `/articles/${encodeURIComponent(articleId)}/archive`,
+    method: "POST",
+    body: { version },
+    session,
+    fetchImpl,
+  });
+
+export const unarchiveArticle = ({ articleId, version, session, fetchImpl }) =>
+  adminRequest({
+    path: `/articles/${encodeURIComponent(articleId)}/unarchive`,
     method: "POST",
     body: { version },
     session,
