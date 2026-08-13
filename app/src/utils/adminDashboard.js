@@ -179,6 +179,42 @@ export const createEmptyArticleForm = () => ({
   version: null,
 });
 
+export const createEmptyAuthorProfileForm = () => ({
+  id: "",
+  name: "",
+  slug: "",
+  biography: "",
+  photoUrl: "",
+  photoPublicId: "",
+  version: null,
+});
+
+export const authorProfileToForm = (profile = {}) => ({
+  ...createEmptyAuthorProfileForm(),
+  id: profile.id || "",
+  name: profile.name || "",
+  slug: profile.slug || "",
+  biography: profile.biography || "",
+  photoUrl: profile.photoUrl || profile.photo?.secure_url || profile.photo?.url || "",
+  photoPublicId: profile.photo?.public_id || profile.photoPublicId || "",
+  version: profile.version || null,
+});
+
+export const buildAuthorProfilePayload = (form = {}) => ({
+  name: String(form.name || "").trim(),
+  slug: String(form.slug || "").trim(),
+  biography: String(form.biography || "").trim(),
+  ...(form.photoPublicId || form.photoUrl
+    ? {
+        photo: {
+          public_id: String(form.photoPublicId || "").trim(),
+          secure_url: String(form.photoUrl || "").trim(),
+        },
+      }
+    : {}),
+  version: form.version,
+});
+
 export const summarizeArticleStatuses = (articles = []) =>
   articles.reduce(
     (summary, article) => {

@@ -5,6 +5,7 @@ import {
   CloudinaryMediaConfigurationError,
   CloudinaryMediaRequestError,
   ContentfulAdminConfigurationError,
+  ContentfulAuthorProfileResolutionError,
   ContentfulManagementRequestError,
   ContentfulVersionConflictError,
   createContentfulAdminHandler,
@@ -52,6 +53,134 @@ describe("contentful admin handler", () => {
         authorEntryId: "author-1",
       }
     );
+  });
+
+  it("rejects author profile operations when the session has no trusted author mapping", async () => {
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl: async () => {
+        throw new Error("Contentful should not be called");
+      },
+    });
+
+    await assert.rejects(() => facade.getAuthorProfile({ session: createSession(["writer"]) }), ContentfulAuthorProfileResolutionError);
+  });
+
+  it("loads the current user's Contentful author profile separately from Netlify Identity", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method });
+
+      assert.match(String(url), /\/entries\/author-1$/);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            sys: { id: "author-1", version: 11, contentType: { sys: { id: "author" } } },
+            fields: {
+              name: { "pt-BR": "Marcelo Munhoz" },
+              slug: { "pt-BR": "marcelo-munhoz" },
+              biography: {
+                "pt-BR": {
+                  nodeType: "document",
+                  data: {},
+                  content: [
+                    {
+                      nodeType: "paragraph",
+                      data: {},
+                      content: [{ nodeType: "text", value: "But first...", marks: [], data: {} }],
+                    },
+                  ],
+                },
+              },
+            },
+          };
+        },
+      };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const response = await facade.getAuthorProfile({ session: createSession(["writer"], { authorEntryId: "author-1" }) });
+
+    assert.deepEqual(response, {
+      profile: {
+        id: "author-1",
+        version: 11,
+        name: "Marcelo Munhoz",
+        slug: "marcelo-munhoz",
+        biography: "But first...",
+        photoUrl: "",
+      },
+    });
+    assert.deepEqual(calls, [{ url: "https://api.contentful.com/spaces/space-id/environments/master/entries/author-1", method: "GET" }]);
+  });
+
+  it("updates only public Contentful author profile fields", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method, headers: options.headers, body: options.body });
+
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              sys: { id: "author-1", version: 11, contentType: { sys: { id: "author" } } },
+              fields: {
+                name: { "pt-BR": "Old Name" },
+                biography: { "pt-BR": { nodeType: "document", data: {}, content: [] } },
+                internalNote: { "pt-BR": "keep me" },
+              },
+            };
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { sys: { id: "author-1", version: 12 } };
+        },
+      };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const response = await facade.updateAuthorProfile({
+      data: { name: "Marcelo Munhoz", slug: "marcelo-munhoz", biography: "Updated bio", version: 11 },
+      session: createSession(["writer"], { authorEntryId: "author-1" }),
+    });
+    const body = JSON.parse(calls[1].body);
+
+    assert.deepEqual(response, { sys: { id: "author-1", version: 12 } });
+    assert.equal(calls[1].method, "PUT");
+    assert.equal(calls[1].headers["x-contentful-version"], "11");
+    assert.equal(body.fields.name["pt-BR"], "Marcelo Munhoz");
+    assert.equal(body.fields.slug["pt-BR"], "marcelo-munhoz");
+    assert.equal(body.fields.biography["pt-BR"].nodeType, "document");
+    assert.equal(body.fields.biography["pt-BR"].content[0].content[0].value, "Updated bio");
+    assert.equal(body.fields.internalNote["pt-BR"], "keep me");
+    assert.doesNotMatch(calls[1].body, /app_metadata|user_metadata|email|roles/i);
   });
 
   it("rejects unauthenticated admin API requests without running an operation", async () => {
@@ -102,6 +231,8 @@ describe("contentful admin handler", () => {
       ["PUT", "/articles/article-1", "updateArticleDraft"],
       ["POST", "/articles/article-1/submit", "submitArticleForReview"],
       ["POST", "/articles/article-1/unpublication-requests", "requestUnpublication"],
+      ["GET", "/author-profile", "getAuthorProfile"],
+      ["PUT", "/author-profile", "updateAuthorProfile"],
       ["GET", "/media/assets", "listMedia"],
       ["POST", "/media/upload", "uploadMedia"],
     ]) {
@@ -141,6 +272,30 @@ describe("contentful admin handler", () => {
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(parse(response), { writer: "user-123" });
+  });
+
+  it("authorizes author profile routes before loading or updating Contentful data", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession() {
+        return createSession(["writer"], { authorEntryId: "author-1" });
+      },
+      operations: {
+        async getAuthorProfile({ session }) {
+          return { profile: { id: session.authorEntryId } };
+        },
+        async updateAuthorProfile({ data, session }) {
+          return { sys: { id: session.authorEntryId }, fields: data };
+        },
+      },
+    });
+
+    const getResponse = await handler({ method: "GET", path: "/author-profile" });
+    const putResponse = await handler({ method: "PUT", path: "/author-profile", body: JSON.stringify({ name: "Marcelo Munhoz", version: 7 }) });
+
+    assert.equal(getResponse.statusCode, 200);
+    assert.deepEqual(parse(getResponse), { profile: { id: "author-1" } });
+    assert.equal(putResponse.statusCode, 200);
+    assert.deepEqual(parse(putResponse), { sys: { id: "author-1" }, fields: { name: "Marcelo Munhoz", version: 7 } });
   });
 
   it("rejects writer sessions before owner-only operations run", async () => {

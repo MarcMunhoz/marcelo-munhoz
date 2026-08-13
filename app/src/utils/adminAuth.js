@@ -107,6 +107,28 @@ export const adminSessionDisplay = (session) => {
   };
 };
 
+export const adminAccountInitials = (session) => {
+  const display = adminSessionDisplay(session);
+  const parts = String(display.name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (display.preview) {
+    return display.role.slice(0, 1).toUpperCase();
+  }
+
+  if (parts.length === 0 || display.name === "Signed out") {
+    return "AD";
+  }
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+};
+
 export const signOutAdmin = async ({ identity = globalThis.netlifyIdentity, confirmImpl = globalThis.confirm } = {}) => {
   if (typeof confirmImpl === "function" && !confirmImpl("Sign out of the admin area?")) {
     return false;

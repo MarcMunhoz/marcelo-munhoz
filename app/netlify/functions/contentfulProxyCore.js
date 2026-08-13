@@ -122,6 +122,31 @@ const createRuntimeClient = (env, fetchImpl) => {
   };
 };
 
+const publicAuthorProfile = (entry = {}) => {
+  const fields = entry.fields || {};
+  const biography = fields.biography;
+  const photo = fields.photo || fields.avatar;
+  const textFromNode = (node = {}) => {
+    if (typeof node === "string") {
+      return node;
+    }
+
+    const own = typeof node.value === "string" ? node.value : "";
+    const children = Array.isArray(node.content) ? node.content.map(textFromNode).join("") : "";
+    return `${own}${children}`;
+  };
+
+  return {
+    sys: { id: entry.sys?.id || "" },
+    fields: {
+      name: fields.name || "",
+      slug: fields.slug || entry.sys?.id || "",
+      biography: typeof biography === "string" ? biography : textFromNode(biography).trim(),
+      ...(photo ? { photo } : {}),
+    },
+  };
+};
+
 export const createContentfulHandler = ({ client, env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) => {
   const getClient = () => client || createRuntimeClient(env, fetchImpl);
 
@@ -200,6 +225,44 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
       } catch (error) {
         logger.error("Contentful proxy request failed:", error?.message || error);
         return jsonResponse(500, { error: "Failed to fetch article" });
+      }
+    }
+
+    if (routePath.startsWith("/author/")) {
+      const contentfulClient = getClient();
+
+      if (!contentfulClient) {
+        logger.error("Contentful runtime configuration is missing");
+        return jsonResponse(500, { error: "Server configuration error" });
+      }
+
+      try {
+        const slug = decodeURIComponent(routePath.replace("/author/", ""));
+        const authorEntries = await contentfulClient.getEntries({
+          content_type: "author",
+          "fields.slug": slug,
+          limit: 1,
+        });
+
+        if (authorEntries.items.length === 0) {
+          return jsonResponse(404, { error: "Author not found" });
+        }
+
+        const author = publicAuthorProfile(authorEntries.items[0]);
+        const articles = await contentfulClient.getEntries({
+          content_type: "article",
+          "fields.author.sys.id": author.sys.id,
+          order: "-fields.createAt",
+          limit: 100,
+        });
+
+        return jsonResponse(200, {
+          author,
+          articles: articles.items || [],
+        });
+      } catch (error) {
+        logger.error("Contentful proxy request failed:", error?.message || error);
+        return jsonResponse(500, { error: "Failed to fetch author" });
       }
     }
 

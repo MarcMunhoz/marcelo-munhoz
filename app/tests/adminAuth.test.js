@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { adminSessionDisplay, createPreviewSession, getAdminSession, openAdminLogin, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
+import { adminAccountInitials, adminSessionDisplay, createPreviewSession, getAdminSession, openAdminLogin, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
 
 describe("admin auth preview sessions", () => {
   it("uses owner as the default local preview role for full admin testing", () => {
@@ -98,6 +98,13 @@ describe("admin auth preview sessions", () => {
       preview: true,
       canSignOut: false,
     });
+  });
+
+  it("formats account menu initials without requiring a profile photo", () => {
+    assert.equal(adminAccountInitials({ name: "Marcelo Munhoz", roles: ["owner"] }), "MM");
+    assert.equal(adminAccountInitials({ name: "Guest", roles: ["writer"] }), "G");
+    assert.equal(adminAccountInitials(createPreviewSession({ role: "writer" })), "W");
+    assert.equal(adminAccountInitials(null), "AD");
   });
 
   it("falls back to the Netlify Identity login route when the widget is unavailable", () => {

@@ -9,8 +9,12 @@
         {{ article.description }}
       </div>
       <cite class="block not-italic">
-        Por <strong>{{ articleAuthor }}</strong
-        ><br />
+        Por
+        <router-link v-if="articleAuthorSlug" :to="{ name: 'Author', params: { slug: articleAuthorSlug } }" class="author-link">
+          <strong>{{ articleAuthor }}</strong>
+        </router-link>
+        <strong v-else>{{ articleAuthor }}</strong>
+        <br />
         em {{ formatDate(article.createAt, "pt-br") }}
       </cite>
 
@@ -95,6 +99,7 @@ import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
+import { articleAuthorProfile } from "../utils/authorProfiles.js";
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
 export default defineComponent({
@@ -104,6 +109,7 @@ export default defineComponent({
       article: {},
       articleImg: "",
       articleAuthor: "",
+      articleAuthorSlug: "",
       articleTags: [],
       createAt: null,
       progress: true,
@@ -181,7 +187,9 @@ export default defineComponent({
 
         this.createAt = article.sys.createdAt;
         this.article = article.fields;
-        this.articleAuthor = article.fields.author.fields.name;
+        const author = articleAuthorProfile(article);
+        this.articleAuthor = author.name;
+        this.articleAuthorSlug = author.slug;
         this.articleImg = articleHeroImageUrl(article.fields);
 
         const rawBody = article.fields.body;
@@ -258,6 +266,13 @@ export default defineComponent({
       color: $blue-grey-3;
     }
   }
+}
+
+.author-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 :deep(.rendered-text) {
