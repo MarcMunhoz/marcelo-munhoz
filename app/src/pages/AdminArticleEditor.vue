@@ -8,6 +8,20 @@
           <p>{{ articleForm.id ? articleForm.title : "Create a new draft for review." }}</p>
         </div>
         <div class="editor-heading-actions">
+          <div class="article-language-switch" role="group" aria-label="Article language">
+            <span :class="{ active: articleForm.locale === 'pt-BR' }">PT</span>
+            <q-btn-toggle
+              v-model="articleForm.locale"
+              class="article-locale-toggle"
+              dense
+              no-caps
+              unelevated
+              toggle-color="blue-grey-7"
+              :options="articleLocaleOptions"
+              aria-label="Article language"
+            />
+            <span :class="{ active: articleForm.locale === 'en-US' }">EN</span>
+          </div>
           <q-badge outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
           <q-btn outline color="blue-grey-7" icon="arrow_back" label="Dashboard" no-caps @click="leaveEditor" />
         </div>
@@ -92,16 +106,6 @@
 
           <div class="form-row">
             <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
-            <q-btn-toggle
-              v-model="articleForm.locale"
-              class="article-locale-toggle"
-              dense
-              no-caps
-              outline
-              toggle-color="blue-grey-7"
-              :options="articleLocaleOptions"
-              aria-label="Article language"
-            />
             <q-input v-model="articleForm.authorName" label="Author" outlined dense readonly :error="Boolean(errors.author)" :error-message="errors.author">
               <template #prepend>
                 <q-icon name="person" />
@@ -358,8 +362,8 @@ export default defineComponent({
         { label: "Preview", value: "preview" },
       ],
       articleLocaleOptions: [
-        { label: "Portuguese", value: "pt-BR" },
-        { label: "English", value: "en-US" },
+        { label: "PT", value: "pt-BR" },
+        { label: "EN", value: "en-US" },
       ],
       loadedArticle: null,
       statusMessage: "",
@@ -968,6 +972,34 @@ export default defineComponent({
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.article-language-switch {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #b0bec5;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: auto auto auto;
+  min-height: 38px;
+  padding: 4px 8px;
+
+  span {
+    color: #90a4ae;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  span.active {
+    color: #263238;
+  }
+}
+
+.article-locale-toggle {
+  border: 1px solid #cfd8dc;
+  border-radius: 999px;
+  overflow: hidden;
 }
 
 .admin-kicker {

@@ -224,6 +224,25 @@ const normalizedTagIds = (tags = []) =>
 
 const tagsFromIds = (tags = []) => normalizedTagIds(tags).map((id) => contentfulLink("Tag", id));
 
+const ARTICLE_LANGUAGE_TAGS = {
+  "pt-BR": "article-lang-pt-br",
+  "en-US": "article-lang-en-us",
+};
+
+const articleLocaleFromTagIds = (tags = []) => {
+  if (tags.includes(ARTICLE_LANGUAGE_TAGS["en-US"])) {
+    return "en-US";
+  }
+
+  if (tags.includes(ARTICLE_LANGUAGE_TAGS["pt-BR"])) {
+    return "pt-BR";
+  }
+
+  return "";
+};
+
+const isArticleLanguageTag = (tagId = "") => Object.values(ARTICLE_LANGUAGE_TAGS).includes(tagId);
+
 const existingTagIds = async ({ request }) => {
   const payload = await request({ method: "GET", path: "/tags?limit=1000" });
   return new Set((payload.items || []).map((tag) => tag?.sys?.id).filter(Boolean));
@@ -243,15 +262,46 @@ const tagIdFromName = (name = "") =>
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-const filterExistingTagIds = async ({ tags, request }) => {
+const filterExistingTagIds = async ({ tags, request, extraTags = [] }) => {
   const ids = normalizedTagIds(tags);
+  const extraIds = normalizedTagIds(extraTags);
 
-  if (ids.length === 0) {
+  if (ids.length === 0 && extraIds.length === 0) {
     return [];
   }
 
   const existingIds = await existingTagIds({ request });
-  return ids.filter((id) => existingIds.has(id));
+  return [...ids.filter((id) => existingIds.has(id)), ...extraIds];
+};
+
+const ensureArticleLanguageTag = async ({ locale, request }) => {
+  const tagId = ARTICLE_LANGUAGE_TAGS[locale];
+
+  if (!tagId || typeof request !== "function") {
+    return [];
+  }
+
+  try {
+    await request({
+      method: "PUT",
+      path: `/tags/${encodeURIComponent(tagId)}`,
+      headers: {
+        "x-contentful-tag-visibility": "private",
+      },
+      body: {
+        name: locale === "en-US" ? "Article language: English" : "Article language: Portuguese",
+        sys: {
+          id: tagId,
+          type: "Tag",
+          visibility: "private",
+        },
+      },
+    });
+
+    return [tagId];
+  } catch {
+    return [];
+  }
 };
 
 const thumbnailFromData = (data = {}) => data.thumbnail || (Array.isArray(data.cloudinary) ? data.cloudinary[0] : undefined);
@@ -368,10 +418,19 @@ const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
     };
   }
 
-  const tagIds = request && Array.isArray(data.tags) ? await filterExistingTagIds({ tags: data.tags, request }) : normalizedTagIds(data.tags);
-  const writeLocales = await articleWriteLocales({ locale, request });
   const supportedFieldIds =
     data.updatedAt || data.locale ? await contentTypeFieldIds({ contentTypeId: "article", request }) : null;
+  const editorialLocale = ["pt-BR", "en-US"].includes(String(data.locale || "").trim()) ? String(data.locale).trim() : "";
+  const shouldStoreLocaleAsTag = editorialLocale && !optionalContentTypeSupportsField(supportedFieldIds, "locale");
+  const tagIds =
+    request && Array.isArray(data.tags)
+      ? await filterExistingTagIds({
+          tags: data.tags,
+          request,
+          extraTags: shouldStoreLocaleAsTag ? await ensureArticleLanguageTag({ locale: editorialLocale, request }) : [],
+        })
+      : normalizedTagIds(data.tags);
+  const writeLocales = await articleWriteLocales({ locale, request });
 
   return {
     fields: articleFieldsFromData(data, writeLocales, { supportedFieldIds }),
@@ -502,7 +561,9 @@ const normalizeCloudinaryAsset = (asset = {}) => {
   return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== undefined && value !== null && value !== ""));
 };
 
-const normalizedTags = (metadata = {}) => (metadata.tags || []).map((tag) => tag?.sys?.id).filter(Boolean);
+const allNormalizedTags = (metadata = {}) => (metadata.tags || []).map((tag) => tag?.sys?.id).filter(Boolean);
+
+const normalizedTags = (metadata = {}) => allNormalizedTags(metadata).filter((tagId) => !isArticleLanguageTag(tagId));
 
 const contentTypeIdFromEntry = (entry = {}) => entry.sys?.contentType?.sys?.id || "";
 
@@ -661,6 +722,7 @@ const articleDataForSession = (data = {}, session = {}) => ({
 const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
   const fields = entry.fields || {};
   const authorData = normalizedAuthor(resolvedEntry(firstLocalizedValue(fields, "author", locale), entryMap), locale);
+  const tagIds = allNormalizedTags(entry.metadata);
 
   return {
     id: entry.sys?.id || "",
@@ -668,6 +730,9 @@ const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
     slug: firstLocalizedValue(fields, "slug", locale) || "",
     description: firstLocalizedValue(fields, "description", locale) || "",
     body: firstLocalizedValue(fields, "body", locale) || "",
+    ...(firstLocalizedValue(fields, "locale", locale) || articleLocaleFromTagIds(tagIds)
+      ? { locale: firstLocalizedValue(fields, "locale", locale) || articleLocaleFromTagIds(tagIds) }
+      : {}),
     createAt: firstLocalizedValue(fields, "createAt", locale) || entry.sys?.createdAt || "",
     thumbnail: firstLocalizedValue(fields, "thumbnail", locale) || firstLocalizedValue(fields, "cloudinary", locale)?.[0],
     alt: firstLocalizedValue(fields, "alt", locale) || "",

@@ -1033,6 +1033,7 @@ describe("admin frontend writer workflow", () => {
     assert.doesNotMatch(page, /v-model="articleForm\./);
 
     assert.match(editor, /:model-value="articleForm\.title"/);
+    assert.match(editor, /class="editor-heading-actions"[\s\S]*class="article-language-switch"/);
     assert.match(editor, /q-btn-toggle[\s\S]*articleForm\.locale/);
     assert.match(editor, /articleLocaleOptions/);
 
@@ -1189,7 +1190,13 @@ describe("admin frontend writer workflow", () => {
     const article = read("../src/components/BlogArticle.vue");
 
     assert.match(article, /articleLocaleFromArticle/);
+    assert.match(article, /isArticleLanguageTag/);
     assert.deepEqual(articleBylineLabels("", { title: "During 9 years my career changed", body: "When I decide to write about software" }), {
+      by: "By",
+      on: "on",
+      updated: "Updated on",
+    });
+    assert.deepEqual(articleBylineLabels("", { tags: ["article-lang-en-us"], title: "Texto misto" }), {
       by: "By",
       on: "on",
       updated: "Updated on",

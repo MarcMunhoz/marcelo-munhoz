@@ -4,10 +4,28 @@ export const normalizeArticleLocale = (locale = "", fallbackLocale = "pt-BR") =>
   return ["pt-BR", "en-US"].includes(normalized) ? normalized : fallbackLocale;
 };
 
+export const articleLocaleFromTags = (tags = []) => {
+  const tagIds = (Array.isArray(tags) ? tags : [])
+    .map((tag) => tag?.sys?.id || tag?.id || tag)
+    .map((tag) => String(tag || "").trim());
+
+  if (tagIds.includes("article-lang-en-us")) {
+    return "en-US";
+  }
+
+  if (tagIds.includes("article-lang-pt-br")) {
+    return "pt-BR";
+  }
+
+  return "";
+};
+
+export const isArticleLanguageTag = (tag = "") => ["article-lang-en-us", "article-lang-pt-br"].includes(String(tag || "").trim());
+
 const normalizedLocale = (locale = "") => String(locale || "").trim() || "pt-BR";
 
 export const articleLocaleFromArticle = (article = {}, fallbackLocale = "pt-BR") => {
-  const explicitLocale = article.locale || article.language || article.lang;
+  const explicitLocale = article.locale || article.language || article.lang || articleLocaleFromTags(article.tags || article.metadata?.tags);
 
   if (explicitLocale) {
     return explicitLocale;

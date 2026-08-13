@@ -103,7 +103,7 @@ import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
-import { articleBylineLabels, articleLocaleFromArticle, publicArticleDates } from "../utils/articleDates.js";
+import { articleBylineLabels, articleLocaleFromArticle, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
 import { articleAuthorProfile } from "../utils/authorProfiles.js";
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
@@ -193,7 +193,7 @@ export default defineComponent({
 
         this.createAt = article.sys.createdAt;
         this.article = article.fields;
-        this.articleLocale = articleLocaleFromArticle(article.fields, this.articleLocale);
+        this.articleLocale = articleLocaleFromArticle({ ...article.fields, metadata: article.metadata }, this.articleLocale);
         const author = articleAuthorProfile(article);
         this.articleAuthor = author.name;
         this.articleAuthorSlug = author.slug;
@@ -216,7 +216,7 @@ export default defineComponent({
         document.querySelector(".rendered-text").innerHTML = linkToIframe;
 
         const hashtags = article.metadata?.tags || [];
-        this.articleTags = hashtags.map((tag) => tag.sys.id);
+        this.articleTags = hashtags.map((tag) => tag.sys.id).filter((tag) => !isArticleLanguageTag(tag));
 
         const headerArticleName = document.querySelector(".header-title");
         if (headerArticleName) {

@@ -523,7 +523,7 @@ describe("contentful admin handler", () => {
               items: [
                 {
                   sys: { id: "article-1", version: 7, publishedVersion: 5, updatedAt: "2026-08-11T10:00:00Z", contentType: { sys: { id: "article" } } },
-                  metadata: { tags: [{ sys: { id: "contentful" } }] },
+                  metadata: { tags: [{ sys: { id: "contentful" } }, { sys: { id: "article-lang-en-us" } }] },
                   fields: {
                     title: { "pt-BR": "Published article" },
                     slug: { "pt-BR": "published-article" },
@@ -589,6 +589,7 @@ describe("contentful admin handler", () => {
         authorEntryId: article.authorEntryId,
         tags: article.tags,
         requestId: article.requestId,
+        locale: article.locale,
       })),
       [
         {
@@ -599,6 +600,7 @@ describe("contentful admin handler", () => {
           authorEntryId: "author-1",
           tags: ["contentful"],
           requestId: undefined,
+          locale: "en-US",
         },
         {
           id: "article-2",
@@ -608,6 +610,7 @@ describe("contentful admin handler", () => {
           authorEntryId: "author-2",
           tags: [],
           requestId: "request-1",
+          locale: undefined,
         },
       ]
     );

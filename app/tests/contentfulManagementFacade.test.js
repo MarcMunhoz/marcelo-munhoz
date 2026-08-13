@@ -216,6 +216,64 @@ describe("contentful management facade", () => {
     assert.equal(body.fields.locale["en-US"], "pt-BR");
   });
 
+  it("persists editorial article locale as internal metadata when the model has no locale field", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (url.toString().endsWith("/tags?limit=1000")) {
+          return createResponse(200, {
+            items: [
+              { sys: { id: "ai" } },
+              { sys: { id: "article-lang-en-us" } },
+            ],
+          });
+        }
+
+        if (url.toString().endsWith("/locales")) {
+          return createResponse(200, {
+            items: [{ code: "en-US", default: true }],
+          });
+        }
+
+        if (url.toString().endsWith("/content_types/article")) {
+          return createResponse(200, {
+            fields: [{ id: "title" }, { id: "slug" }, { id: "description" }, { id: "body" }, { id: "createAt" }, { id: "author" }],
+          });
+        }
+
+        return createResponse(201, { sys: { id: "article-1", version: 1 } });
+      },
+    });
+
+    await facade.createArticleDraft({
+      data: {
+        title: "Draft title",
+        slug: "draft-title",
+        description: "Draft description",
+        body: "# Draft",
+        createAt: "2026-08-11",
+        locale: "en-US",
+        author: "author-1",
+        tags: ["ai"],
+      },
+      session: { subject: "writer-123", authorEntryId: "author-1" },
+    });
+
+    const createCall = calls.find((call) => call.options.method === "POST");
+    const languageTagCall = calls.find((call) => call.options.method === "PUT" && call.url.endsWith("/tags/article-lang-en-us"));
+    const body = JSON.parse(createCall.options.body);
+
+    assert.equal(languageTagCall.options.headers["x-contentful-tag-visibility"], "private");
+    assert.equal(body.fields.locale, undefined);
+    assert.deepEqual(body.metadata.tags, [
+      { sys: { type: "Link", linkType: "Tag", id: "ai" } },
+      { sys: { type: "Link", linkType: "Tag", id: "article-lang-en-us" } },
+    ]);
+  });
+
   it("updates article drafts with the supplied version header", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({
