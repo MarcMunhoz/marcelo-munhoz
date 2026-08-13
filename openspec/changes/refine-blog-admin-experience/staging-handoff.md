@@ -64,11 +64,11 @@ The owner-name fallback exists only to support legacy owner-authored content alr
 
 ## Resume Checklist
 
-- Wait for the latest staging deploy to finish.
-- Hard refresh `/admin` in the staging branch deploy.
-- Confirm login closes automatically after successful sign-in.
-- Confirm a new article title fills the slug until the slug is manually edited.
-- Confirm owner edit buttons remain visible for owner-authored rows.
-- Reopen media library and confirm existing Cloudinary assets appear.
+- Staging deploy completed.
+- `/admin` was hard refreshed in the staging branch deploy.
+- Login closes automatically after successful sign-in.
+- A new article title fills the slug until the slug is manually edited.
+- Owner edit buttons remain visible for owner-authored rows.
+- Existing Cloudinary assets appear in the media library.
 - Keep the Cloudinary API user on `Master Admin` while this admin workflow uses the Admin API resource list.
 - If Cloudinary exposes narrower account roles later, retest resource listing and upload before reducing permissions.

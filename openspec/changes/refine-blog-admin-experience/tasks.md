@@ -63,4 +63,4 @@
 - [x] 9.2 Run lint, build validation, and frontend credential scanning in the container context.
 - [x] 9.3 Run `openspec validate refine-blog-admin-experience --strict`.
 - [x] 9.4 Document optional staging smoke checks for Netlify Identity login/logout, role metadata, admin Function redirects, Contentful operations, and Cloudinary listing/upload using disposable content.
-- [ ] 9.5 When production-like behavior must be verified, push to `staging` and complete the documented smoke checks before merging onward. Staging smoke is partially complete; see `staging-handoff.md` for confirmed behavior and the remaining Cloudinary media-library diagnostic.
+- [x] 9.5 When production-like behavior must be verified, push to `staging` and complete the documented smoke checks before merging onward.
