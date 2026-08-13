@@ -201,8 +201,8 @@ export default defineComponent({
         errors.name = "Name is required";
       }
 
-      if (this.profileForm.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(this.profileForm.slug)) {
-        errors.slug = "Use a URL-safe slug";
+      if (this.profileForm.slug && !/^[a-z]+(?:-[a-z]+)*$/.test(this.profileForm.slug)) {
+        errors.slug = "Use letters and hyphens only";
       }
 
       if (!this.profileForm.slug && this.profileForm.name) {

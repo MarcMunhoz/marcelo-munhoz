@@ -8,6 +8,7 @@ import {
   getMediaEditorConfig,
   getAuthorProfile,
   createArticleDraft,
+  createContentfulTag,
   deleteArticle,
   listContentfulTags,
   listAdminArticles,
@@ -132,6 +133,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /\/media\/editor-config/);
     assert.match(api, /\/author-profile/);
     assert.match(api, /createArticleDraft/);
+    assert.match(api, /createContentfulTag/);
     assert.match(api, /updateArticleDraft/);
     assert.match(api, /getAuthorProfile/);
     assert.match(api, /updateAuthorProfile/);
@@ -168,6 +170,27 @@ describe("admin frontend writer workflow", () => {
     assert.equal(calls[0].url, "/api/admin/contentful/tags");
     assert.equal(calls[0].options.method, "GET");
     assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
+  });
+
+  it("creates new public Contentful tags before selecting them in the editor", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { tag: { id: "teste-kurumin", label: "Teste Kurumin", visibility: "public" } };
+        },
+      };
+    };
+
+    const result = await createContentfulTag({ name: "Teste Kurumin", session: { token: "writer-token" }, fetchImpl });
+
+    assert.deepEqual(result, { tag: { id: "teste-kurumin", label: "Teste Kurumin", visibility: "public" } });
+    assert.equal(calls[0].url, "/api/admin/contentful/tags");
+    assert.equal(calls[0].options.method, "POST");
+    assert.deepEqual(JSON.parse(calls[0].options.body), { name: "Teste Kurumin" });
   });
 
   it("calls owner lifecycle endpoints with version state and server authorization", async () => {
@@ -571,6 +594,7 @@ describe("admin frontend writer workflow", () => {
   it("derives URL-safe slugs from new article titles", () => {
     assert.equal(slugFromTitle("Inteligência Artificial para developers e creators"), "inteligencia-artificial-para-developers-e-creators");
     assert.equal(slugFromTitle("  Vue, Contentful & Cloudinary!  "), "vue-contentful-cloudinary");
+    assert.equal(slugFromTitle("Inteligência Artificial para developers e creators 123456"), "inteligencia-artificial-para-developers-e-creators");
   });
 
   it("auto-fills new article slugs from title input until the slug is edited", () => {
@@ -1004,6 +1028,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /q-select[\s\S]*v-model="articleForm\.tagList"/);
     assert.match(editor, /availableTagOptions/);
     assert.match(editor, /loadContentfulTags/);
+    assert.match(editor, /@new-value="createNewContentfulTag"/);
     assert.doesNotMatch(editor, /@keyup\.enter\.prevent="addTagToArticleForm"/);
     assert.match(editor, /articleForm\.tagList/);
     assert.match(editor, /removeTagFromArticleForm/);

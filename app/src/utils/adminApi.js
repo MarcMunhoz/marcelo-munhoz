@@ -143,6 +143,15 @@ export const listContentfulTags = ({ session, fetchImpl } = {}) =>
     fetchImpl,
   });
 
+export const createContentfulTag = ({ name, session, fetchImpl } = {}) =>
+  adminRequest({
+    path: "/tags",
+    method: "POST",
+    body: { name },
+    session,
+    fetchImpl,
+  });
+
 export const getMediaEditorConfig = ({ session, fetchImpl } = {}) =>
   adminRequest({
     path: "/media/editor-config",

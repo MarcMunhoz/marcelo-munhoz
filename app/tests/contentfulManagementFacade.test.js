@@ -263,6 +263,35 @@ describe("contentful management facade", () => {
     assert.equal(new URL(calls[0].url).searchParams.get("limit"), "1000");
   });
 
+  it("creates public Contentful metadata tags with normalized tag ids", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        return createResponse(201, {
+          name: "Teste Kurumin",
+          sys: { id: "teste-kurumin", visibility: "public" },
+        });
+      },
+    });
+
+    const result = await facade.createTag({ data: { name: "Teste Kurumin" } });
+
+    assert.deepEqual(result, { tag: { id: "teste-kurumin", label: "Teste Kurumin", visibility: "public" } });
+    assert.equal(calls[0].options.method, "PUT");
+    assert.equal(new URL(calls[0].url).pathname, "/spaces/space-id/environments/staging/tags/teste-kurumin");
+    assert.equal(calls[0].options.headers["x-contentful-tag-visibility"], "public");
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      name: "Teste Kurumin",
+      sys: {
+        id: "teste-kurumin",
+        type: "Tag",
+        visibility: "public",
+      },
+    });
+  });
+
   it("creates editorial workflow request entries for review and unpublication", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({

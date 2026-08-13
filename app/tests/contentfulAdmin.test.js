@@ -352,6 +352,7 @@ describe("contentful admin handler", () => {
       ["GET", "/media/editor-config", "getMediaEditorConfig"],
       ["POST", "/media/upload", "uploadMedia"],
       ["GET", "/tags", "listTags"],
+      ["POST", "/tags", "createTag"],
     ]) {
       let operationRan = false;
       const handler = createContentfulAdminHandler({
@@ -459,6 +460,27 @@ describe("contentful admin handler", () => {
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(parse(response), { tags: [{ id: "AI", label: "AI" }], requestedBy: "user-123" });
+  });
+
+  it("allows writer sessions to create public Contentful tags for article editing", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession() {
+        return createSession(["writer"]);
+      },
+      operations: {
+        async createTag({ data, session }) {
+          return { tag: { id: "teste-kurumin", label: data.name, visibility: "public" }, requestedBy: session.subject };
+        },
+      },
+    });
+
+    const response = await handler({ method: "POST", path: "/tags", body: JSON.stringify({ name: "Teste Kurumin" }) });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(parse(response), {
+      tag: { id: "teste-kurumin", label: "Teste Kurumin", visibility: "public" },
+      requestedBy: "user-123",
+    });
   });
 
   it("allows owner sessions to reach owner-only routes", async () => {

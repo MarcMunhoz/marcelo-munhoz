@@ -234,6 +234,14 @@ const normalizedContentfulTag = (tag = {}) => ({
   visibility: tag?.sys?.visibility || "",
 });
 
+const tagIdFromName = (name = "") =>
+  String(name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const filterExistingTagIds = async ({ tags, request }) => {
   const ids = normalizedTagIds(tags);
 
@@ -931,6 +939,34 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         tags: (payload.items || []).map(normalizedContentfulTag).filter((tag) => tag.id),
       };
     },
+    async createTag({ data = {} } = {}) {
+      const name = String(data.name || "").trim();
+      const tagId = tagIdFromName(name);
+
+      if (!name || !tagId) {
+        throw new ContentfulAdminLifecycleError("Tag name is required.");
+      }
+
+      const payload = await request({
+        method: "PUT",
+        path: `/tags/${encodeURIComponent(tagId)}`,
+        headers: {
+          "x-contentful-tag-visibility": "public",
+        },
+        body: {
+          name,
+          sys: {
+            id: tagId,
+            type: "Tag",
+            visibility: "public",
+          },
+        },
+      });
+
+      return {
+        tag: normalizedContentfulTag(payload),
+      };
+    },
     async createArticleDraft({ data, session }) {
       const config = managementConfigFromEnv(env, fetchImpl);
       const authorResolution = await resolveSessionAuthorProfile({ session, config });
@@ -1225,6 +1261,15 @@ export const createContentfulAdminHandler = ({
         role: "writer",
         operation: adminOperations.listTags,
         payload: {},
+      });
+    }
+
+    if (requestMethod === "POST" && routePath === "/tags") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.createTag,
+        payload: { data },
       });
     }
 

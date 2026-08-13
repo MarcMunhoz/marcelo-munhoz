@@ -14,7 +14,7 @@ export const slugFromTitle = (title = "") =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^a-z]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
 const humanDateFormatter = new Intl.DateTimeFormat("en-US", {

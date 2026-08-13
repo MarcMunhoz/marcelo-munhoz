@@ -178,6 +178,7 @@
             map-options
             :loading="tagsLoading"
             @filter="filterTagOptions"
+            @new-value="createNewContentfulTag"
             @update:model-value="syncArticleTags"
             @keyup.enter.stop.prevent
           >
@@ -289,6 +290,7 @@
 import { defineComponent } from "vue";
 import {
   createArticleDraft,
+  createContentfulTag,
   getMediaEditorConfig,
   getAuthorProfile,
   listContentfulTags,
@@ -550,6 +552,48 @@ export default defineComponent({
           : this.availableTagOptions;
       });
     },
+    async createNewContentfulTag(value, done) {
+      const name = String(value || "").trim();
+
+      if (!name) {
+        done();
+        return;
+      }
+
+      const existingTag = this.availableTagOptions.find((tag) => tag.label.toLowerCase() === name.toLowerCase() || tag.id.toLowerCase() === name.toLowerCase());
+
+      if (existingTag) {
+        done(existingTag.id, "add-unique");
+        this.$nextTick(this.syncArticleTags);
+        return;
+      }
+
+      this.tagsLoading = true;
+
+      try {
+        const response = await createContentfulTag({ name, session: this.session });
+        const createdTag = this.normalizeTagOptions([response.tag])[0];
+
+        if (!createdTag) {
+          done();
+          this.showFeedback("The tag could not be created.", "error");
+          return;
+        }
+
+        this.availableTagOptions = [...this.availableTagOptions.filter((tag) => tag.id !== createdTag.id), createdTag].sort((left, right) =>
+          left.label.localeCompare(right.label)
+        );
+        this.filteredTagOptions = this.availableTagOptions;
+        done(createdTag.id, "add-unique");
+        this.$nextTick(this.syncArticleTags);
+        this.showFeedback("Tag created.", "success");
+      } catch (error) {
+        done();
+        this.handleAdminError(error);
+      } finally {
+        this.tagsLoading = false;
+      }
+    },
     leaveEditor() {
       this.$router.push("/admin");
     },
@@ -570,8 +614,8 @@ export default defineComponent({
         errors.title = "Title is required";
       }
 
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(this.articleForm.slug)) {
-        errors.slug = "Use a URL-safe slug";
+      if (!/^[a-z]+(?:-[a-z]+)*$/.test(this.articleForm.slug)) {
+        errors.slug = "Use letters and hyphens only";
       }
 
       if (!this.articleForm.description.trim()) {
