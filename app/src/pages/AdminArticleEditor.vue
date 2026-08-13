@@ -92,6 +92,16 @@
 
           <div class="form-row">
             <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
+            <q-btn-toggle
+              v-model="articleForm.locale"
+              class="article-locale-toggle"
+              dense
+              no-caps
+              outline
+              toggle-color="blue-grey-7"
+              :options="articleLocaleOptions"
+              aria-label="Article language"
+            />
             <q-input v-model="articleForm.authorName" label="Author" outlined dense readonly :error="Boolean(errors.author)" :error-message="errors.author">
               <template #prepend>
                 <q-icon name="person" />
@@ -346,6 +356,10 @@ export default defineComponent({
       bodyEditorModeOptions: [
         { label: "Editor", value: "editor" },
         { label: "Preview", value: "preview" },
+      ],
+      articleLocaleOptions: [
+        { label: "Portuguese", value: "pt-BR" },
+        { label: "English", value: "en-US" },
       ],
       loadedArticle: null,
       statusMessage: "",

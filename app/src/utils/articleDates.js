@@ -1,3 +1,9 @@
+export const normalizeArticleLocale = (locale = "", fallbackLocale = "pt-BR") => {
+  const normalized = String(locale || "").trim();
+
+  return ["pt-BR", "en-US"].includes(normalized) ? normalized : fallbackLocale;
+};
+
 const normalizedLocale = (locale = "") => String(locale || "").trim() || "pt-BR";
 
 export const articleLocaleFromArticle = (article = {}, fallbackLocale = "pt-BR") => {
@@ -17,7 +23,7 @@ export const articleLocaleFromArticle = (article = {}, fallbackLocale = "pt-BR")
     return "en-US";
   }
 
-  return fallbackLocale;
+  return normalizeArticleLocale(fallbackLocale);
 };
 
 export const articleBylineLabels = (locale = "pt-BR", article = {}) => {

@@ -136,6 +136,12 @@ The system SHALL persist article creation and update timestamps as timezone-safe
 - **THEN** labels such as "By", "on", "Por", and "em" match the article or site locale
 - **AND** an English article does not render Portuguese byline labels
 
+#### Scenario: Admin selects article language
+- **WHEN** an authenticated author creates or edits an article
+- **THEN** the focused article editor provides an explicit article language control for Portuguese and English content
+- **AND** the system stores the selected editorial language when the Contentful Article model supports it
+- **AND** public byline labels prefer the selected editorial language over legacy Contentful technical locale defaults
+
 ### Requirement: Article Editor Hides Technical Contentful And Cloudinary Fields
 The system SHALL keep technical Contentful and Cloudinary identifiers out of primary article editing controls.
 

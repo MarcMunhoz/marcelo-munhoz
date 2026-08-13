@@ -485,6 +485,7 @@ describe("admin frontend writer workflow", () => {
       description: "  Dashboard work  ",
       body: "# Body",
       createAt: "2026-08-11",
+      locale: "en-US",
       thumbnail: { public_id: "marcelo-munhoz-website/image", secure_url: "https://example.test/image.jpg" },
       alt: "Admin screenshot",
       authorName: "Marcelo Munhoz",
@@ -500,6 +501,7 @@ describe("admin frontend writer workflow", () => {
       description: "Dashboard work",
       body: "# Body",
       createAt: "2026-08-11T12:00:00.000Z",
+      locale: "en-US",
       cloudinary: [{ public_id: "marcelo-munhoz-website/image", secure_url: "https://example.test/image.jpg" }],
       alt: "Admin screenshot",
       author: "authorEntry",
@@ -540,6 +542,13 @@ describe("admin frontend writer workflow", () => {
     });
 
     assert.equal(form.createAt, "2026-08-11");
+  });
+
+  it("defaults and hydrates editable article language metadata", () => {
+    assert.equal(createEmptyArticleForm().locale, "pt-BR");
+    assert.equal(articleToForm({ title: "English article", locale: "en-US" }).locale, "en-US");
+    assert.equal(articleToForm({ title: "During 9 years my career changed", body: "When I wrote about software" }).locale, "en-US");
+    assert.equal(buildArticlePayload({ title: "PT", slug: "pt", description: "D", body: "B", createAt: "2026-08-11" }).locale, "pt-BR");
   });
 
   it("preserves complete Cloudinary asset metadata when building article payloads", () => {
@@ -721,6 +730,7 @@ describe("admin frontend writer workflow", () => {
       slug: "existing-article",
       description: "Existing description",
       body: "# Body",
+      locale: "pt-BR",
       createAt: "2026-08-11",
       thumbnail: {
         public_id: "marcelo-munhoz-website/existing",
@@ -740,6 +750,7 @@ describe("admin frontend writer workflow", () => {
       slug: "existing-article",
       description: "Existing description",
       body: "# Body",
+      locale: "pt-BR",
       createAt: "2026-08-11",
       thumbnailPublicId: "marcelo-munhoz-website/existing",
       thumbnailUrl: "https://example.test/existing.jpg",
@@ -1022,6 +1033,8 @@ describe("admin frontend writer workflow", () => {
     assert.doesNotMatch(page, /v-model="articleForm\./);
 
     assert.match(editor, /:model-value="articleForm\.title"/);
+    assert.match(editor, /q-btn-toggle[\s\S]*articleForm\.locale/);
+    assert.match(editor, /articleLocaleOptions/);
 
     for (const field of ["slug", "description", "body", "createAt", "alt", "authorName"]) {
       assert.match(editor, new RegExp(`v-model="articleForm\\.${field}"`));

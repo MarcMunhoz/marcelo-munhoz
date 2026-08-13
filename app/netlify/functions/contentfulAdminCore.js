@@ -322,6 +322,8 @@ const contentTypeFieldIds = async ({ contentTypeId, request }) => {
 
 const contentTypeSupportsField = (fieldIds, fieldId) => !fieldIds || fieldIds.has(fieldId);
 
+const optionalContentTypeSupportsField = (fieldIds, fieldId) => Boolean(fieldIds && fieldIds.has(fieldId));
+
 const articleDateTimeValue = (value) => {
   const text = String(value || "").trim();
 
@@ -342,6 +344,7 @@ const articleFieldsFromData = (data = {}, writeLocales, { supportedFieldIds = nu
   const locales = uniqueLocales(writeLocales);
   const createAt = articleDateTimeValue(data.createAt);
   const updatedAt = articleDateTimeValue(data.updatedAt);
+  const editorialLocale = ["pt-BR", "en-US"].includes(String(data.locale || "").trim()) ? String(data.locale).trim() : undefined;
 
   return definedEntries([
     ["title", localizedForLocales(data.title, locales)],
@@ -349,7 +352,8 @@ const articleFieldsFromData = (data = {}, writeLocales, { supportedFieldIds = nu
     ["description", localizedForLocales(data.description, locales)],
     ["body", localizedForLocales(data.body, locales)],
     ["createAt", localizedForLocales(createAt, locales)],
-    ["updatedAt", updatedAt && contentTypeSupportsField(supportedFieldIds, "updatedAt") ? localizedForLocales(updatedAt, locales) : undefined],
+    ["updatedAt", updatedAt && optionalContentTypeSupportsField(supportedFieldIds, "updatedAt") ? localizedForLocales(updatedAt, locales) : undefined],
+    ["locale", editorialLocale && optionalContentTypeSupportsField(supportedFieldIds, "locale") ? localizedForLocales(editorialLocale, locales) : undefined],
     ["alt", localizedForLocales(data.alt, locales)],
     ["author", data.author ? localizedForLocales(contentfulLink("Entry", data.author), locales) : undefined],
     ["cloudinary", localizedForLocales(cloudinaryMediaFromData(data), locales)],
@@ -366,7 +370,8 @@ const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
 
   const tagIds = request && Array.isArray(data.tags) ? await filterExistingTagIds({ tags: data.tags, request }) : normalizedTagIds(data.tags);
   const writeLocales = await articleWriteLocales({ locale, request });
-  const supportedFieldIds = data.updatedAt ? await contentTypeFieldIds({ contentTypeId: "article", request }) : null;
+  const supportedFieldIds =
+    data.updatedAt || data.locale ? await contentTypeFieldIds({ contentTypeId: "article", request }) : null;
 
   return {
     fields: articleFieldsFromData(data, writeLocales, { supportedFieldIds }),

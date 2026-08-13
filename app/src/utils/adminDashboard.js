@@ -1,3 +1,5 @@
+import { articleLocaleFromArticle, normalizeArticleLocale } from "./articleDates.js";
+
 const normalize = (value) => String(value || "").trim().toLowerCase();
 const sessionRoles = (session = {}) => (Array.isArray(session?.roles) ? session.roles : []).map(normalize);
 const hasRole = (session, role) => sessionRoles(session).includes(normalize(role));
@@ -250,6 +252,7 @@ export const createEmptyArticleForm = ({ now = () => new Date(), timeZone } = {}
   slug: "",
   description: "",
   body: "",
+  locale: "pt-BR",
   createAt: localDateInputValue(now(), timeZone),
   thumbnailPublicId: "",
   thumbnailUrl: "",
@@ -368,6 +371,7 @@ export const articleToForm = (article = {}) => {
     slug: article.slug || "",
     description: article.description || "",
     body: article.body || "",
+    locale: articleLocaleFromArticle(article, "pt-BR"),
     createAt: articleDateInputValue(article.createAt),
     thumbnailPublicId: article.thumbnail?.public_id || article.thumbnailPublicId || "",
     thumbnailUrl: article.thumbnail?.secure_url || article.thumbnail?.url || article.thumbnailUrl || "",
@@ -467,6 +471,7 @@ export const buildArticlePayload = (form = {}, { now = () => new Date() } = {}) 
     slug: String(form.slug || "").trim(),
     description: String(form.description || "").trim(),
     body: form.body || "",
+    locale: normalizeArticleLocale(form.locale || articleLocaleFromArticle(form, "pt-BR")),
     createAt,
     ...(updatedAt ? { updatedAt } : {}),
     ...(thumbnail ? { cloudinary: [thumbnail] } : {}),

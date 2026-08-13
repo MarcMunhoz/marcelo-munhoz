@@ -158,6 +158,64 @@ describe("contentful management facade", () => {
     assert.equal(body.fields.updatedAt, undefined);
   });
 
+  it("writes editorial article locale only when the Contentful article model supports the field", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (url.toString().endsWith("/tags?limit=1000")) {
+          return createResponse(200, { items: [] });
+        }
+
+        if (url.toString().endsWith("/locales")) {
+          return createResponse(200, {
+            items: [{ code: "en-US", default: true }],
+          });
+        }
+
+        if (url.toString().endsWith("/content_types/article")) {
+          return createResponse(200, {
+            fields: [
+              { id: "title" },
+              { id: "slug" },
+              { id: "description" },
+              { id: "body" },
+              { id: "createAt" },
+              { id: "locale" },
+              { id: "author" },
+            ],
+          });
+        }
+
+        return createResponse(201, { sys: { id: "article-1", version: 1 } });
+      },
+    });
+
+    await facade.createArticleDraft({
+      data: {
+        title: "Draft title",
+        slug: "draft-title",
+        description: "Draft description",
+        body: "# Draft",
+        createAt: "2026-08-11",
+        locale: "pt-BR",
+        author: "author-1",
+      },
+      session: { subject: "writer-123", authorEntryId: "author-1" },
+    });
+
+    const createCall = calls.find((call) => call.options.method === "POST");
+    const body = JSON.parse(createCall.options.body);
+
+    assert.equal(
+      calls.some((call) => new URL(call.url).pathname === "/spaces/space-id/environments/staging/content_types/article"),
+      true
+    );
+    assert.equal(body.fields.locale["en-US"], "pt-BR");
+  });
+
   it("updates article drafts with the supplied version header", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({
