@@ -1033,8 +1033,10 @@ describe("admin frontend writer workflow", () => {
     assert.doesNotMatch(page, /v-model="articleForm\./);
 
     assert.match(editor, /:model-value="articleForm\.title"/);
+    assert.match(editor, /v-else-if="editorLoading"/);
+    assert.match(editor, /q-inner-loading/);
     assert.match(editor, /class="editor-heading-actions"[\s\S]*class="article-language-switch"/);
-    assert.match(editor, /q-btn-toggle[\s\S]*articleForm\.locale/);
+    assert.match(editor, /article-language-switch__track[\s\S]*articleForm\.locale/);
     assert.match(editor, /articleLocaleOptions/);
 
     for (const field of ["slug", "description", "body", "createAt", "alt", "authorName"]) {

@@ -1,5 +1,9 @@
 const ARTICLE_LIMIT = 3;
 const CONTENTFUL_HOST = "https://cdn.contentful.com";
+const ARTICLE_LANGUAGE_TAGS = {
+  "article-lang-pt-br": "pt-BR",
+  "article-lang-en-us": "en-US",
+};
 
 const jsonResponse = (statusCode, payload) => ({
   statusCode,
@@ -76,6 +80,37 @@ const resolveResponseLinks = (payload) => {
     ...payload,
     items: resolveLinks(payload.items || [], includesMap),
     includes: resolveLinks(payload.includes, includesMap),
+  };
+};
+
+const contentfulTagId = (tag = {}) => String(tag?.sys?.id || tag?.id || tag || "").trim();
+
+const isArticleLanguageTag = (tag = {}) => Object.prototype.hasOwnProperty.call(ARTICLE_LANGUAGE_TAGS, contentfulTagId(tag));
+
+const articleLocaleFromTags = (tags = []) => {
+  for (const tag of Array.isArray(tags) ? tags : []) {
+    const locale = ARTICLE_LANGUAGE_TAGS[contentfulTagId(tag)];
+
+    if (locale) {
+      return locale;
+    }
+  }
+
+  return "";
+};
+
+const publicArticleEntry = (entry = {}) => {
+  const tags = entry.metadata?.tags || [];
+  const locale = entry.fields?.locale || articleLocaleFromTags(tags);
+  const visibleTags = tags.filter((tag) => !isArticleLanguageTag(tag));
+
+  return {
+    ...entry,
+    fields: {
+      ...(entry.fields || {}),
+      ...(locale ? { locale } : {}),
+    },
+    ...(entry.metadata ? { metadata: { ...entry.metadata, tags: visibleTags } } : {}),
   };
 };
 
@@ -292,7 +327,7 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
           return jsonResponse(404, { error: "Article not found" });
         }
 
-        return jsonResponse(200, entries.items[0]);
+        return jsonResponse(200, publicArticleEntry(entries.items[0]));
       } catch (error) {
         logger.error("Contentful proxy request failed:", error?.message || error);
         return jsonResponse(500, { error: "Failed to fetch article" });

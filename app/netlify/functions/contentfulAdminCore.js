@@ -286,7 +286,7 @@ const ensureArticleLanguageTag = async ({ locale, request }) => {
       method: "PUT",
       path: `/tags/${encodeURIComponent(tagId)}`,
       headers: {
-        "x-contentful-tag-visibility": "private",
+        "x-contentful-tag-visibility": "public",
       },
       body: {
         name: locale === "en-US" ? "Article language: English" : "Article language: Portuguese",

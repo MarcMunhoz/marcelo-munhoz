@@ -266,7 +266,7 @@ describe("contentful management facade", () => {
     const languageTagCall = calls.find((call) => call.options.method === "PUT" && call.url.endsWith("/tags/article-lang-en-us"));
     const body = JSON.parse(createCall.options.body);
 
-    assert.equal(languageTagCall.options.headers["x-contentful-tag-visibility"], "private");
+    assert.equal(languageTagCall.options.headers["x-contentful-tag-visibility"], "public");
     assert.equal(body.fields.locale, undefined);
     assert.deepEqual(body.metadata.tags, [
       { sys: { type: "Link", linkType: "Tag", id: "ai" } },

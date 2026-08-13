@@ -9,18 +9,18 @@
         </div>
         <div class="editor-heading-actions">
           <div class="article-language-switch" role="group" aria-label="Article language">
-            <span :class="{ active: articleForm.locale === 'pt-BR' }">PT</span>
-            <q-btn-toggle
-              v-model="articleForm.locale"
-              class="article-locale-toggle"
-              dense
-              no-caps
-              unelevated
-              toggle-color="blue-grey-7"
-              :options="articleLocaleOptions"
-              aria-label="Article language"
-            />
-            <span :class="{ active: articleForm.locale === 'en-US' }">EN</span>
+            <button
+              v-for="option in articleLocaleOptions"
+              :key="option.value"
+              type="button"
+              class="article-language-switch__option"
+              :class="{ active: articleForm.locale === option.value }"
+              :aria-pressed="articleForm.locale === option.value"
+              @click="articleForm.locale = option.value"
+            >
+              {{ option.label }}
+            </button>
+            <span class="article-language-switch__track" :class="{ english: articleForm.locale === 'en-US' }"></span>
           </div>
           <q-badge outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
           <q-btn outline color="blue-grey-7" icon="arrow_back" label="Dashboard" no-caps @click="leaveEditor" />
@@ -36,6 +36,13 @@
           <p>Sign in with an invited writer account to edit articles.</p>
           <q-btn outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
         </div>
+      </section>
+
+      <section v-else-if="editorLoading" class="editor-loading" aria-live="polite">
+        <q-inner-loading showing>
+          <q-spinner size="42px" color="blue-grey-6" />
+          <p>Loading article editor</p>
+        </q-inner-loading>
       </section>
 
       <q-form v-else class="editor-form-page" @submit.prevent="saveDraft">
@@ -371,6 +378,7 @@ export default defineComponent({
       feedbackTone: "info",
       dashboardError: "",
       loadingAction: "",
+      editorLoading: false,
     };
   },
   computed: {
@@ -469,22 +477,24 @@ export default defineComponent({
         return;
       }
 
-      await this.loadContentfulTags();
-
-      if (this.isNewArticle) {
-        this.articleForm = createEmptyArticleForm();
-        this.loadedArticle = null;
-        await this.applyCurrentAuthorProfile();
-        this.statusMessage = "New draft";
-        this.slugTouched = false;
-        this.snapshotForm();
-        return;
-      }
-
-      this.loadingAction = "articles";
-      this.dashboardError = "";
+      this.editorLoading = true;
 
       try {
+        await this.loadContentfulTags();
+
+        if (this.isNewArticle) {
+          this.articleForm = createEmptyArticleForm();
+          this.loadedArticle = null;
+          await this.applyCurrentAuthorProfile();
+          this.statusMessage = "New draft";
+          this.slugTouched = false;
+          this.snapshotForm();
+          return;
+        }
+
+        this.loadingAction = "articles";
+        this.dashboardError = "";
+
         const response = await listAdminArticles({ session: this.session });
         this.applyResolvedSession(response.session);
         const dashboard = reconcileAdminDashboardData(response);
@@ -511,6 +521,7 @@ export default defineComponent({
         this.dashboardError = adminUserMessage(error);
       } finally {
         this.loadingAction = "";
+        this.editorLoading = false;
       }
     },
     applyResolvedSession(session = {}) {
@@ -977,29 +988,47 @@ export default defineComponent({
 .article-language-switch {
   align-items: center;
   background: #ffffff;
-  border: 1px solid #b0bec5;
+  border: 1px solid #90a4ae;
+  border-radius: 999px;
   display: grid;
-  gap: 7px;
-  grid-template-columns: auto auto auto;
-  min-height: 38px;
-  padding: 4px 8px;
+  grid-template-columns: 1fr 1fr;
+  min-height: 36px;
+  overflow: hidden;
+  padding: 3px;
+  position: relative;
 
-  span {
-    color: #90a4ae;
-    font-size: 0.78rem;
+  &__option {
+    background: transparent;
+    border: 0;
+    color: #607d8b;
+    cursor: pointer;
+    font-size: 0.74rem;
     font-weight: 800;
     letter-spacing: 0;
+    min-width: 42px;
+    padding: 6px 10px;
+    position: relative;
+    z-index: 1;
+
+    &.active {
+      color: #ffffff;
+    }
   }
 
-  span.active {
-    color: #263238;
-  }
-}
+  &__track {
+    background: #455a64;
+    border-radius: 999px;
+    bottom: 3px;
+    left: 3px;
+    position: absolute;
+    top: 3px;
+    transition: transform 140ms ease;
+    width: calc(50% - 3px);
 
-.article-locale-toggle {
-  border: 1px solid #cfd8dc;
-  border-radius: 999px;
-  overflow: hidden;
+    &.english {
+      transform: translateX(100%);
+    }
+  }
 }
 
 .admin-kicker {
@@ -1018,6 +1047,19 @@ export default defineComponent({
   display: flex;
   gap: 16px;
   padding: 18px;
+}
+
+.editor-loading {
+  background: #ffffff;
+  border: 1px solid #cfd8dc;
+  min-height: 340px;
+  position: relative;
+
+  p {
+    color: #607d8b;
+    font-weight: 700;
+    margin: 12px 0 0;
+  }
 }
 
 .editor-form-page {
