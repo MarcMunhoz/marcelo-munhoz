@@ -235,6 +235,34 @@ describe("contentful management facade", () => {
     assert.equal(calls[5].options.headers["x-contentful-version"], "14");
   });
 
+  it("lists Contentful metadata tags for controlled admin selection", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        return createResponse(200, {
+          items: [
+            { name: "AI", sys: { id: "AI", visibility: "public" } },
+            { sys: { id: "career", visibility: "public" } },
+          ],
+        });
+      },
+    });
+
+    const result = await facade.listTags();
+
+    assert.deepEqual(result, {
+      tags: [
+        { id: "AI", label: "AI", visibility: "public" },
+        { id: "career", label: "career", visibility: "public" },
+      ],
+    });
+    assert.equal(calls[0].options.method, "GET");
+    assert.equal(new URL(calls[0].url).pathname, "/spaces/space-id/environments/staging/tags");
+    assert.equal(new URL(calls[0].url).searchParams.get("limit"), "1000");
+  });
+
   it("creates editorial workflow request entries for review and unpublication", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({

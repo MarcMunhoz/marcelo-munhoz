@@ -154,10 +154,6 @@ describe("cloudinary media facade", () => {
         public_id: "marcelo-munhoz-website/cursor-cover",
         secure_url: "https://res.cloudinary.com/demo-cloud/image/upload/cursor-cover.jpg",
         url: "https://res.cloudinary.com/demo-cloud/image/upload/cursor-cover.jpg",
-        width: undefined,
-        height: undefined,
-        format: undefined,
-        created_at: undefined,
       },
     ]);
   });

@@ -161,18 +161,32 @@
         </section>
 
         <section class="editor-card">
-          <q-input v-model="articleForm.tagInput" label="Tags" outlined dense @keyup.enter.prevent="addTagToArticleForm">
-            <template #append>
-              <q-btn flat round dense color="blue-grey-7" icon="add" @click="addTagToArticleForm">
-                <q-tooltip>Add tag</q-tooltip>
-              </q-btn>
+          <q-select
+            v-model="articleForm.tagList"
+            :options="filteredTagOptions"
+            label="Tags"
+            outlined
+            dense
+            multiple
+            use-chips
+            use-input
+            fill-input
+            input-debounce="0"
+            option-value="id"
+            option-label="label"
+            emit-value
+            map-options
+            :loading="tagsLoading"
+            @filter="filterTagOptions"
+            @update:model-value="syncArticleTags"
+            @keyup.enter.stop.prevent
+          >
+            <template #no-option>
+              <q-item>
+                <q-item-section class="text-blue-grey-7">No matching Contentful tags</q-item-section>
+              </q-item>
             </template>
-          </q-input>
-          <div class="tag-chip-list">
-            <q-chip v-for="tag in articleForm.tagList" :key="tag" removable outline color="blue-grey-7" @remove="removeTagFromArticleForm(tag)">
-              {{ tag }}
-            </q-chip>
-          </div>
+          </q-select>
         </section>
 
         <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
@@ -277,6 +291,7 @@ import {
   createArticleDraft,
   getMediaEditorConfig,
   getAuthorProfile,
+  listContentfulTags,
   listAdminArticles,
   listMediaAssets,
   requestArticleUnpublication,
@@ -321,6 +336,9 @@ export default defineComponent({
       mediaError: "",
       mediaEditorConfig: null,
       mediaUploadFile: null,
+      availableTagOptions: [],
+      filteredTagOptions: [],
+      tagsLoading: false,
       showMediaDiagnostics: false,
       bodyEditorMode: "editor",
       bodyEditorModeOptions: [
@@ -431,6 +449,8 @@ export default defineComponent({
         return;
       }
 
+      await this.loadContentfulTags();
+
       if (this.isNewArticle) {
         this.articleForm = createEmptyArticleForm();
         this.loadedArticle = null;
@@ -497,6 +517,38 @@ export default defineComponent({
         this.articleForm.authorName = this.session?.name || "";
         this.dashboardError = adminUserMessage(error);
       }
+    },
+    normalizeTagOptions(tags = []) {
+      return (Array.isArray(tags) ? tags : [])
+        .map((tag) => ({
+          id: String(tag.id || "").trim(),
+          label: String(tag.label || tag.id || "").trim(),
+        }))
+        .filter((tag) => tag.id);
+    },
+    async loadContentfulTags() {
+      this.tagsLoading = true;
+
+      try {
+        const response = await listContentfulTags({ session: this.session });
+        this.availableTagOptions = this.normalizeTagOptions(response.tags);
+        this.filteredTagOptions = this.availableTagOptions;
+      } catch (error) {
+        this.availableTagOptions = [];
+        this.filteredTagOptions = [];
+        this.dashboardError = adminUserMessage(error);
+      } finally {
+        this.tagsLoading = false;
+      }
+    },
+    filterTagOptions(value, update) {
+      const needle = String(value || "").trim().toLowerCase();
+
+      update(() => {
+        this.filteredTagOptions = needle
+          ? this.availableTagOptions.filter((tag) => `${tag.label} ${tag.id}`.toLowerCase().includes(needle))
+          : this.availableTagOptions;
+      });
     },
     leaveEditor() {
       this.$router.push("/admin");
@@ -648,6 +700,11 @@ export default defineComponent({
     applySelectedMedia(asset = {}) {
       this.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || "";
       this.articleForm.thumbnailUrl = asset.thumbnailUrl || asset.secure_url || asset.url || "";
+      this.articleForm.thumbnail = asset.asset || {
+        public_id: this.articleForm.thumbnailPublicId,
+        secure_url: this.articleForm.thumbnailUrl,
+        url: this.articleForm.thumbnailUrl,
+      };
       this.articleForm.alt = this.articleForm.alt || asset.alt || asset.title || "";
       this.mediaDialogOpen = false;
       this.showMediaDiagnostics = false;
@@ -663,6 +720,12 @@ export default defineComponent({
 
       this.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || this.articleForm.thumbnailPublicId;
       this.articleForm.thumbnailUrl = secureUrl;
+      this.articleForm.thumbnail = {
+        ...(this.articleForm.thumbnail || {}),
+        public_id: this.articleForm.thumbnailPublicId,
+        secure_url: secureUrl,
+        url: secureUrl,
+      };
       this.showMediaDiagnostics = false;
       this.showFeedback("Edited image applied. Save the draft to keep it.", "success");
     },
@@ -701,23 +764,12 @@ export default defineComponent({
     clearThumbnail() {
       this.articleForm.thumbnailPublicId = "";
       this.articleForm.thumbnailUrl = "";
+      this.articleForm.thumbnail = null;
       this.showMediaDiagnostics = false;
       this.showFeedback("Image cleared.", "info");
     },
     syncArticleTags() {
       this.articleForm.tags = this.articleForm.tagList.join(", ");
-    },
-    addTagToArticleForm() {
-      const tag = String(this.articleForm.tagInput || "").trim();
-
-      if (!tag || this.articleForm.tagList.includes(tag)) {
-        this.articleForm.tagInput = "";
-        return;
-      }
-
-      this.articleForm.tagList = [...this.articleForm.tagList, tag];
-      this.articleForm.tagInput = "";
-      this.syncArticleTags();
     },
     removeTagFromArticleForm(tag) {
       this.articleForm.tagList = this.articleForm.tagList.filter((item) => item !== tag);

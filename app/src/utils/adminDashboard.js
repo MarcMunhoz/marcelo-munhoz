@@ -102,6 +102,43 @@ const safeMediaErrorMessage = (error = "") => {
   return "Media request failed.";
 };
 
+const cloudinaryAssetPayload = (asset = {}) => {
+  const payload = {};
+  const scalarKeys = [
+    "public_id",
+    "secure_url",
+    "url",
+    "width",
+    "height",
+    "format",
+    "resource_type",
+    "type",
+    "version",
+    "bytes",
+    "created_at",
+    "display_name",
+    "asset_id",
+  ];
+
+  scalarKeys.forEach((key) => {
+    if (asset[key] !== undefined && asset[key] !== null && asset[key] !== "") {
+      payload[key] = asset[key];
+    }
+  });
+
+  ["context", "metadata", "tags"].forEach((key) => {
+    if (asset[key] !== undefined && asset[key] !== null) {
+      payload[key] = asset[key];
+    }
+  });
+
+  if (payload.secure_url && !payload.url) {
+    payload.url = payload.secure_url;
+  }
+
+  return payload;
+};
+
 export const normalizeMediaAssetDisplay = (asset = {}) => {
   const customContext = asset.context?.custom || {};
   const title = String(asset.display_name || customContext.alt || customContext.caption || assetTitleFromPublicId(asset.public_id)).trim();
@@ -114,6 +151,7 @@ export const normalizeMediaAssetDisplay = (asset = {}) => {
     title,
     alt: title || "Media asset",
     dimensions: width > 0 && height > 0 ? `${width} x ${height}` : "",
+    asset: cloudinaryAssetPayload(asset),
   };
 };
 
@@ -179,6 +217,7 @@ export const createEmptyArticleForm = () => ({
   createAt: new Date().toISOString().slice(0, 10),
   thumbnailPublicId: "",
   thumbnailUrl: "",
+  thumbnail: null,
   alt: "",
   author: "",
   authorEntryId: "",
@@ -296,6 +335,7 @@ export const articleToForm = (article = {}) => {
     createAt: articleDateInputValue(article.createAt),
     thumbnailPublicId: article.thumbnail?.public_id || article.thumbnailPublicId || "",
     thumbnailUrl: article.thumbnail?.secure_url || article.thumbnail?.url || article.thumbnailUrl || "",
+    thumbnail: article.thumbnail || null,
     alt: article.alt || "",
     author: authorEntryId,
     authorEntryId,
@@ -379,6 +419,7 @@ export const buildArticlePayload = (form = {}) => {
     ? {
         public_id: String(form.thumbnailPublicId || "").trim(),
         secure_url: String(form.thumbnailUrl || "").trim(),
+        url: String(form.thumbnailUrl || "").trim(),
       }
     : undefined);
   const tagList = normalizeTagList(Array.isArray(form.tagList) && form.tagList.length > 0 ? form.tagList : form.tags);

@@ -351,6 +351,7 @@ describe("contentful admin handler", () => {
       ["GET", "/media/assets", "listMedia"],
       ["GET", "/media/editor-config", "getMediaEditorConfig"],
       ["POST", "/media/upload", "uploadMedia"],
+      ["GET", "/tags", "listTags"],
     ]) {
       let operationRan = false;
       const handler = createContentfulAdminHandler({
@@ -440,6 +441,24 @@ describe("contentful admin handler", () => {
       assert.deepEqual(parse(response), { error: "Owner role required" });
       assert.equal(operationRan, false);
     }
+  });
+
+  it("allows writer sessions to list Contentful tags for article editing", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession() {
+        return createSession(["writer"]);
+      },
+      operations: {
+        async listTags({ session }) {
+          return { tags: [{ id: "AI", label: "AI" }], requestedBy: session.subject };
+        },
+      },
+    });
+
+    const response = await handler({ method: "GET", path: "/tags" });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(parse(response), { tags: [{ id: "AI", label: "AI" }], requestedBy: "user-123" });
   });
 
   it("allows owner sessions to reach owner-only routes", async () => {

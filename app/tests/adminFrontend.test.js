@@ -9,6 +9,7 @@ import {
   getAuthorProfile,
   createArticleDraft,
   deleteArticle,
+  listContentfulTags,
   listAdminArticles,
   publishArticle,
   requestArticleUnpublication,
@@ -126,6 +127,7 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(api, /\/api\/admin\/contentful\/articles/);
     assert.match(api, /\/media\/assets/);
+    assert.match(api, /\/tags/);
     assert.match(api, /\/media\/upload/);
     assert.match(api, /\/media\/editor-config/);
     assert.match(api, /\/author-profile/);
@@ -140,10 +142,32 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /archiveArticle/);
     assert.match(api, /unarchiveArticle/);
     assert.match(api, /deleteArticle/);
+    assert.match(api, /listContentfulTags/);
     assert.match(api, /listMediaAssets/);
     assert.match(api, /getMediaEditorConfig/);
     assert.match(api, /uploadMediaAsset/);
     assert.match(api, /Authorization/);
+  });
+
+  it("loads existing Contentful tags for controlled article tag selection", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { tags: [{ id: "AI", label: "AI" }] };
+        },
+      };
+    };
+
+    const result = await listContentfulTags({ session: { token: "writer-token" }, fetchImpl });
+
+    assert.deepEqual(result, { tags: [{ id: "AI", label: "AI" }] });
+    assert.equal(calls[0].url, "/api/admin/contentful/tags");
+    assert.equal(calls[0].options.method, "GET");
+    assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
   });
 
   it("calls owner lifecycle endpoints with version state and server authorization", async () => {
@@ -460,6 +484,41 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
+  it("preserves complete Cloudinary asset metadata when building article payloads", () => {
+    const payload = buildArticlePayload({
+      title: "Image metadata",
+      slug: "image-metadata",
+      description: "Dashboard work",
+      body: "# Body",
+      createAt: "2026-08-11",
+      thumbnail: {
+        public_id: "marcelo-munhoz-website/image",
+        secure_url: "https://example.test/image.jpg",
+        url: "https://example.test/image.jpg",
+        width: 1600,
+        height: 900,
+        format: "jpg",
+        resource_type: "image",
+        type: "upload",
+      },
+      authorEntryId: "authorEntry",
+      version: 7,
+    });
+
+    assert.deepEqual(payload.cloudinary, [
+      {
+        public_id: "marcelo-munhoz-website/image",
+        secure_url: "https://example.test/image.jpg",
+        url: "https://example.test/image.jpg",
+        width: 1600,
+        height: 900,
+        format: "jpg",
+        resource_type: "image",
+        type: "upload",
+      },
+    ]);
+  });
+
   it("formats Markdown around selected text or inserts a placeholder at the cursor", () => {
     assert.deepEqual(
       formatMarkdownSelection({
@@ -625,6 +684,10 @@ describe("admin frontend writer workflow", () => {
       createAt: "2026-08-11",
       thumbnailPublicId: "marcelo-munhoz-website/existing",
       thumbnailUrl: "https://example.test/existing.jpg",
+      thumbnail: {
+        public_id: "marcelo-munhoz-website/existing",
+        secure_url: "https://example.test/existing.jpg",
+      },
       alt: "Existing image",
       author: "author-1",
       authorEntryId: "author-1",
@@ -814,6 +877,9 @@ describe("admin frontend writer workflow", () => {
         secure_url: "https://example.test/admin-dashboard.jpg",
         width: 1600,
         height: 900,
+        format: "jpg",
+        resource_type: "image",
+        type: "upload",
         context: { custom: { alt: "Admin dashboard thumbnail" } },
       }),
       {
@@ -822,6 +888,17 @@ describe("admin frontend writer workflow", () => {
         title: "Admin dashboard thumbnail",
         alt: "Admin dashboard thumbnail",
         dimensions: "1600 x 900",
+        asset: {
+          public_id: "marcelo-munhoz-website/blog/admin-dashboard",
+          secure_url: "https://example.test/admin-dashboard.jpg",
+          url: "https://example.test/admin-dashboard.jpg",
+          width: 1600,
+          height: 900,
+          format: "jpg",
+          resource_type: "image",
+          type: "upload",
+          context: { custom: { alt: "Admin dashboard thumbnail" } },
+        },
       }
     );
     assert.equal(normalizeMediaAssetDisplay({ public_id: "folder/public-id-only" }).title, "public-id-only");
@@ -858,6 +935,10 @@ describe("admin frontend writer workflow", () => {
           title: "photo",
           alt: "photo",
           dimensions: "",
+          asset: {
+            public_id: "folder/photo",
+            url: "https://example.test/photo.jpg",
+          },
         },
       ],
     });
@@ -881,7 +962,7 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(editor, /:model-value="articleForm\.title"/);
 
-    for (const field of ["slug", "description", "body", "createAt", "alt", "authorName", "tagInput"]) {
+    for (const field of ["slug", "description", "body", "createAt", "alt", "authorName"]) {
       assert.match(editor, new RegExp(`v-model="articleForm\\.${field}"`));
     }
 
@@ -920,8 +1001,11 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /getMediaEditorConfig/);
     assert.match(editor, /applyEditedMedia/);
     assert.match(editor, /articleForm\.thumbnailUrl/);
+    assert.match(editor, /q-select[\s\S]*v-model="articleForm\.tagList"/);
+    assert.match(editor, /availableTagOptions/);
+    assert.match(editor, /loadContentfulTags/);
+    assert.doesNotMatch(editor, /@keyup\.enter\.prevent="addTagToArticleForm"/);
     assert.match(editor, /articleForm\.tagList/);
-    assert.match(editor, /addTagToArticleForm/);
     assert.match(editor, /removeTagFromArticleForm/);
     assert.match(editor, /applySelectedMedia/);
     assert.match(editor, /handleMediaFile/);

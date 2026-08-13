@@ -136,6 +136,13 @@ export const listMediaAssets = ({ session, maxResults = 24, fetchImpl } = {}) =>
     fetchImpl,
   });
 
+export const listContentfulTags = ({ session, fetchImpl } = {}) =>
+  adminRequest({
+    path: "/tags",
+    session,
+    fetchImpl,
+  });
+
 export const getMediaEditorConfig = ({ session, fetchImpl } = {}) =>
   adminRequest({
     path: "/media/editor-config",

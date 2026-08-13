@@ -228,6 +228,12 @@ const existingTagIds = async ({ request }) => {
   return new Set((payload.items || []).map((tag) => tag?.sys?.id).filter(Boolean));
 };
 
+const normalizedContentfulTag = (tag = {}) => ({
+  id: tag?.sys?.id || "",
+  label: tag?.name || tag?.sys?.id || "",
+  visibility: tag?.sys?.visibility || "",
+});
+
 const filterExistingTagIds = async ({ tags, request }) => {
   const ids = normalizedTagIds(tags);
 
@@ -417,15 +423,31 @@ const signedParams = (params = {}, apiSecret) => {
   return createHash("sha1").update(`${signatureBase}${apiSecret}`).digest("hex");
 };
 
-const normalizeCloudinaryAsset = (asset = {}) => ({
-  public_id: asset.public_id,
-  secure_url: asset.secure_url || asset.url,
-  url: asset.secure_url || asset.url,
-  width: asset.width,
-  height: asset.height,
-  format: asset.format,
-  created_at: asset.created_at,
-});
+const normalizeCloudinaryAsset = (asset = {}) => {
+  const normalized = {
+    public_id: asset.public_id,
+    secure_url: asset.secure_url || asset.url,
+    url: asset.secure_url || asset.url,
+    width: asset.width,
+    height: asset.height,
+    format: asset.format,
+    resource_type: asset.resource_type,
+    type: asset.type,
+    version: asset.version,
+    bytes: asset.bytes,
+    created_at: asset.created_at,
+    display_name: asset.display_name,
+    asset_id: asset.asset_id,
+  };
+
+  ["context", "metadata", "tags"].forEach((key) => {
+    if (asset[key] !== undefined && asset[key] !== null) {
+      normalized[key] = asset[key];
+    }
+  });
+
+  return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== undefined && value !== null && value !== ""));
+};
 
 const normalizedTags = (metadata = {}) => (metadata.tags || []).map((tag) => tag?.sys?.id).filter(Boolean);
 
@@ -902,6 +924,13 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
   };
 
   return {
+    async listTags() {
+      const payload = await request({ method: "GET", path: "/tags?limit=1000" });
+
+      return {
+        tags: (payload.items || []).map(normalizedContentfulTag).filter((tag) => tag.id),
+      };
+    },
     async createArticleDraft({ data, session }) {
       const config = managementConfigFromEnv(env, fetchImpl);
       const authorResolution = await resolveSessionAuthorProfile({ session, config });
@@ -1187,6 +1216,15 @@ export const createContentfulAdminHandler = ({
         role: "writer",
         operation: adminOperations.listAdminArticles,
         payload: { query },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/tags") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.listTags,
+        payload: {},
       });
     }
 
