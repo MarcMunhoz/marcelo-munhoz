@@ -211,7 +211,28 @@ const localized = (value, locale) => (value === undefined ? undefined : { [local
 
 const definedEntries = (entries) => Object.fromEntries(entries.filter(([, value]) => value !== undefined));
 
-const tagsFromIds = (tags = []) => tags.map((id) => contentfulLink("Tag", id));
+const normalizedTagIds = (tags = []) =>
+  (Array.isArray(tags) ? tags : [])
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+
+const tagsFromIds = (tags = []) => normalizedTagIds(tags).map((id) => contentfulLink("Tag", id));
+
+const existingTagIds = async ({ request }) => {
+  const payload = await request({ method: "GET", path: "/tags?limit=1000" });
+  return new Set((payload.items || []).map((tag) => tag?.sys?.id).filter(Boolean));
+};
+
+const filterExistingTagIds = async ({ tags, request }) => {
+  const ids = normalizedTagIds(tags);
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const existingIds = await existingTagIds({ request });
+  return ids.filter((id) => existingIds.has(id));
+};
 
 const thumbnailFromData = (data = {}) => data.thumbnail || (Array.isArray(data.cloudinary) ? data.cloudinary[0] : undefined);
 
@@ -250,7 +271,7 @@ const articleFieldsFromData = (data = {}, locale) =>
     ["cloudinary", localized(cloudinaryMediaFromData(data), locale)],
   ]);
 
-const articlePayloadFromData = (data = {}, locale) => {
+const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
   if (data.fields) {
     return {
       fields: data.fields,
@@ -258,9 +279,11 @@ const articlePayloadFromData = (data = {}, locale) => {
     };
   }
 
+  const tagIds = request && Array.isArray(data.tags) ? await filterExistingTagIds({ tags: data.tags, request }) : normalizedTagIds(data.tags);
+
   return {
     fields: articleFieldsFromData(data, locale),
-    ...(Array.isArray(data.tags) ? { metadata: { tags: tagsFromIds(data.tags) } } : {}),
+    ...(tagIds.length > 0 ? { metadata: { tags: tagsFromIds(tagIds) } } : {}),
   };
 };
 
@@ -854,7 +877,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         headers: {
           "x-contentful-content-type": "article",
         },
-        body: articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale),
+        body: await articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale, { request }),
       });
     },
     async listAdminArticles({ session } = {}) {
@@ -960,7 +983,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         headers: {
           "x-contentful-version": version,
         },
-        body: articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale),
+        body: await articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale, { request }),
       });
     },
     async publishArticle({ articleId, data }) {

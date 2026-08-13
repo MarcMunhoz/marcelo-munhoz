@@ -492,6 +492,21 @@ describe("admin frontend writer workflow", () => {
         selectionEnd: 17,
       }
     );
+
+    assert.deepEqual(
+      formatMarkdownSelection({
+        value: "item 1\nitem 2\nitem 3",
+        selectionStart: 0,
+        selectionEnd: 20,
+        before: "- ",
+        placeholder: "List item",
+      }),
+      {
+        value: "- item 1\n- item 2\n- item 3",
+        selectionStart: 2,
+        selectionEnd: 26,
+      }
+    );
   });
 
   it("derives URL-safe slugs from new article titles", () => {
@@ -858,6 +873,8 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(page, /this\.\$router\.push\("\/admin\/articles\/new"\)/);
     assert.match(page, /\/admin\/articles\/\$\{encodeURIComponent\(article\.slug \|\| article\.id\)\}\/edit/);
+    assert.match(page, /canUnarchiveArticleAction,\s*[\r\n]/);
+    assert.match(page, /unarchiveSelectedArticle/);
     assert.doesNotMatch(page, /<q-drawer/);
     assert.doesNotMatch(page, /class="editor-drawer"/);
     assert.doesNotMatch(page, /v-model="articleForm\./);
@@ -1168,6 +1185,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /formatMarkdownSelection/);
     assert.match(editor, /q-btn-dropdown[\s\S]*Headings/);
     assert.match(editor, /q-btn-dropdown[\s\S]*More actions/);
+    assert.match(editor, /:disable="bodyEditorMode === 'preview'"/);
     assert.match(editor, /marked\.parse/);
     assert.doesNotMatch(editor, /label="Body"[\s\S]*type="textarea"/);
 

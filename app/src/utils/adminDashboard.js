@@ -397,18 +397,34 @@ export const buildArticlePayload = (form = {}) => {
   };
 };
 
+const markdownListPrefixForLine = (before, index) => (before === "1. " ? `${index + 1}. ` : before);
+
+const shouldFormatMarkdownLines = ({ before, after, selected }) => !after && ["- ", "1. "].includes(before) && selected.includes("\n");
+
 export const formatMarkdownSelection = ({ value = "", selectionStart, selectionEnd, before, after = "", placeholder = "text" } = {}) => {
   const text = String(value || "");
   const start = Number.isInteger(selectionStart) ? Math.max(0, Math.min(selectionStart, text.length)) : text.length;
   const end = Number.isInteger(selectionEnd) ? Math.max(start, Math.min(selectionEnd, text.length)) : start;
   const selected = text.slice(start, end) || placeholder;
-  const insertion = `${before || ""}${selected}${after || ""}`;
+  let insertion = `${before || ""}${selected}${after || ""}`;
+  let selectionOffset = String(before || "").length;
+  let selectedLength = selected.length;
+
+  if (shouldFormatMarkdownLines({ before, after, selected })) {
+    insertion = selected
+      .split("\n")
+      .map((line, index) => `${markdownListPrefixForLine(before, index)}${line}`)
+      .join("\n");
+    selectionOffset = markdownListPrefixForLine(before, 0).length;
+    selectedLength = insertion.length - selectionOffset;
+  }
+
   const nextValue = `${text.slice(0, start)}${insertion}${text.slice(end)}`;
-  const nextSelectionStart = start + String(before || "").length;
+  const nextSelectionStart = start + selectionOffset;
 
   return {
     value: nextValue,
     selectionStart: nextSelectionStart,
-    selectionEnd: nextSelectionStart + selected.length,
+    selectionEnd: nextSelectionStart + selectedLength,
   };
 };

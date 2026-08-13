@@ -41,7 +41,7 @@
           <div class="markdown-editor" :class="{ 'has-error': errors.body }">
             <div class="markdown-editor-label">Body <span>(required)</span></div>
             <div class="markdown-editor-toolbar">
-              <q-btn-dropdown flat dense icon="title" dropdown-icon="arrow_drop_down">
+              <q-btn-dropdown flat dense icon="title" dropdown-icon="arrow_drop_down" :disable="bodyEditorMode === 'preview'">
                 <q-list dense>
                   <q-item v-close-popup clickable @click="insertMarkdown('body', '# ', '', 'Heading 1')">
                     <q-item-section>Heading 1</q-item-section>
@@ -55,13 +55,13 @@
                 </q-list>
                 <q-tooltip>Headings</q-tooltip>
               </q-btn-dropdown>
-              <q-btn flat dense icon="format_bold" @click="insertMarkdown('body', '**', '**', 'bold text')" />
-              <q-btn flat dense icon="format_italic" @click="insertMarkdown('body', '_', '_', 'italic text')" />
-              <q-btn flat dense icon="format_quote" @click="insertMarkdown('body', '> ', '', 'Quote')" />
-              <q-btn flat dense icon="format_list_bulleted" @click="insertMarkdown('body', '- ', '', 'List item')" />
-              <q-btn flat dense icon="format_list_numbered" @click="insertMarkdown('body', '1. ', '', 'List item')" />
-              <q-btn flat dense icon="link" @click="insertMarkdown('body', '[', '](https://)', 'link text')" />
-              <q-btn-dropdown flat dense icon="more_horiz" dropdown-icon="arrow_drop_down">
+              <q-btn flat dense icon="format_bold" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '**', '**', 'bold text')" />
+              <q-btn flat dense icon="format_italic" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '_', '_', 'italic text')" />
+              <q-btn flat dense icon="format_quote" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '> ', '', 'Quote')" />
+              <q-btn flat dense icon="format_list_bulleted" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '- ', '', 'List item')" />
+              <q-btn flat dense icon="format_list_numbered" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '1. ', '', 'List item')" />
+              <q-btn flat dense icon="link" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '[', '](https://)', 'link text')" />
+              <q-btn-dropdown flat dense icon="more_horiz" dropdown-icon="arrow_drop_down" :disable="bodyEditorMode === 'preview'">
                 <q-list dense>
                   <q-item v-close-popup clickable @click="insertMarkdown('body', '`', '`', 'code')">
                     <q-item-section>Inline code</q-item-section>

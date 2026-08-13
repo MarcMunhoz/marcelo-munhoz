@@ -449,6 +449,7 @@ export default defineComponent({
     canOwnerPublishAction,
     canOwnerUnpublishAction,
     canArchiveArticleAction,
+    canUnarchiveArticleAction,
     async requestUnpublicationFromRow(article) {
       this.loadingAction = "unpublish";
 

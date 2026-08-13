@@ -29,6 +29,14 @@ describe("contentful management facade", () => {
       env: createEnv(),
       async fetchImpl(url, options) {
         calls.push({ url: url.toString(), options });
+        if (url.toString().endsWith("/tags?limit=1000")) {
+          return createResponse(200, {
+            items: [
+              { sys: { id: "vue" } },
+              { sys: { id: "contentful" } },
+            ],
+          });
+        }
         return createResponse(201, { sys: { id: "article-1", version: 1 } });
       },
     });
@@ -43,22 +51,24 @@ describe("contentful management facade", () => {
         author: "author-1",
         thumbnail: { public_id: "folder/image", secure_url: "https://example.invalid/image.jpg" },
         alt: "Draft thumbnail",
-        tags: ["vue", "contentful"],
+        tags: ["vue", "contentful", "unknown tag"],
       },
       session: { subject: "writer-123", authorEntryId: "author-1" },
     });
 
     assert.deepEqual(result, { sys: { id: "article-1", version: 1 } });
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 2);
 
-    const url = new URL(calls[0].url);
+    assert.equal(new URL(calls[0].url).pathname, "/spaces/space-id/environments/staging/tags");
+
+    const url = new URL(calls[1].url);
     assert.equal(url.origin, "https://api.contentful.com");
     assert.equal(url.pathname, "/spaces/space-id/environments/staging/entries");
-    assert.equal(calls[0].options.method, "POST");
-    assert.equal(calls[0].options.headers.authorization, "Bearer management-key");
-    assert.equal(calls[0].options.headers["x-contentful-content-type"], "article");
+    assert.equal(calls[1].options.method, "POST");
+    assert.equal(calls[1].options.headers.authorization, "Bearer management-key");
+    assert.equal(calls[1].options.headers["x-contentful-content-type"], "article");
 
-    const body = JSON.parse(calls[0].options.body);
+    const body = JSON.parse(calls[1].options.body);
     assert.equal(body.fields.title["en-US"], "Draft title");
     assert.equal(body.fields.slug["en-US"], "draft-title");
     assert.equal(body.fields.description["en-US"], "Draft description");
