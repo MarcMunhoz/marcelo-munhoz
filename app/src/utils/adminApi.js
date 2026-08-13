@@ -34,6 +34,10 @@ export const adminUserMessage = (error, { media = false } = {}) => {
     return media ? "Your account cannot select media." : "Your account cannot perform this action.";
   }
 
+  if (media && error.status === 500 && /configuration|config/i.test(error.message || error.payload?.error || "")) {
+    return "Media service is not configured for this environment.";
+  }
+
   if (!media && error.status === 409) {
     return "This article changed elsewhere. Reload before saving.";
   }
@@ -124,6 +128,13 @@ export const requestArticleUnpublication = ({ articleId, version, notes, session
 export const listMediaAssets = ({ session, maxResults = 24, fetchImpl } = {}) =>
   adminRequest({
     path: `${ADMIN_MEDIA_PATH}?max_results=${encodeURIComponent(maxResults)}`,
+    session,
+    fetchImpl,
+  });
+
+export const getMediaEditorConfig = ({ session, fetchImpl } = {}) =>
+  adminRequest({
+    path: "/media/editor-config",
     session,
     fetchImpl,
   });

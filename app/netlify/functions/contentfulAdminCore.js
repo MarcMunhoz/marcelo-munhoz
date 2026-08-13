@@ -230,6 +230,7 @@ const articleFieldsFromData = (data = {}, locale) =>
     ["thumbnail", localized(thumbnailFromData(data), locale)],
     ["alt", localized(data.alt, locale)],
     ["author", data.author ? localized(contentfulLink("Entry", data.author), locale) : undefined],
+    ["writerSubject", data.writerSubject ? localized(data.writerSubject, locale) : undefined],
     ["cloudinary", Array.isArray(data.cloudinary) ? localized(data.cloudinary, locale) : undefined],
   ]);
 
@@ -273,6 +274,16 @@ const cloudinaryConfigFromEnv = (env = {}, fetchImpl) => {
     apiKey: env.CLOUDINARY_API_KEY,
     apiSecret: env.CLOUDINARY_API_SECRET,
     folder: cloudinaryFolderFromEnv(env),
+  };
+};
+
+const cloudinaryEditorConfigFromEnv = (env = {}) => {
+  if (!env.CLOUDINARY_CLOUD_NAME) {
+    throw new CloudinaryMediaConfigurationError();
+  }
+
+  return {
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
   };
 };
 
@@ -460,6 +471,12 @@ const ensureSessionAuthorEntryId = (session = {}) => {
   return session.authorEntryId;
 };
 
+const articleDataForSession = (data = {}, session = {}) => ({
+  ...data,
+  author: ensureSessionAuthorEntryId(session),
+  writerSubject: session.subject || data.writerSubject || "",
+});
+
 const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
   const fields = entry.fields || {};
   const authorData = normalizedAuthor(resolvedEntry(firstLocalizedValue(fields, "author", locale), entryMap), locale);
@@ -485,8 +502,7 @@ const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
 const sessionOwnsArticle = (article = {}, session = {}) =>
   Boolean(
     (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
-      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId) ||
-      (isOwner(session) && article.author && session.name && article.author.trim().toLowerCase() === session.name.trim().toLowerCase())
+      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
   );
 
 const ensureCanEditArticle = (article = {}, session = {}) => {
@@ -603,6 +619,11 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
   };
 
   return {
+    async getMediaEditorConfig() {
+      return {
+        mediaEditor: cloudinaryEditorConfigFromEnv(env),
+      };
+    },
     async listMedia({ query = {} } = {}) {
       const config = cloudinaryConfigFromEnv(env, fetchImpl);
       const maxResults = safeMaxResults(query.max_results);
@@ -700,7 +721,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
   const articlePath = (articleId) => `/entries/${encodeURIComponent(articleId)}`;
 
   return {
-    async createArticleDraft({ data }) {
+    async createArticleDraft({ data, session }) {
       const config = managementConfigFromEnv(env, fetchImpl);
 
       return request({
@@ -709,7 +730,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         headers: {
           "x-contentful-content-type": "article",
         },
-        body: articlePayloadFromData(data, config.locale),
+        body: articlePayloadFromData(articleDataForSession(data, session), config.locale),
       });
     },
     async listAdminArticles({ session } = {}) {
@@ -749,7 +770,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
             ...(request?.writerName ? { writerName: request.writerName } : {}),
           };
         })
-        .filter((article) => isOwner(session) || article.status === "published" || article.writerSubject === session?.subject);
+        .filter((article) => isOwner(session) || article.status === "published" || sessionOwnsArticle(article, session));
 
       return {
         articles,
@@ -799,7 +820,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         headers: {
           "x-contentful-version": version,
         },
-        body: articlePayloadFromData(data, config.locale),
+        body: articlePayloadFromData(articleDataForSession(data, session), config.locale),
       });
     },
     async publishArticle({ articleId, data }) {
@@ -979,6 +1000,15 @@ export const createContentfulAdminHandler = ({
         role: "writer",
         operation: adminOperations.listMedia,
         payload: { query },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/media/editor-config") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.getMediaEditorConfig,
+        payload: {},
       });
     }
 

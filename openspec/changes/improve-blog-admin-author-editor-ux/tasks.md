@@ -34,23 +34,23 @@
 
 ## 6. Creator-Scoped Editing And Owner Moderation
 
-- [ ] 6.1 Enforce edit button visibility and save authorization only for articles created by the signed-in author.
-- [ ] 6.2 Preserve owner moderation actions for other authors' articles without allowing owner body edits.
-- [ ] 6.3 Add tests for owner-created, writer-created, other-author, published, draft, and review-state action matrices.
-- [ ] 6.4 Document the moderation boundary for owner actions and future feedback-wall work.
+- [x] 6.1 Enforce edit button visibility and save authorization only for articles created by the signed-in author.
+- [x] 6.2 Preserve owner moderation actions for other authors' articles without allowing owner body edits.
+- [x] 6.3 Add tests for owner-created, writer-created, other-author, published, draft, and review-state action matrices.
+- [x] 6.4 Document the moderation boundary for owner actions and future feedback-wall work.
 
 ## 7. Visual Image Workflow
 
-- [ ] 7.1 Make existing article thumbnail previews actionable for image replacement and supported edit actions.
-- [ ] 7.2 Hide raw Cloudinary IDs and URLs from primary editor controls while keeping diagnostics intentional.
-- [ ] 7.3 Keep media library selection visual and ensure selected assets update the article thumbnail preview.
-- [ ] 7.4 Add fallback states for empty media, missing configuration, and upstream media failures.
+- [x] 7.1 Make existing article thumbnail previews actionable for image replacement and supported edit actions.
+- [x] 7.2 Hide raw Cloudinary IDs and URLs from primary editor controls while keeping diagnostics intentional.
+- [x] 7.3 Keep media library selection visual and ensure selected assets update the article thumbnail preview.
+- [x] 7.4 Add fallback states for empty media, missing configuration, and upstream media failures.
 
 ## 8. Cloudinary Editing Integration
 
-- [ ] 8.1 Evaluate Cloudinary Media Editor widget integration behind a small adapter loaded only when image editing is requested.
-- [ ] 8.2 Implement widget configuration for supported existing-image edits without exposing Cloudinary secrets.
-- [ ] 8.3 Decide whether edited images create a derived asset, update article transformation metadata, or store a new asset reference.
+- [x] 8.1 Evaluate Cloudinary Media Editor widget integration behind a small adapter loaded only when image editing is requested.
+- [x] 8.2 Implement widget configuration for supported existing-image edits without exposing Cloudinary secrets.
+- [x] 8.3 Decide whether edited images create a derived asset, update article transformation metadata, or store a new asset reference.
 - [ ] 8.4 Validate Upload Widget and Media Editor behavior in staging before relying on either path as the primary editing workflow.
 
 ## 9. Verification

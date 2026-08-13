@@ -5,8 +5,7 @@ const isWriter = (session) => hasRole(session, "writer") || isOwner(session);
 const ownsArticle = (article = {}, session = {}) =>
   Boolean(
     (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
-      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId) ||
-      (isOwner(session) && normalize(article.author || article.authorName) && normalize(article.author || article.authorName) === normalize(session.name))
+      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
   );
 
 export const slugFromTitle = (title = "") =>
@@ -92,6 +91,16 @@ const assetTitleFromPublicId = (publicId = "") => {
   return leaf;
 };
 
+const safeMediaErrorMessage = (error = "") => {
+  const message = String(error || "").trim();
+
+  if (message === "Media service is not configured for this environment.") {
+    return message;
+  }
+
+  return "Media request failed.";
+};
+
 export const normalizeMediaAssetDisplay = (asset = {}) => {
   const customContext = asset.context?.custom || {};
   const title = String(asset.display_name || customContext.alt || customContext.caption || assetTitleFromPublicId(asset.public_id)).trim();
@@ -119,7 +128,7 @@ export const mediaLibraryState = ({ assets = [], error = "", isLoading = false }
   if (error) {
     return {
       status: "error",
-      message: "Media request failed.",
+      message: safeMediaErrorMessage(error),
       assets: [],
     };
   }
@@ -323,7 +332,7 @@ export const canEditArticleAction = (article = {}, session) => {
 };
 
 export const canPrepareReviewAction = (article = {}, session = { roles: ["writer"] }) => {
-  if (!article.id || !hasRole(session, "writer") || isOwner(session) || !ownsArticle(article, session)) {
+  if (!article.id || !isWriter(session) || isOwner(session) || !ownsArticle(article, session)) {
     return false;
   }
 
@@ -331,7 +340,7 @@ export const canPrepareReviewAction = (article = {}, session = { roles: ["writer
 };
 
 export const canRequestUnpublicationAction = (article = {}, session = { roles: ["writer"] }) =>
-  Boolean(article.id && hasRole(session, "writer") && !isOwner(session) && ownsArticle(article, session) && normalize(article.status) === "published");
+  Boolean(article.id && isWriter(session) && !isOwner(session) && ownsArticle(article, session) && normalize(article.status) === "published");
 
 export const canOwnerPublishAction = (article = {}, session) => Boolean(article.id && isOwner(session) && normalize(article.status) === "review");
 

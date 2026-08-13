@@ -5,6 +5,7 @@ import {
   adminUserMessage,
   AdminApiError,
   archiveArticle,
+  getMediaEditorConfig,
   getAuthorProfile,
   createArticleDraft,
   deleteArticle,
@@ -42,6 +43,7 @@ import {
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../src/utils/adminDashboard.js";
+import { buildMediaEditorOptions, normalizeMediaEditorExport, openCloudinaryMediaEditor } from "../src/utils/cloudinaryMediaEditor.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -109,7 +111,9 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(index, /identity\.netlify\.com\/v1\/netlify-identity-widget\.js/);
     assert.match(netlifyConfig, /script-src[^"]*https:\/\/identity\.netlify\.com/);
+    assert.match(netlifyConfig, /script-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
     assert.match(netlifyConfig, /connect-src[^"]*https:\/\/identity\.netlify\.com/);
+    assert.match(netlifyConfig, /frame-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
   });
 
   it("provides admin API helpers for draft and workflow requests", () => {
@@ -118,6 +122,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /\/api\/admin\/contentful\/articles/);
     assert.match(api, /\/media\/assets/);
     assert.match(api, /\/media\/upload/);
+    assert.match(api, /\/media\/editor-config/);
     assert.match(api, /\/author-profile/);
     assert.match(api, /createArticleDraft/);
     assert.match(api, /updateArticleDraft/);
@@ -130,6 +135,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /archiveArticle/);
     assert.match(api, /deleteArticle/);
     assert.match(api, /listMediaAssets/);
+    assert.match(api, /getMediaEditorConfig/);
     assert.match(api, /uploadMediaAsset/);
     assert.match(api, /Authorization/);
   });
@@ -194,6 +200,30 @@ describe("admin frontend writer workflow", () => {
       ]
     );
     assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
+  });
+
+  it("loads Cloudinary Media Editor public configuration without write credentials", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { mediaEditor: { cloudName: "demo-cloud" } };
+        },
+      };
+    };
+
+    const response = await getMediaEditorConfig({
+      session: { token: "jwt-token", roles: ["writer"] },
+      fetchImpl,
+    });
+
+    assert.deepEqual(response, { mediaEditor: { cloudName: "demo-cloud" } });
+    assert.equal(calls[0].url, "/api/admin/contentful/media/editor-config");
+    assert.equal(calls[0].options.headers.Authorization, "Bearer jwt-token");
+    assert.doesNotMatch(JSON.stringify(response), /api.?key|secret/i);
   });
 
   it("calls author profile endpoints without using Netlify Identity fields as profile payload", async () => {
@@ -584,7 +614,7 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canRequestUnpublicationAction({ id: "review-1", status: "review", writerSubject: "writer-1" }, writer), false);
   });
 
-  it("shows writer actions only for writer-eligible article states", () => {
+  it("shows writer actions only for writer-owned article states", () => {
     const writer = { subject: "writer-1", roles: ["writer"], authorEntryId: "author-1" };
 
     assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
@@ -600,24 +630,68 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, writer), false);
   });
 
-  it("shows owner lifecycle actions directly instead of writer request actions", () => {
+  it("keeps owner body editing scoped to owned articles while preserving moderation", () => {
     const owner = { subject: "owner-1", roles: ["owner"], authorEntryId: "author-1" };
 
+    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "owner-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-1", status: "published", authorEntryId: "author-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-2", status: "published", authorEntryId: "author-2" }, owner), false);
     assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, owner), true);
+    assert.equal(canOwnerUnpublishAction({ id: "take-down-1", status: "unpublicationRequested" }, owner), true);
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, owner), true);
 
     assert.equal(canPrepareReviewAction({ id: "review-1", status: "review" }, owner), false);
     assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }, owner), false);
   });
 
-  it("allows an owner to edit legacy articles when the resolved author name matches their identity", () => {
+  it("does not treat matching display names as trusted edit ownership", () => {
     const owner = { subject: "owner-1", name: "Marcelo Munhoz", roles: ["owner"] };
 
-    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", author: "Marcelo Munhoz" }, owner), true);
+    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", author: "Marcelo Munhoz" }, owner), false);
     assert.equal(canEditArticleAction({ id: "draft-2", status: "draft", author: "Guest Writer" }, owner), false);
+  });
+
+  it("covers creator-scoped action matrices across draft, review, published, and other-author rows", () => {
+    const writer = { subject: "writer-1", roles: ["writer"], authorEntryId: "author-1" };
+    const owner = { subject: "owner-1", roles: ["owner"], authorEntryId: "author-owner" };
+    const rows = [
+      { id: "own-draft", status: "draft", authorEntryId: "author-1" },
+      { id: "own-review", status: "review", writerSubject: "writer-1" },
+      { id: "own-published", status: "published", writerSubject: "writer-1" },
+      { id: "other-draft", status: "draft", authorEntryId: "author-2" },
+    ];
+
+    assert.deepEqual(
+      rows.map((row) => ({
+        id: row.id,
+        edit: canEditArticleAction(row, writer),
+        review: canPrepareReviewAction(row, writer),
+        requestUnpublication: canRequestUnpublicationAction(row, writer),
+      })),
+      [
+        { id: "own-draft", edit: true, review: true, requestUnpublication: false },
+        { id: "own-review", edit: true, review: false, requestUnpublication: false },
+        { id: "own-published", edit: true, review: false, requestUnpublication: true },
+        { id: "other-draft", edit: false, review: false, requestUnpublication: false },
+      ]
+    );
+
+    assert.deepEqual(
+      rows.map((row) => ({
+        id: row.id,
+        edit: canEditArticleAction(row, owner),
+        publish: canOwnerPublishAction(row, owner),
+        unpublish: canOwnerUnpublishAction(row, owner),
+        archive: canArchiveArticleAction(row, owner),
+      })),
+      [
+        { id: "own-draft", edit: false, publish: false, unpublish: false, archive: true },
+        { id: "own-review", edit: false, publish: true, unpublish: false, archive: true },
+        { id: "own-published", edit: false, publish: false, unpublish: true, archive: true },
+        { id: "other-draft", edit: false, publish: false, unpublish: false, archive: true },
+      ]
+    );
   });
 
   it("resolves Contentful thumbnail images with legacy Cloudinary fallback", () => {
@@ -673,6 +747,11 @@ describe("admin frontend writer workflow", () => {
     assert.deepEqual(mediaLibraryState({ error: "Cloudinary API secret leaked raw diagnostic" }), {
       status: "error",
       message: "Media request failed.",
+      assets: [],
+    });
+    assert.deepEqual(mediaLibraryState({ error: "Media service is not configured for this environment." }), {
+      status: "error",
+      message: "Media service is not configured for this environment.",
       assets: [],
     });
     assert.deepEqual(mediaLibraryState({ assets: [{ public_id: "folder/photo", url: "https://example.test/photo.jpg" }] }), {
@@ -732,6 +811,17 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /Select image/);
     assert.match(editor, /Upload image/);
     assert.match(editor, /thumbnail-preview/);
+    assert.match(editor, /thumbnail-preview-button/);
+    assert.match(editor, /Replace image/);
+    assert.match(editor, /Clear image/);
+    assert.match(editor, /Edit image/);
+    assert.match(editor, /Image diagnostics/);
+    assert.match(editor, /showMediaDiagnostics/);
+    assert.match(editor, /clearThumbnail/);
+    assert.match(editor, /editThumbnailImage/);
+    assert.match(editor, /openCloudinaryMediaEditor/);
+    assert.match(editor, /getMediaEditorConfig/);
+    assert.match(editor, /applyEditedMedia/);
     assert.match(editor, /articleForm\.thumbnailUrl/);
     assert.match(editor, /articleForm\.tagList/);
     assert.match(editor, /addTagToArticleForm/);
@@ -853,8 +943,81 @@ describe("admin frontend writer workflow", () => {
       adminUserMessage(new AdminApiError(502, { error: "Cloudinary API returned api-secret from raw diagnostics" }), { media: true }),
       "Media request failed."
     );
+    assert.equal(
+      adminUserMessage(new AdminApiError(500, { error: "Server configuration error" }), { media: true }),
+      "Media service is not configured for this environment."
+    );
     assert.equal(adminUserMessage(new AdminApiError(401, { error: "raw" })), "Sign in again before saving.");
     assert.equal(adminUserMessage(new AdminApiError(403, { error: "raw" })), "Your account cannot perform this action.");
     assert.equal(adminUserMessage(new AdminApiError(409, { error: "raw" })), "This article changed elsewhere. Reload before saving.");
+  });
+
+  it("configures Cloudinary Media Editor with public image options only", async () => {
+    assert.deepEqual(buildMediaEditorOptions({ cloudName: "demo-cloud", publicId: "folder/image" }), {
+      cloudName: "demo-cloud",
+      publicIds: ["folder/image"],
+      image: {
+        steps: ["resizeAndCrop", "textOverlays", "export"],
+        resizeAndCrop: {
+          cropPresets: ["original", "square", "landscape-16:9", "landscape-4:3"],
+        },
+        export: {
+          formats: ["jpg", "png", "webp"],
+          quality: ["auto", "best", "good"],
+          download: false,
+          share: false,
+        },
+      },
+    });
+
+    assert.deepEqual(normalizeMediaEditorExport({ assets: [{ public_id: "folder/image", secure_url: "https://res.cloudinary.com/demo/image/upload/f_auto/folder/image.jpg" }] }), {
+      publicId: "folder/image",
+      secureUrl: "https://res.cloudinary.com/demo/image/upload/f_auto/folder/image.jpg",
+      transformation: "",
+    });
+
+    let updateOptions = null;
+    let exportHandler = null;
+    let shown = false;
+    const windowRef = {
+      cloudinary: {
+        mediaEditor() {
+          return {
+            update(options) {
+              updateOptions = options;
+            },
+            on(eventName, handler) {
+              if (eventName === "export") {
+                exportHandler = handler;
+              }
+            },
+            show() {
+              shown = true;
+            },
+          };
+        },
+      },
+    };
+    const exported = [];
+
+    await openCloudinaryMediaEditor({
+      cloudName: "demo-cloud",
+      publicId: "folder/image",
+      onExport: (asset) => exported.push(asset),
+      windowRef,
+    });
+    exportHandler({ public_id: "folder/image", url: "https://res.cloudinary.com/demo/image/upload/c_crop/folder/image.jpg" });
+
+    assert.equal(shown, true);
+    assert.equal(updateOptions.cloudName, "demo-cloud");
+    assert.deepEqual(updateOptions.publicIds, ["folder/image"]);
+    assert.deepEqual(exported, [
+      {
+        publicId: "folder/image",
+        secureUrl: "https://res.cloudinary.com/demo/image/upload/c_crop/folder/image.jpg",
+        transformation: "",
+      },
+    ]);
+    assert.doesNotMatch(JSON.stringify(updateOptions), /api.?key|secret/i);
   });
 });

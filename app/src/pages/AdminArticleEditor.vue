@@ -54,15 +54,31 @@
             <q-icon name="cloud_upload" />
             <span>Thumbnail</span>
           </div>
-          <div v-if="articleForm.thumbnailUrl" class="thumbnail-preview">
+          <button v-if="articleForm.thumbnailUrl" type="button" class="thumbnail-preview thumbnail-preview-button" @click="openMediaLibrary">
             <img :src="articleForm.thumbnailUrl" :alt="articleForm.alt || 'Article thumbnail preview'" />
-          </div>
-          <div v-else class="thumbnail-preview empty">
+            <span class="thumbnail-preview-action">
+              <q-icon name="perm_media" />
+              Replace image
+            </span>
+          </button>
+          <div v-else class="thumbnail-preview empty" role="button" tabindex="0" @click="openMediaLibrary" @keyup.enter="openMediaLibrary">
             <q-icon name="image" size="34px" />
             <span>No thumbnail selected</span>
+            <small>Select an image from the media library</small>
           </div>
           <div class="media-actions">
             <q-btn outline color="blue-grey-7" icon="perm_media" label="Select image" no-caps :loading="loadingAction === 'media-list'" @click="openMediaLibrary" />
+            <q-btn
+              outline
+              color="blue-grey-7"
+              icon="crop"
+              label="Edit image"
+              no-caps
+              :disable="!articleForm.thumbnailPublicId"
+              :loading="loadingAction === 'media-editor'"
+              @click="editThumbnailImage"
+            />
+            <q-btn outline color="blue-grey-7" icon="backspace" label="Clear image" no-caps :disable="!articleForm.thumbnailUrl" @click="clearThumbnail" />
             <q-file
               v-model="mediaUploadFile"
               dense
@@ -79,6 +95,18 @@
             </q-file>
           </div>
           <q-input v-model="articleForm.alt" label="Alt text" outlined dense />
+          <q-expansion-item v-if="articleForm.thumbnailPublicId || articleForm.thumbnailUrl" v-model="showMediaDiagnostics" dense icon="bug_report" label="Image diagnostics" class="media-diagnostics">
+            <dl>
+              <div v-if="articleForm.thumbnailPublicId">
+                <dt>Cloudinary public ID</dt>
+                <dd>{{ articleForm.thumbnailPublicId }}</dd>
+              </div>
+              <div v-if="articleForm.thumbnailUrl">
+                <dt>Delivery URL</dt>
+                <dd>{{ articleForm.thumbnailUrl }}</dd>
+              </div>
+            </dl>
+          </q-expansion-item>
         </section>
 
         <section class="editor-card">
@@ -99,9 +127,31 @@
         <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
 
         <div class="editor-actions">
-          <q-btn unelevated color="blue-grey-8" icon="save" label="Save draft" dense no-caps type="submit" :loading="loadingAction === 'save'" />
-          <q-btn outline color="blue-grey-7" icon="rate_review" label="Submit for review" dense no-caps :disable="!articleForm.id" :loading="loadingAction === 'review'" @click="submitReview" />
-          <q-btn outline color="amber-9" icon="visibility_off" label="Request unpublication" dense no-caps :disable="!articleForm.id" :loading="loadingAction === 'unpublish'" @click="requestUnpublication" />
+          <q-btn v-if="canSaveArticle" unelevated color="blue-grey-8" icon="save" label="Save draft" dense no-caps type="submit" :loading="loadingAction === 'save'" />
+          <q-btn
+            v-if="canSubmitArticleForReview"
+            outline
+            color="blue-grey-7"
+            icon="rate_review"
+            label="Submit for review"
+            dense
+            no-caps
+            :disable="!articleForm.id"
+            :loading="loadingAction === 'review'"
+            @click="submitReview"
+          />
+          <q-btn
+            v-if="canRequestArticleUnpublication"
+            outline
+            color="amber-9"
+            icon="visibility_off"
+            label="Request unpublication"
+            dense
+            no-caps
+            :disable="!articleForm.id"
+            :loading="loadingAction === 'unpublish'"
+            @click="requestUnpublication"
+          />
         </div>
       </q-form>
     </section>
@@ -162,6 +212,7 @@
 import { defineComponent } from "vue";
 import {
   createArticleDraft,
+  getMediaEditorConfig,
   listAdminArticles,
   listMediaAssets,
   requestArticleUnpublication,
@@ -175,12 +226,16 @@ import {
   applyArticleResponseToForm,
   articleToForm,
   buildArticlePayload,
+  canEditArticleAction,
+  canPrepareReviewAction,
+  canRequestUnpublicationAction,
   createEmptyArticleForm,
   mediaLibraryState,
   reconcileAdminDashboardData,
   slugFromTitle,
 } from "../utils/adminDashboard.js";
 import { getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
+import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
 
 export default defineComponent({
   name: "AdminArticleEditor",
@@ -196,7 +251,10 @@ export default defineComponent({
       mediaAssets: [],
       mediaDialogOpen: false,
       mediaError: "",
+      mediaEditorConfig: null,
       mediaUploadFile: null,
+      showMediaDiagnostics: false,
+      loadedArticle: null,
       statusMessage: "",
       feedbackMessage: "",
       feedbackTone: "info",
@@ -230,6 +288,15 @@ export default defineComponent({
         "feedback-error": this.feedbackTone === "error",
         "feedback-info": this.feedbackTone === "info",
       };
+    },
+    canSaveArticle() {
+      return this.isNewArticle || canEditArticleAction(this.loadedArticle, this.session);
+    },
+    canSubmitArticleForReview() {
+      return canPrepareReviewAction(this.loadedArticle, this.session);
+    },
+    canRequestArticleUnpublication() {
+      return canRequestUnpublicationAction(this.loadedArticle, this.session);
     },
   },
   async mounted() {
@@ -284,6 +351,7 @@ export default defineComponent({
 
       if (this.isNewArticle) {
         this.articleForm = createEmptyArticleForm();
+        this.loadedArticle = null;
         this.articleForm.author = this.session?.authorEntryId || "";
         this.articleForm.authorEntryId = this.session?.authorEntryId || "";
         this.articleForm.authorName = this.session?.name || "";
@@ -305,6 +373,13 @@ export default defineComponent({
           return;
         }
 
+        if (!canEditArticleAction(article, this.session)) {
+          this.loadedArticle = article;
+          this.dashboardError = "This article belongs to another author. Use owner moderation actions from the dashboard instead.";
+          return;
+        }
+
+        this.loadedArticle = article;
         this.articleForm = articleToForm(article);
         this.statusMessage = "Loaded";
         this.slugTouched = true;
@@ -359,6 +434,11 @@ export default defineComponent({
       return Object.keys(errors).length === 0;
     },
     async saveDraft() {
+      if (!this.canSaveArticle) {
+        this.showFeedback("This article belongs to another author. Use moderation actions from the dashboard.", "error");
+        return;
+      }
+
       if (!this.validateArticleForm()) {
         this.showFeedback("Fix the highlighted fields before saving.", "error");
         return;
@@ -373,6 +453,13 @@ export default defineComponent({
           : await createArticleDraft({ article: payload, session: this.session });
 
         this.articleForm = applyArticleResponseToForm(this.articleForm, response);
+        this.loadedArticle = {
+          ...(this.loadedArticle || {}),
+          id: this.articleForm.id,
+          status: this.loadedArticle?.status || "draft",
+          authorEntryId: this.articleForm.authorEntryId,
+          writerSubject: this.session?.subject || this.loadedArticle?.writerSubject || "",
+        };
         this.statusMessage = "Draft saved";
         this.snapshotForm();
         this.showFeedback("Draft saved.", "success");
@@ -437,7 +524,59 @@ export default defineComponent({
       this.articleForm.thumbnailUrl = asset.thumbnailUrl || asset.secure_url || asset.url || "";
       this.articleForm.alt = this.articleForm.alt || asset.alt || asset.title || "";
       this.mediaDialogOpen = false;
+      this.showMediaDiagnostics = false;
       this.showFeedback("Image selected.", "success");
+    },
+    applyEditedMedia(asset = {}) {
+      const secureUrl = asset.secureUrl || asset.secure_url || asset.url || "";
+
+      if (!secureUrl) {
+        this.showFeedback("The editor did not return an image URL. Select or upload an image instead.", "error");
+        return;
+      }
+
+      this.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || this.articleForm.thumbnailPublicId;
+      this.articleForm.thumbnailUrl = secureUrl;
+      this.showMediaDiagnostics = false;
+      this.showFeedback("Edited image applied. Save the draft to keep it.", "success");
+    },
+    async loadMediaEditorConfig() {
+      if (this.mediaEditorConfig) {
+        return this.mediaEditorConfig;
+      }
+
+      const response = await getMediaEditorConfig({ session: this.session });
+      this.mediaEditorConfig = response.mediaEditor || null;
+      return this.mediaEditorConfig;
+    },
+    async editThumbnailImage() {
+      if (!this.articleForm.thumbnailPublicId) {
+        this.showFeedback("Select an image before opening the editor.", "error");
+        return;
+      }
+
+      this.mediaError = "";
+      this.loadingAction = "media-editor";
+
+      try {
+        const config = await this.loadMediaEditorConfig();
+        await openCloudinaryMediaEditor({
+          cloudName: config?.cloudName,
+          publicId: this.articleForm.thumbnailPublicId,
+          onExport: this.applyEditedMedia,
+        });
+        this.showFeedback("Image editor opened. Export an image there to update the thumbnail.", "info");
+      } catch (error) {
+        this.handleMediaEditorError(error);
+      } finally {
+        this.loadingAction = "";
+      }
+    },
+    clearThumbnail() {
+      this.articleForm.thumbnailPublicId = "";
+      this.articleForm.thumbnailUrl = "";
+      this.showMediaDiagnostics = false;
+      this.showFeedback("Image cleared.", "info");
     },
     syncArticleTags() {
       this.articleForm.tags = this.articleForm.tagList.join(", ");
@@ -506,6 +645,17 @@ export default defineComponent({
       }
 
       this.mediaError = adminUserMessage(error, { media: true });
+      this.showFeedback(this.mediaError, "error");
+    },
+    handleMediaEditorError(error) {
+      if (error instanceof AdminApiError) {
+        this.mediaError = adminUserMessage(error, { media: true });
+      } else if (error instanceof CloudinaryMediaEditorUnavailableError) {
+        this.mediaError = "Image editor is unavailable. Select or upload an image instead.";
+      } else {
+        this.mediaError = "Image editor is unavailable. Select or upload an image instead.";
+      }
+
       this.showFeedback(this.mediaError, "error");
     },
     showFeedback(message, tone = "info") {
@@ -608,7 +758,7 @@ export default defineComponent({
 .media-actions {
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+  grid-template-columns: minmax(140px, 170px) minmax(120px, 150px) minmax(120px, 150px) minmax(0, 1fr);
 }
 
 .media-upload {
@@ -618,10 +768,12 @@ export default defineComponent({
 .thumbnail-preview {
   align-items: center;
   background: #eef3f5;
+  border: 1px solid transparent;
   display: flex;
   justify-content: center;
   min-height: 220px;
   overflow: hidden;
+  position: relative;
 
   img {
     max-height: 360px;
@@ -630,12 +782,59 @@ export default defineComponent({
   }
 }
 
+.thumbnail-preview-button {
+  cursor: pointer;
+  padding: 0;
+  text-align: inherit;
+  width: 100%;
+
+  &:focus-visible,
+  &:hover {
+    border-color: #607d8b;
+  }
+}
+
+.thumbnail-preview-action {
+  align-items: center;
+  background: rgb(38 50 56 / 88%);
+  color: #ffffff;
+  display: flex;
+  font-weight: 700;
+  gap: 6px;
+  inset: auto 12px 12px auto;
+  padding: 8px 10px;
+  position: absolute;
+}
+
 .thumbnail-preview.empty {
   color: #607d8b;
   display: grid;
   gap: 6px;
   min-height: 140px;
   place-items: center;
+}
+
+.media-diagnostics {
+  border: 1px dashed #cfd8dc;
+
+  dl {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0 12px 12px;
+  }
+
+  dt {
+    color: #607d8b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 .tag-chip-list,

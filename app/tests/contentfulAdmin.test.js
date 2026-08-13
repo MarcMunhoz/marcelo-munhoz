@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   CloudinaryMediaConfigurationError,
   CloudinaryMediaRequestError,
+  ContentfulAdminAuthorizationError,
   ContentfulAdminConfigurationError,
   ContentfulAuthorProfileResolutionError,
   ContentfulManagementRequestError,
@@ -234,6 +235,7 @@ describe("contentful admin handler", () => {
       ["GET", "/author-profile", "getAuthorProfile"],
       ["PUT", "/author-profile", "updateAuthorProfile"],
       ["GET", "/media/assets", "listMedia"],
+      ["GET", "/media/editor-config", "getMediaEditorConfig"],
       ["POST", "/media/upload", "uploadMedia"],
     ]) {
       let operationRan = false;
@@ -571,6 +573,122 @@ describe("contentful admin handler", () => {
     assert.doesNotMatch(calls[0], /content_type=|include=|order=/);
   });
 
+  it("includes writer-owned drafts resolved by author entry mapping", async () => {
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          items: [
+            {
+              sys: { id: "own-draft-1", version: 2, contentType: { sys: { id: "article" } } },
+              fields: {
+                title: { "pt-BR": "Own draft" },
+                author: { "pt-BR": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+              },
+            },
+            {
+              sys: { id: "other-draft-1", version: 2, contentType: { sys: { id: "article" } } },
+              fields: {
+                title: { "pt-BR": "Other draft" },
+                author: { "pt-BR": { sys: { type: "Link", linkType: "Entry", id: "author-2" } } },
+              },
+            },
+          ],
+        };
+      },
+    });
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    const dashboard = await facade.listAdminArticles({ session: createSession(["writer"], { authorEntryId: "author-1" }) });
+
+    assert.deepEqual(
+      dashboard.articles.map((article) => article.id),
+      ["own-draft-1"]
+    );
+    assert.deepEqual(dashboard.summary, { published: 0, drafts: 1, review: 0, archived: 0, total: 1 });
+  });
+
+  it("forces created article ownership to the signed-in author", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method, body: options.body });
+
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { sys: { id: "article-1", version: 3 } };
+        },
+      };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    await facade.createArticleDraft({
+      data: { title: "Draft", author: "author-2" },
+      session: createSession(["writer"], { authorEntryId: "author-1" }),
+    });
+
+    const body = JSON.parse(calls[0].body);
+    assert.equal(body.fields.author["pt-BR"].sys.id, "author-1");
+    assert.equal(body.fields.writerSubject["pt-BR"], "user-123");
+  });
+
+  it("rejects article body edits for other authors even when the signed-in user is owner", async () => {
+    const fetchImpl = async (url, options = {}) => {
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              sys: { id: "article-1", version: 7, contentType: { sys: { id: "article" } } },
+              fields: {
+                title: { "pt-BR": "Other article" },
+                author: { "pt-BR": { sys: { type: "Link", linkType: "Entry", id: "author-2" } } },
+                writerSubject: { "pt-BR": "writer-999" },
+              },
+            };
+          },
+        };
+      }
+
+      throw new Error("Other-author update should not be sent to Contentful");
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    await assert.rejects(
+      () =>
+        facade.updateArticleDraft({
+          articleId: "article-1",
+          data: { title: "Changed", version: 7, author: "author-1" },
+          session: createSession(["owner"], { authorEntryId: "author-1" }),
+        }),
+      ContentfulAdminAuthorizationError
+    );
+  });
+
   it("keeps dashboard article reads available when editorial workflow records are absent from the entry collection", async () => {
     const calls = [];
     const fetchImpl = async (url) => {
@@ -843,7 +961,7 @@ describe("contentful admin handler", () => {
     assert.deepEqual(calls.map((call) => call.method), ["GET", "PUT"]);
   });
 
-  it("allows owner draft updates for legacy articles when the resolved author name matches the session", async () => {
+  it("rejects legacy owner draft updates when only the display author name matches the session", async () => {
     const calls = [];
     const fetchImpl = async (url, options = {}) => {
       calls.push({ url: String(url), method: options.method, body: options.body });
@@ -863,16 +981,6 @@ describe("contentful admin handler", () => {
         };
       }
 
-      if (String(url).endsWith("/entries/article-1") && options.method === "PUT") {
-        return {
-          ok: true,
-          status: 200,
-          async json() {
-            return { sys: { id: "article-1", version: 9 } };
-          },
-        };
-      }
-
       throw new Error(`Unexpected Contentful URL: ${url}`);
     };
     const facade = createContentfulManagementFacade({
@@ -884,14 +992,16 @@ describe("contentful admin handler", () => {
       fetchImpl,
     });
 
-    const response = await facade.updateArticleDraft({
-      articleId: "article-1",
-      data: { title: "Changed", version: 8 },
-      session: createSession(["owner"], { name: "Marcelo Munhoz" }),
-    });
-
-    assert.deepEqual(response, { sys: { id: "article-1", version: 9 } });
-    assert.deepEqual(calls.map((call) => call.method), ["GET", "PUT"]);
+    await assert.rejects(
+      () =>
+        facade.updateArticleDraft({
+          articleId: "article-1",
+          data: { title: "Changed", version: 8 },
+          session: createSession(["owner"], { name: "Marcelo Munhoz" }),
+        }),
+      ContentfulAdminAuthorizationError
+    );
+    assert.deepEqual(calls.map((call) => call.method), ["GET"]);
   });
 
   it("allows writer sessions to record submit-for-review workflow requests", async () => {

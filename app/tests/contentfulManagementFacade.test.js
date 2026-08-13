@@ -45,6 +45,7 @@ describe("contentful management facade", () => {
         alt: "Draft thumbnail",
         tags: ["vue", "contentful"],
       },
+      session: { subject: "writer-123", authorEntryId: "author-1" },
     });
 
     assert.deepEqual(result, { sys: { id: "article-1", version: 1 } });
@@ -66,6 +67,7 @@ describe("contentful management facade", () => {
     assert.deepEqual(body.fields.author["en-US"], {
       sys: { type: "Link", linkType: "Entry", id: "author-1" },
     });
+    assert.equal(body.fields.writerSubject["en-US"], "writer-123");
     assert.deepEqual(body.fields.thumbnail["en-US"], { public_id: "folder/image", secure_url: "https://example.invalid/image.jpg" });
     assert.equal(body.fields.alt["en-US"], "Draft thumbnail");
     assert.deepEqual(body.metadata.tags, [
@@ -274,7 +276,10 @@ describe("contentful management facade", () => {
       },
     });
 
-    const result = await facade.createArticleDraft({ data: { title: "Draft" } });
+    const result = await facade.createArticleDraft({
+      data: { title: "Draft" },
+      session: { subject: "writer-123", authorEntryId: "author-1" },
+    });
 
     assert.deepEqual(result, {});
   });
