@@ -221,6 +221,20 @@ describe("cloudinary media facade", () => {
     assert.equal(called, false);
   });
 
+  it("returns only public Cloudinary config for the Media Editor widget", async () => {
+    const facade = createCloudinaryMediaFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        throw new Error("Media editor config should not call Cloudinary");
+      },
+    });
+
+    const result = await facade.getMediaEditorConfig();
+
+    assert.deepEqual(result, { mediaEditor: { cloudName: "demo-cloud" } });
+    assert.doesNotMatch(JSON.stringify(result), /api.?key|secret|folder/i);
+  });
+
   it("maps upstream media failures to safe media request errors", async () => {
     const facade = createCloudinaryMediaFacade({
       env: createEnv(),
@@ -296,12 +310,15 @@ describe("cloudinary media admin routes", () => {
     assert.equal(operationRan, false);
   });
 
-  it("allows writer sessions to list and upload media through narrow routes", async () => {
+  it("allows writer sessions to list, configure, and upload media through narrow routes", async () => {
     const handler = createContentfulAdminHandler({
       getSession() {
         return createSession(["writer"]);
       },
       operations: {
+        async getMediaEditorConfig({ session }) {
+          return { mediaEditor: { cloudName: "demo-cloud" }, requestedBy: session.subject };
+        },
         async listMedia({ query, session }) {
           return { assets: [{ public_id: "folder/asset" }], requestedBy: session.subject, query };
         },
@@ -312,6 +329,7 @@ describe("cloudinary media admin routes", () => {
     });
 
     const listResponse = await handler({ method: "GET", path: "/media/assets", query: { max_results: "8" } });
+    const configResponse = await handler({ method: "GET", path: "/media/editor-config", query: {} });
     const uploadResponse = await handler({
       method: "POST",
       path: "/media/upload",
@@ -320,6 +338,8 @@ describe("cloudinary media admin routes", () => {
 
     assert.equal(listResponse.statusCode, 200);
     assert.deepEqual(parse(listResponse), { assets: [{ public_id: "folder/asset" }], requestedBy: "user-123", query: { max_results: "8" } });
+    assert.equal(configResponse.statusCode, 200);
+    assert.deepEqual(parse(configResponse), { mediaEditor: { cloudName: "demo-cloud" }, requestedBy: "user-123" });
     assert.equal(uploadResponse.statusCode, 200);
     assert.deepEqual(parse(uploadResponse), {
       asset: { public_id: "folder/upload", secure_url: "data:image/png;base64,abc123" },

@@ -2,6 +2,7 @@ import { buildApiUrl } from "./apiBase.js";
 
 const ADMIN_ARTICLES_PATH = "/api/admin/contentful/articles";
 const ADMIN_MEDIA_PATH = "/media/assets";
+const ADMIN_AUTHOR_PROFILE_PATH = "/author-profile";
 
 const parseJson = async (response) => {
   try {
@@ -33,8 +34,16 @@ export const adminUserMessage = (error, { media = false } = {}) => {
     return media ? "Your account cannot select media." : "Your account cannot perform this action.";
   }
 
+  if (media && error.status === 500 && /configuration|config/i.test(error.message || error.payload?.error || "")) {
+    return "Media service is not configured for this environment.";
+  }
+
   if (!media && error.status === 409) {
     return "This article changed elsewhere. Reload before saving.";
+  }
+
+  if (!media && error.status === 404 && /author profile/i.test(error.message)) {
+    return "Author profile not resolved for this account.";
   }
 
   if (!media && (error.status === 422 || /media/i.test(error.message))) {
@@ -119,6 +128,29 @@ export const requestArticleUnpublication = ({ articleId, version, notes, session
 export const listMediaAssets = ({ session, maxResults = 24, fetchImpl } = {}) =>
   adminRequest({
     path: `${ADMIN_MEDIA_PATH}?max_results=${encodeURIComponent(maxResults)}`,
+    session,
+    fetchImpl,
+  });
+
+export const getMediaEditorConfig = ({ session, fetchImpl } = {}) =>
+  adminRequest({
+    path: "/media/editor-config",
+    session,
+    fetchImpl,
+  });
+
+export const getAuthorProfile = ({ session, fetchImpl } = {}) =>
+  adminRequest({
+    path: ADMIN_AUTHOR_PROFILE_PATH,
+    session,
+    fetchImpl,
+  });
+
+export const updateAuthorProfile = ({ profile, session, fetchImpl } = {}) =>
+  adminRequest({
+    path: ADMIN_AUTHOR_PROFILE_PATH,
+    method: "PUT",
+    body: profile,
     session,
     fetchImpl,
   });

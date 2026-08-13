@@ -112,9 +112,9 @@ Admin authentication uses Netlify Identity in deployed environments. Registratio
 | Role | Allowed workflow |
 | --- | --- |
 | `writer` | Create and edit permitted drafts or submissions, select or upload Cloudinary thumbnail images through the admin API, submit drafts for owner review, and request unpublication for eligible published articles. |
-| `owner` | All writer workflows, plus publish, unpublish, archive, and permanently delete articles through owner-only server routes. |
+| `owner` | Edit only articles with a trusted creator match to the owner account, plus publish, unpublish, archive, and permanently delete articles through owner-only server routes. |
 
-Frontend role checks only shape the UI. The admin backend must still reject unauthenticated requests and writer attempts to run owner-only lifecycle actions before calling Contentful or Cloudinary.
+Frontend role checks only shape the UI. The admin backend must still reject unauthenticated requests, writer attempts to run owner-only lifecycle actions, and article body edits without a trusted `writerSubject` or Contentful Author entry match before calling Contentful or Cloudinary.
 
 The admin dashboard is the first `/admin` screen. It loads real article rows, status cards, and owner review queues from `/api/admin/contentful/articles`. The dashboard should not use static sample articles at runtime; fixtures belong in deterministic tests only. Page-view metrics are optional and may remain unavailable until a free-compatible analytics source is connected.
 

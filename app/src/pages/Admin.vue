@@ -72,6 +72,7 @@
               </div>
 
               <q-banner v-if="dashboardError" class="feedback-error dashboard-feedback" rounded>{{ dashboardError }}</q-banner>
+              <q-banner v-if="feedbackMessage" :class="feedbackClass" class="dashboard-feedback" rounded>{{ feedbackMessage }}</q-banner>
 
               <div class="article-filters">
                 <q-select v-model="filters.status" dense outlined clearable emit-value map-options label="Status" :options="statusOptions" />
@@ -180,151 +181,6 @@
 
     <section v-else class="admin-login-shell" aria-hidden="true"></section>
 
-    <q-drawer v-model="editorOpen" side="right" overlay bordered class="editor-drawer" :width="560">
-      <div class="editor-drawer-body">
-        <div class="panel-heading compact editor-drawer-header">
-          <div>
-            <p class="admin-kicker">Article editor</p>
-            <h2>{{ articleForm.id ? "Edit article" : "Create article" }}</h2>
-          </div>
-          <div class="editor-drawer-actions">
-            <q-badge outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
-            <q-btn flat round dense color="blue-grey-7" icon="close" @click="closeEditor">
-              <q-tooltip>Close editor</q-tooltip>
-            </q-btn>
-          </div>
-        </div>
-
-        <q-form class="editor-form" @submit.prevent="saveDraft">
-          <q-input
-            :model-value="articleForm.title"
-            label="Title"
-            outlined
-            dense
-            :error="Boolean(errors.title)"
-            :error-message="errors.title"
-            @update:model-value="updateArticleTitle"
-          />
-          <q-input v-model="articleForm.slug" label="Slug" outlined dense :error="Boolean(errors.slug)" :error-message="errors.slug" @update:model-value="markSlugTouched" />
-          <q-input v-model="articleForm.description" label="Description" outlined dense type="textarea" autogrow :error="Boolean(errors.description)" :error-message="errors.description" />
-          <q-input v-model="articleForm.body" label="Body" outlined type="textarea" :rows="8" :error="Boolean(errors.body)" :error-message="errors.body" />
-
-          <div class="form-row">
-            <q-input v-model="articleForm.createAt" label="Display date" outlined dense type="date" />
-            <q-input v-model="articleForm.authorName" label="Author" outlined dense readonly :error="Boolean(errors.author)" :error-message="errors.author">
-              <template #prepend>
-                <q-icon name="person" />
-              </template>
-            </q-input>
-          </div>
-
-          <div class="media-fields">
-            <div class="media-fields-title">
-              <q-icon name="cloud_upload" />
-              <span>Thumbnail</span>
-            </div>
-            <div v-if="articleForm.thumbnailUrl" class="thumbnail-preview">
-              <img :src="articleForm.thumbnailUrl" :alt="articleForm.alt || 'Article thumbnail preview'" />
-            </div>
-            <div v-else class="thumbnail-preview empty">
-              <q-icon name="image" size="34px" />
-              <span>No thumbnail selected</span>
-            </div>
-            <div class="media-actions">
-              <q-btn outline color="blue-grey-7" icon="perm_media" label="Select image" :loading="loadingAction === 'media-list'" @click="openMediaLibrary" />
-              <q-file
-                v-model="mediaUploadFile"
-                dense
-                outlined
-                accept="image/*"
-                label="Upload image"
-                class="media-upload"
-                :loading="loadingAction === 'media-upload'"
-                @update:model-value="handleMediaFile"
-              >
-                <template #prepend>
-                  <q-icon name="upload" />
-                </template>
-              </q-file>
-            </div>
-            <q-input v-model="articleForm.alt" label="Alt text" outlined dense />
-          </div>
-
-          <div class="tag-editor">
-            <q-input v-model="articleForm.tagInput" label="Tags" outlined dense @keyup.enter.prevent="addTagToArticleForm">
-              <template #append>
-                <q-btn flat round dense color="blue-grey-7" icon="add" @click="addTagToArticleForm">
-                  <q-tooltip>Add tag</q-tooltip>
-                </q-btn>
-              </template>
-            </q-input>
-            <div class="tag-chip-list">
-              <q-chip v-for="tag in articleForm.tagList" :key="tag" removable outline color="blue-grey-7" @remove="removeTagFromArticleForm(tag)">
-                {{ tag }}
-              </q-chip>
-            </div>
-          </div>
-
-          <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
-
-          <div class="editor-actions">
-            <q-btn unelevated color="blue-grey-8" icon="save" label="Save draft" dense no-caps size="sm" type="submit" :loading="loadingAction === 'save'" />
-            <q-btn outline color="blue-grey-7" icon="rate_review" label="Submit for review" dense no-caps size="sm" :disable="!articleForm.id" :loading="loadingAction === 'review'" @click="submitReview" />
-            <q-btn outline color="amber-9" icon="visibility_off" label="Request unpublication" dense no-caps size="sm" :disable="!articleForm.id" :loading="loadingAction === 'unpublish'" @click="requestUnpublication" />
-          </div>
-        </q-form>
-      </div>
-    </q-drawer>
-
-    <q-dialog v-model="mediaDialogOpen">
-      <q-card class="media-dialog">
-        <q-card-section class="media-dialog-header">
-          <div>
-            <p class="admin-kicker">Media library</p>
-            <h2>Select an image</h2>
-          </div>
-          <q-btn flat round dense icon="close" v-close-popup />
-        </q-card-section>
-
-        <q-card-section>
-          <div class="media-dialog-toolbar">
-            <q-file
-              v-model="mediaUploadFile"
-              dense
-              outlined
-              accept="image/*"
-              label="Upload image"
-              class="media-upload"
-              :loading="loadingAction === 'media-upload'"
-              @update:model-value="handleMediaFile"
-            >
-              <template #prepend>
-                <q-icon name="upload" />
-              </template>
-            </q-file>
-          </div>
-
-          <q-banner v-if="mediaState.status === 'error'" class="feedback-error media-state-banner" rounded>{{ mediaState.message }}</q-banner>
-          <div v-if="mediaState.status === 'empty'" class="media-empty-state">
-            <q-icon name="image_not_supported" size="38px" />
-            <strong>No images available</strong>
-            <span>{{ mediaState.message }}</span>
-          </div>
-          <q-inner-loading :showing="loadingAction === 'media-list'">
-            <q-spinner color="blue-grey-7" size="42px" />
-          </q-inner-loading>
-
-          <div v-if="mediaState.status === 'ready'" class="media-grid">
-            <button v-for="asset in mediaState.assets" :key="asset.publicId" type="button" class="media-asset" @click="applySelectedMedia(asset)">
-              <img :src="asset.thumbnailUrl" :alt="asset.alt" />
-              <strong class="media-asset-title">{{ asset.title }}</strong>
-              <span v-if="asset.dimensions">{{ asset.dimensions }}</span>
-            </button>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-
     <q-dialog v-model="deleteDialogOpen">
       <q-card class="delete-dialog">
         <q-card-section>
@@ -356,23 +212,15 @@
 import { defineComponent } from "vue";
 import {
   archiveArticle,
-  createArticleDraft,
   deleteArticle,
   listAdminArticles,
-  listMediaAssets,
   publishArticle,
   requestArticleUnpublication,
-  submitArticleForReview,
   unpublishArticle,
-  updateArticleDraft,
-  uploadMediaAsset,
   adminUserMessage,
   AdminApiError,
 } from "../utils/adminApi.js";
 import {
-  applyArticleResponseToForm,
-  articleToForm,
-  buildArticlePayload,
   canArchiveArticleAction,
   canEditArticleAction,
   canOwnerPublishAction,
@@ -380,13 +228,10 @@ import {
   canPrepareReviewAction,
   canConfirmArticleDeletion,
   canRequestUnpublicationAction,
-  createEmptyArticleForm,
   filterAdminArticles,
-  mediaLibraryState,
   ownerReviewQueues,
   removeArticleById,
   reconcileAdminDashboardData,
-  slugFromTitle,
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
@@ -403,9 +248,6 @@ export default defineComponent({
       articles: [],
       adminSummary: summarizeArticleStatuses([]),
       reviewRequests: [],
-      editorOpen: false,
-      articleForm: createEmptyArticleForm(),
-      slugTouched: false,
       filters: {
         search: "",
         status: "",
@@ -413,15 +255,9 @@ export default defineComponent({
         date: "",
         author: "",
       },
-      errors: {},
-      mediaAssets: [],
-      mediaDialogOpen: false,
-      mediaError: "",
-      mediaUploadFile: null,
       deleteDialogOpen: false,
       articlePendingDeletion: null,
       deleteConfirmation: "",
-      statusMessage: "",
       feedbackMessage: "",
       feedbackTone: "info",
       dashboardError: "",
@@ -470,13 +306,6 @@ export default defineComponent({
     },
     filteredArticles() {
       return filterAdminArticles(this.articles, this.filters);
-    },
-    mediaState() {
-      return mediaLibraryState({
-        assets: this.mediaAssets,
-        error: this.mediaError,
-        isLoading: this.loadingAction === "media-list",
-      });
     },
     feedbackClass() {
       return {
@@ -547,42 +376,16 @@ export default defineComponent({
       this.activeSection = "dashboard";
     },
     openEditorForNewArticle() {
-      this.articleForm = createEmptyArticleForm();
-      this.slugTouched = false;
-      this.errors = {};
-      this.statusMessage = "New draft";
-      this.showFeedback("", "info");
-      this.editorOpen = true;
+      this.$router.push("/admin/articles/new");
     },
     openEditorForArticle(article) {
-      this.articleForm = articleToForm(article);
-      this.slugTouched = true;
-      this.errors = {};
-      this.statusMessage = "Loaded";
-      this.showFeedback("", "info");
-      this.editorOpen = true;
-    },
-    closeEditor() {
-      this.editorOpen = false;
-      this.errors = {};
-      this.statusMessage = "";
-      this.showFeedback("", "info");
+      this.$router.push(`/admin/articles/${encodeURIComponent(article.id)}/edit`);
     },
     startNewArticle() {
       this.openEditorForNewArticle();
     },
     editArticle(article) {
       this.openEditorForArticle(article);
-    },
-    updateArticleTitle(value) {
-      this.articleForm.title = value;
-
-      if (!this.articleForm.id && !this.slugTouched) {
-        this.articleForm.slug = slugFromTitle(value);
-      }
-    },
-    markSlugTouched() {
-      this.slugTouched = true;
     },
     statusColor(status) {
       return {
@@ -604,39 +407,6 @@ export default defineComponent({
         archived: "Archived",
       }[status] || "Draft";
     },
-    validateArticleForm() {
-      const errors = {};
-
-      if (!this.articleForm.title.trim()) {
-        errors.title = "Title is required";
-      }
-
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(this.articleForm.slug)) {
-        errors.slug = "Use a URL-safe slug";
-      }
-
-      if (!this.articleForm.description.trim()) {
-        errors.description = "Description is required";
-      }
-
-      if (!this.articleForm.body.trim()) {
-        errors.body = "Body is required";
-      }
-
-      if (!String(this.articleForm.authorEntryId || this.articleForm.author || "").trim()) {
-        errors.author = "Author profile is required";
-      }
-
-      if (this.articleForm.thumbnailUrl && !this.articleForm.thumbnailPublicId) {
-        errors.thumbnail = "Select media again so the Cloudinary public ID is saved.";
-      }
-
-      this.errors = errors;
-      return Object.keys(errors).length === 0;
-    },
-    articlePayload() {
-      return buildArticlePayload(this.articleForm);
-    },
     async signOut() {
       const signedOut = await signOutAdmin();
 
@@ -645,7 +415,6 @@ export default defineComponent({
         this.articles = [];
         this.adminSummary = summarizeArticleStatuses([]);
         this.reviewRequests = [];
-        this.editorOpen = false;
       }
     },
     canEditArticleAction,
@@ -654,134 +423,13 @@ export default defineComponent({
     canOwnerPublishAction,
     canOwnerUnpublishAction,
     canArchiveArticleAction,
-    async openMediaLibrary() {
-      this.mediaDialogOpen = true;
-      this.mediaError = "";
-      this.loadingAction = "media-list";
-
-      try {
-        const response = await listMediaAssets({ session: this.session });
-        this.mediaAssets = response.assets || [];
-      } catch (error) {
-        this.handleMediaError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    applySelectedMedia(asset = {}) {
-      this.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || "";
-      this.articleForm.thumbnailUrl = asset.thumbnailUrl || asset.secure_url || asset.url || "";
-      this.articleForm.alt = this.articleForm.alt || asset.alt || asset.title || "";
-      this.mediaDialogOpen = false;
-      this.showFeedback("Image selected.", "success");
-    },
-    syncArticleTags() {
-      this.articleForm.tags = this.articleForm.tagList.join(", ");
-    },
-    addTagToArticleForm() {
-      const tag = String(this.articleForm.tagInput || "").trim();
-
-      if (!tag || this.articleForm.tagList.includes(tag)) {
-        this.articleForm.tagInput = "";
-        return;
-      }
-
-      this.articleForm.tagList = [...this.articleForm.tagList, tag];
-      this.articleForm.tagInput = "";
-      this.syncArticleTags();
-    },
-    removeTagFromArticleForm(tag) {
-      this.articleForm.tagList = this.articleForm.tagList.filter((item) => item !== tag);
-      this.syncArticleTags();
-    },
-    async handleMediaFile(file) {
-      if (!file) {
-        return;
-      }
-
-      this.mediaError = "";
-      this.loadingAction = "media-upload";
-
-      try {
-        const dataUrl = await this.readFileAsDataUrl(file);
-        const response = await uploadMediaAsset({
-          file: dataUrl,
-          filename: file.name,
-          session: this.session,
-        });
-
-        this.applySelectedMedia(response.asset);
-        this.mediaUploadFile = null;
-      } catch (error) {
-        this.handleMediaError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    readFileAsDataUrl(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-    },
-    applyArticleResponse(payload = {}) {
-      this.articleForm = applyArticleResponseToForm(this.articleForm, payload);
-    },
-    async saveDraft() {
-      if (!this.validateArticleForm()) {
-        this.showFeedback("Fix the highlighted fields before saving.", "error");
-        return;
-      }
-
-      this.loadingAction = "save";
-
-      try {
-        const payload = this.articlePayload();
-        const response = this.articleForm.id
-          ? await updateArticleDraft({ articleId: this.articleForm.id, article: payload, session: this.session })
-          : await createArticleDraft({ article: payload, session: this.session });
-
-        this.applyArticleResponse(response);
-        await this.loadArticleDashboard();
-        this.statusMessage = "Draft saved";
-        this.showFeedback("Draft saved.", "success");
-      } catch (error) {
-        this.handleAdminError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    async submitReview() {
-      this.loadingAction = "review";
-
-      try {
-        await submitArticleForReview({
-          articleId: this.articleForm.id,
-          version: this.articleForm.version,
-          notes: "",
-          session: this.session,
-        });
-        await this.loadArticleDashboard();
-        this.showFeedback("Submitted for owner review.", "success");
-      } catch (error) {
-        this.handleAdminError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    requestUnpublicationFromRow(article) {
-      this.openEditorForArticle(article);
-      return this.requestUnpublication();
-    },
-    async requestUnpublication() {
+    async requestUnpublicationFromRow(article) {
       this.loadingAction = "unpublish";
 
       try {
         await requestArticleUnpublication({
-          articleId: this.articleForm.id,
-          version: this.articleForm.version,
+          articleId: article.id,
+          version: article.version,
           notes: "",
           session: this.session,
         });
@@ -860,16 +508,6 @@ export default defineComponent({
       }
 
       this.showFeedback(adminUserMessage(error), "error");
-    },
-    handleMediaError(error) {
-      if (error instanceof AdminApiError) {
-        this.mediaError = adminUserMessage(error, { media: true });
-        this.showFeedback(this.mediaError, "error");
-        return;
-      }
-
-      this.mediaError = adminUserMessage(error, { media: true });
-      this.showFeedback(this.mediaError, "error");
     },
     showFeedback(message, tone = "info") {
       this.feedbackMessage = message;

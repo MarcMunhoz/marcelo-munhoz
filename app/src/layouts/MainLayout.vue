@@ -16,13 +16,31 @@
 
         <q-btn outline icon="badge" label="About" to="/about" size="sm" class="mr-4" color="blue-grey-5" />
         <q-btn outline icon="newspaper" label="Blog" to="/blog" size="sm" class="mr-4" color="blue-grey-5" />
-        <q-btn-dropdown outline icon="edit_note" :label="adminNavLabel" size="sm" color="blue-grey-5">
-          <q-list dense>
-            <q-item clickable v-close-popup to="/admin">
+        <q-btn-dropdown outline no-caps icon="edit_note" :label="adminNavLabel" size="sm" color="blue-grey-5" class="admin-account-menu">
+          <q-list class="admin-account-list">
+            <q-item class="admin-account-summary">
+              <q-item-section avatar>
+                <q-avatar color="blue-grey-7" text-color="white" size="34px">{{ adminInitials }}</q-avatar>
+              </q-item-section>
               <q-item-section>
-                <q-item-label>{{ adminNavTitle }}</q-item-label>
+                <q-item-label>{{ adminDisplay.name }}</q-item-label>
                 <q-item-label caption>{{ adminNavCaption }}</q-item-label>
               </q-item-section>
+            </q-item>
+
+            <q-separator />
+
+            <q-item clickable v-close-popup to="/admin">
+              <q-item-section avatar>
+                <q-icon name="dashboard" />
+              </q-item-section>
+              <q-item-section>Dashboard</q-item-section>
+            </q-item>
+            <q-item v-if="adminSession" clickable v-close-popup to="/admin/profile">
+              <q-item-section avatar>
+                <q-icon name="person" />
+              </q-item-section>
+              <q-item-section>Author profile</q-item-section>
             </q-item>
             <q-item v-if="adminDisplay.canSignOut" clickable v-close-popup @click="signOut">
               <q-item-section avatar>
@@ -59,7 +77,7 @@
 import { defineComponent } from "vue";
 import imageUrl from "../assets/rebellion-rebel-alliance-logo.png";
 import audioFile from "../assets/r2d2.ogg";
-import { adminSessionDisplay, getAdminSession, signOutAdmin } from "../utils/adminAuth.js";
+import { adminAccountInitials, adminSessionDisplay, getAdminSession, signOutAdmin } from "../utils/adminAuth.js";
 
 export default defineComponent({
   name: "MainLayout",
@@ -76,17 +94,36 @@ export default defineComponent({
     adminNavLabel() {
       return this.adminSession ? this.adminDisplay.name : "Admin";
     },
-    adminNavTitle() {
-      return this.adminSession ? this.adminDisplay.name : "Admin";
-    },
     adminNavCaption() {
       return this.adminSession ? `${this.adminDisplay.role} · ${this.adminDisplay.context}` : "Sign in required";
+    },
+    adminInitials() {
+      return adminAccountInitials(this.adminSession);
     },
   },
   async mounted() {
     this.adminSession = await getAdminSession();
+    this.bindIdentityCallbacks();
   },
   methods: {
+    bindIdentityCallbacks() {
+      const identity = globalThis.netlifyIdentity;
+
+      if (typeof identity?.on !== "function") {
+        return;
+      }
+
+      identity.on("login", async () => {
+        if (typeof identity.close === "function") {
+          identity.close();
+        }
+
+        this.adminSession = await getAdminSession();
+      });
+      identity.on("logout", () => {
+        this.adminSession = null;
+      });
+    },
     async signOut() {
       const signedOut = await signOutAdmin();
 
@@ -117,3 +154,29 @@ export default defineComponent({
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.admin-account-menu {
+  max-width: min(220px, 42vw);
+
+  :deep(.q-btn__content) {
+    min-width: 0;
+  }
+
+  :deep(.block) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.admin-account-list {
+  min-width: 240px;
+}
+
+.admin-account-summary {
+  cursor: default;
+  padding-bottom: 12px;
+  padding-top: 12px;
+}
+</style>

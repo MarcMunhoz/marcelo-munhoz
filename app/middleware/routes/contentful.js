@@ -3,7 +3,7 @@ import { contentfulHandler } from "../contentfulProxy.js";
 
 const router = express.Router();
 
-router.get(["/entries", "/tags", "/tagged", "/article/:slug"], async (req, res) => {
+router.get(["/entries", "/tags", "/tagged", "/article/:slug", "/author/:slug"], async (req, res) => {
   const response = await contentfulHandler({
     path: req.path,
     query: req.query,

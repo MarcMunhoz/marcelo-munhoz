@@ -5,6 +5,8 @@ import {
   adminUserMessage,
   AdminApiError,
   archiveArticle,
+  getMediaEditorConfig,
+  getAuthorProfile,
   createArticleDraft,
   deleteArticle,
   listAdminArticles,
@@ -12,11 +14,14 @@ import {
   requestArticleUnpublication,
   submitArticleForReview,
   unpublishArticle,
+  updateAuthorProfile,
   updateArticleDraft,
 } from "../src/utils/adminApi.js";
 import {
   applyArticleResponseToForm,
   articleToForm,
+  authorProfileToForm,
+  buildAuthorProfilePayload,
   buildArticlePayload,
   canArchiveArticleAction,
   canConfirmArticleDeletion,
@@ -26,6 +31,7 @@ import {
   canPrepareReviewAction,
   canRequestUnpublicationAction,
   createEmptyArticleForm,
+  createEmptyAuthorProfileForm,
   filterAdminArticles,
   mediaLibraryState,
   normalizeAdminArticleDisplay,
@@ -37,6 +43,7 @@ import {
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../src/utils/adminDashboard.js";
+import { buildMediaEditorOptions, normalizeMediaEditorExport, openCloudinaryMediaEditor } from "../src/utils/cloudinaryMediaEditor.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -47,15 +54,21 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(routes, /path:\s*"\/admin"/);
     assert.match(routes, /name:\s*"Admin"/);
+    assert.match(routes, /path:\s*"\/admin\/articles\/new"/);
+    assert.match(routes, /path:\s*"\/admin\/articles\/:entryId\/edit"/);
     assert.match(routes, /requiresAdmin:\s*true/);
     assert.match(routes, /pages\/Admin\.vue/);
+    assert.match(routes, /pages\/AdminArticleEditor\.vue/);
   });
 
   it("adds admin navigation beside the public blog navigation", () => {
     const layout = read("../src/layouts/MainLayout.vue");
 
     assert.match(layout, /to="\/admin"/);
+    assert.match(layout, /to="\/admin\/profile"/);
     assert.match(layout, /adminNavLabel/);
+    assert.match(layout, /adminInitials/);
+    assert.match(layout, /admin-account-menu/);
     assert.match(layout, /q-btn-dropdown/);
   });
 
@@ -98,7 +111,9 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(index, /identity\.netlify\.com\/v1\/netlify-identity-widget\.js/);
     assert.match(netlifyConfig, /script-src[^"]*https:\/\/identity\.netlify\.com/);
+    assert.match(netlifyConfig, /script-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
     assert.match(netlifyConfig, /connect-src[^"]*https:\/\/identity\.netlify\.com/);
+    assert.match(netlifyConfig, /frame-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
   });
 
   it("provides admin API helpers for draft and workflow requests", () => {
@@ -107,8 +122,12 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /\/api\/admin\/contentful\/articles/);
     assert.match(api, /\/media\/assets/);
     assert.match(api, /\/media\/upload/);
+    assert.match(api, /\/media\/editor-config/);
+    assert.match(api, /\/author-profile/);
     assert.match(api, /createArticleDraft/);
     assert.match(api, /updateArticleDraft/);
+    assert.match(api, /getAuthorProfile/);
+    assert.match(api, /updateAuthorProfile/);
     assert.match(api, /submitArticleForReview/);
     assert.match(api, /requestArticleUnpublication/);
     assert.match(api, /publishArticle/);
@@ -116,6 +135,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(api, /archiveArticle/);
     assert.match(api, /deleteArticle/);
     assert.match(api, /listMediaAssets/);
+    assert.match(api, /getMediaEditorConfig/);
     assert.match(api, /uploadMediaAsset/);
     assert.match(api, /Authorization/);
   });
@@ -177,6 +197,57 @@ describe("admin frontend writer workflow", () => {
         ["/api/admin/contentful/articles/article-1", "PUT", { title: "Updated", version: 4 }],
         ["/api/admin/contentful/articles/article-1/submit", "POST", { version: 5, notes: "" }],
         ["/api/admin/contentful/articles/article-1/unpublication-requests", "POST", { version: 6, notes: "" }],
+      ]
+    );
+    assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
+  });
+
+  it("loads Cloudinary Media Editor public configuration without write credentials", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { mediaEditor: { cloudName: "demo-cloud" } };
+        },
+      };
+    };
+
+    const response = await getMediaEditorConfig({
+      session: { token: "jwt-token", roles: ["writer"] },
+      fetchImpl,
+    });
+
+    assert.deepEqual(response, { mediaEditor: { cloudName: "demo-cloud" } });
+    assert.equal(calls[0].url, "/api/admin/contentful/media/editor-config");
+    assert.equal(calls[0].options.headers.Authorization, "Bearer jwt-token");
+    assert.doesNotMatch(JSON.stringify(response), /api.?key|secret/i);
+  });
+
+  it("calls author profile endpoints without using Netlify Identity fields as profile payload", async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { profile: { id: "author-1", name: "Marcelo Munhoz" } };
+        },
+      };
+    };
+    const session = { token: "writer-token" };
+
+    await getAuthorProfile({ session, fetchImpl });
+    await updateAuthorProfile({ profile: { name: "Marcelo Munhoz", slug: "marcelo-munhoz", version: 7 }, session, fetchImpl });
+
+    assert.deepEqual(
+      calls.map((call) => [call.url, call.options.method, call.options.body ? JSON.parse(call.options.body) : undefined]),
+      [
+        ["/api/admin/contentful/author-profile", "GET", undefined],
+        ["/api/admin/contentful/author-profile", "PUT", { name: "Marcelo Munhoz", slug: "marcelo-munhoz", version: 7 }],
       ]
     );
     assert.equal(calls[0].options.headers.Authorization, "Bearer writer-token");
@@ -384,7 +455,7 @@ describe("admin frontend writer workflow", () => {
   });
 
   it("auto-fills new article slugs from title input until the slug is edited", () => {
-    const page = read("../src/pages/Admin.vue");
+    const page = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(page, /@update:model-value="updateArticleTitle"/);
     assert.match(page, /@update:model-value="markSlugTouched"/);
@@ -401,6 +472,43 @@ describe("admin frontend writer workflow", () => {
     assert.deepEqual(form.tagList, []);
     assert.equal(form.tagInput, "");
     assert.equal(form.version, null);
+  });
+
+  it("normalizes author profile forms with optional photo fallback", () => {
+    assert.deepEqual(createEmptyAuthorProfileForm(), {
+      id: "",
+      name: "",
+      slug: "",
+      biography: "",
+      photoUrl: "",
+      photoPublicId: "",
+      version: null,
+    });
+    assert.deepEqual(
+      authorProfileToForm({
+        id: "author-1",
+        name: "Marcelo Munhoz",
+        slug: "marcelo-munhoz",
+        biography: "But first...",
+        photo: { public_id: "authors/marcelo", secure_url: "https://example.test/marcelo.jpg" },
+        version: 11,
+      }),
+      {
+        id: "author-1",
+        name: "Marcelo Munhoz",
+        slug: "marcelo-munhoz",
+        biography: "But first...",
+        photoUrl: "https://example.test/marcelo.jpg",
+        photoPublicId: "authors/marcelo",
+        version: 11,
+      }
+    );
+    assert.deepEqual(buildAuthorProfilePayload({ name: " Marcelo Munhoz ", slug: "marcelo-munhoz", biography: " Bio ", version: 11 }), {
+      name: "Marcelo Munhoz",
+      slug: "marcelo-munhoz",
+      biography: "Bio",
+      version: 11,
+    });
   });
 
   it("hydrates writer edit forms with display controls without exposing review notes", () => {
@@ -506,7 +614,7 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canRequestUnpublicationAction({ id: "review-1", status: "review", writerSubject: "writer-1" }, writer), false);
   });
 
-  it("shows writer actions only for writer-eligible article states", () => {
+  it("shows writer actions only for writer-owned article states", () => {
     const writer = { subject: "writer-1", roles: ["writer"], authorEntryId: "author-1" };
 
     assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
@@ -522,24 +630,68 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, writer), false);
   });
 
-  it("shows owner lifecycle actions directly instead of writer request actions", () => {
+  it("keeps owner body editing scoped to owned articles while preserving moderation", () => {
     const owner = { subject: "owner-1", roles: ["owner"], authorEntryId: "author-1" };
 
+    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "owner-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-1", status: "published", authorEntryId: "author-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-2", status: "published", authorEntryId: "author-2" }, owner), false);
     assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, owner), true);
+    assert.equal(canOwnerUnpublishAction({ id: "take-down-1", status: "unpublicationRequested" }, owner), true);
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, owner), true);
 
     assert.equal(canPrepareReviewAction({ id: "review-1", status: "review" }, owner), false);
     assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }, owner), false);
   });
 
-  it("allows an owner to edit legacy articles when the resolved author name matches their identity", () => {
+  it("does not treat matching display names as trusted edit ownership", () => {
     const owner = { subject: "owner-1", name: "Marcelo Munhoz", roles: ["owner"] };
 
-    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", author: "Marcelo Munhoz" }, owner), true);
+    assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", author: "Marcelo Munhoz" }, owner), false);
     assert.equal(canEditArticleAction({ id: "draft-2", status: "draft", author: "Guest Writer" }, owner), false);
+  });
+
+  it("covers creator-scoped action matrices across draft, review, published, and other-author rows", () => {
+    const writer = { subject: "writer-1", roles: ["writer"], authorEntryId: "author-1" };
+    const owner = { subject: "owner-1", roles: ["owner"], authorEntryId: "author-owner" };
+    const rows = [
+      { id: "own-draft", status: "draft", authorEntryId: "author-1" },
+      { id: "own-review", status: "review", writerSubject: "writer-1" },
+      { id: "own-published", status: "published", writerSubject: "writer-1" },
+      { id: "other-draft", status: "draft", authorEntryId: "author-2" },
+    ];
+
+    assert.deepEqual(
+      rows.map((row) => ({
+        id: row.id,
+        edit: canEditArticleAction(row, writer),
+        review: canPrepareReviewAction(row, writer),
+        requestUnpublication: canRequestUnpublicationAction(row, writer),
+      })),
+      [
+        { id: "own-draft", edit: true, review: true, requestUnpublication: false },
+        { id: "own-review", edit: true, review: false, requestUnpublication: false },
+        { id: "own-published", edit: true, review: false, requestUnpublication: true },
+        { id: "other-draft", edit: false, review: false, requestUnpublication: false },
+      ]
+    );
+
+    assert.deepEqual(
+      rows.map((row) => ({
+        id: row.id,
+        edit: canEditArticleAction(row, owner),
+        publish: canOwnerPublishAction(row, owner),
+        unpublish: canOwnerUnpublishAction(row, owner),
+        archive: canArchiveArticleAction(row, owner),
+      })),
+      [
+        { id: "own-draft", edit: false, publish: false, unpublish: false, archive: true },
+        { id: "own-review", edit: false, publish: true, unpublish: false, archive: true },
+        { id: "own-published", edit: false, publish: false, unpublish: true, archive: true },
+        { id: "other-draft", edit: false, publish: false, unpublish: false, archive: true },
+      ]
+    );
   });
 
   it("resolves Contentful thumbnail images with legacy Cloudinary fallback", () => {
@@ -597,6 +749,11 @@ describe("admin frontend writer workflow", () => {
       message: "Media request failed.",
       assets: [],
     });
+    assert.deepEqual(mediaLibraryState({ error: "Media service is not configured for this environment." }), {
+      status: "error",
+      message: "Media service is not configured for this environment.",
+      assets: [],
+    });
     assert.deepEqual(mediaLibraryState({ assets: [{ public_id: "folder/photo", url: "https://example.test/photo.jpg" }] }), {
       status: "ready",
       message: "",
@@ -612,35 +769,38 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
-  it("renders the dashboard-first shell, article table, focused editor, and workflow controls", () => {
+  it("renders the dashboard-first shell and routes article editing into focused pages", () => {
     const page = read("../src/pages/Admin.vue");
+    const editor = read("../src/pages/AdminArticleEditor.vue");
 
-    for (const text of ["Editorial dashboard", "Published", "Drafts", "In review", "Article queue", "Owner review", "Media library", "Page views pending"]) {
+    for (const text of ["Editorial dashboard", "Published", "Drafts", "In review", "Article queue", "Owner review", "Page views pending"]) {
       assert.match(page, new RegExp(text));
     }
 
-    assert.match(page, /:model-value="articleForm\.title"/);
+    assert.match(page, /this\.\$router\.push\("\/admin\/articles\/new"\)/);
+    assert.match(page, /\/admin\/articles\/\$\{encodeURIComponent\(article\.id\)\}\/edit/);
+    assert.doesNotMatch(page, /<q-drawer/);
+    assert.doesNotMatch(page, /class="editor-drawer"/);
+    assert.doesNotMatch(page, /v-model="articleForm\./);
+
+    assert.match(editor, /:model-value="articleForm\.title"/);
 
     for (const field of ["slug", "description", "body", "createAt", "alt", "authorName", "tagInput"]) {
-      assert.match(page, new RegExp(`v-model="articleForm\\.${field}"`));
+      assert.match(editor, new RegExp(`v-model="articleForm\\.${field}"`));
     }
 
-    assert.match(page, /<q-drawer[\s\S]*v-model="editorOpen"/);
-    assert.match(page, /class="editor-drawer"/);
-    assert.match(page, /openEditorForNewArticle/);
-    assert.match(page, /openEditorForArticle/);
-    assert.match(page, /closeEditor/);
-    assert.doesNotMatch(page, /<aside class="editor-panel"/);
-    assert.doesNotMatch(page, /v-model="articleForm\.version"/);
-    assert.doesNotMatch(page, /v-model="articleForm\.notes"/);
-    assert.doesNotMatch(page, /label="Author entry ID"/);
-    assert.doesNotMatch(page, /label="Selected image ID"/);
-    assert.doesNotMatch(page, /label="Selected image URL"/);
-    assert.doesNotMatch(page, /Comma-separated Contentful tag IDs/);
-    assert.doesNotMatch(page, /Review notes/);
-    assert.match(page, /Save draft/);
-    assert.match(page, /Submit for review/);
-    assert.match(page, /Request unpublication/);
+    assert.match(editor, /beforeRouteLeave/);
+    assert.match(editor, /Leave the article editor and discard unsaved changes/);
+    assert.doesNotMatch(editor, /v-model="articleForm\.version"/);
+    assert.doesNotMatch(editor, /v-model="articleForm\.notes"/);
+    assert.doesNotMatch(editor, /label="Author entry ID"/);
+    assert.doesNotMatch(editor, /label="Selected image ID"/);
+    assert.doesNotMatch(editor, /label="Selected image URL"/);
+    assert.doesNotMatch(editor, /Comma-separated Contentful tag IDs/);
+    assert.doesNotMatch(editor, /Review notes/);
+    assert.match(editor, /Save draft/);
+    assert.match(editor, /Submit for review/);
+    assert.match(editor, /Request unpublication/);
     assert.match(page, /Publish/);
     assert.match(page, /Unpublish/);
     assert.match(page, /Archive/);
@@ -648,22 +808,33 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /confirmPermanentDeletion/);
     assert.match(page, /v-if="isOwner"/);
     assert.match(page, /isOwnerSession\(this\.session\)/);
-    assert.match(page, /Select image/);
-    assert.match(page, /Upload image/);
-    assert.match(page, /thumbnail-preview/);
-    assert.match(page, /articleForm\.thumbnailUrl/);
-    assert.match(page, /articleForm\.tagList/);
-    assert.match(page, /addTagToArticleForm/);
-    assert.match(page, /removeTagFromArticleForm/);
-    assert.match(page, /applySelectedMedia/);
-    assert.match(page, /handleMediaFile/);
-    assert.match(page, /mediaState/);
-    assert.match(page, /media-empty-state/);
-    assert.match(page, /media-dialog-toolbar/);
-    assert.match(page, /media-asset-title/);
-    assert.match(page, /asset\.thumbnailUrl/);
-    assert.match(page, /asset\.title/);
-    assert.doesNotMatch(page, /\{\{\s*asset\.public_id\s*\}\}/);
+    assert.match(editor, /Select image/);
+    assert.match(editor, /Upload image/);
+    assert.match(editor, /thumbnail-preview/);
+    assert.match(editor, /thumbnail-preview-button/);
+    assert.match(editor, /Replace image/);
+    assert.match(editor, /Clear image/);
+    assert.match(editor, /Edit image/);
+    assert.match(editor, /Image diagnostics/);
+    assert.match(editor, /showMediaDiagnostics/);
+    assert.match(editor, /clearThumbnail/);
+    assert.match(editor, /editThumbnailImage/);
+    assert.match(editor, /openCloudinaryMediaEditor/);
+    assert.match(editor, /getMediaEditorConfig/);
+    assert.match(editor, /applyEditedMedia/);
+    assert.match(editor, /articleForm\.thumbnailUrl/);
+    assert.match(editor, /articleForm\.tagList/);
+    assert.match(editor, /addTagToArticleForm/);
+    assert.match(editor, /removeTagFromArticleForm/);
+    assert.match(editor, /applySelectedMedia/);
+    assert.match(editor, /handleMediaFile/);
+    assert.match(editor, /mediaState/);
+    assert.match(editor, /media-empty-state/);
+    assert.match(editor, /media-dialog-toolbar/);
+    assert.match(editor, /media-asset-title/);
+    assert.match(editor, /asset\.thumbnailUrl/);
+    assert.match(editor, /asset\.title/);
+    assert.doesNotMatch(editor, /\{\{\s*asset\.public_id\s*\}\}/);
     assert.doesNotMatch(page, /admin-sidebar/);
     assert.match(page, /admin-filter-tabs/);
     assert.match(page, /article-table/);
@@ -686,12 +857,47 @@ describe("admin frontend writer workflow", () => {
     assert.doesNotMatch(page, /Owner preview"\s*:\s*"Writer preview/);
 
     assert.match(layout, /adminSessionDisplay/);
+    assert.match(layout, /adminAccountInitials/);
     assert.match(layout, /adminNavLabel/);
+    assert.match(layout, /Author profile/);
     assert.match(layout, /signOut/);
   });
 
+  it("renders a separate author profile page backed by Contentful profile APIs", () => {
+    const routes = read("../src/router/routes.js");
+    const page = read("../src/pages/AdminProfile.vue");
+
+    assert.match(routes, /path:\s*"\/admin\/profile"/);
+    assert.match(routes, /pages\/AdminProfile\.vue/);
+    assert.match(page, /getAuthorProfile/);
+    assert.match(page, /updateAuthorProfile/);
+    assert.match(page, /Netlify Identity/);
+    assert.match(page, /Contentful/);
+    assert.match(page, /Profile photo URL/);
+    assert.match(page, /profileInitials/);
+    assert.doesNotMatch(page, /v-model="session/);
+    assert.doesNotMatch(page, /app_metadata|user_metadata|identity.*email/i);
+  });
+
+  it("renders public author bylines and author pages without identity metadata", () => {
+    const routes = read("../src/router/routes.js");
+    const article = read("../src/components/BlogArticle.vue");
+    const authorPage = read("../src/pages/AuthorProfile.vue");
+
+    assert.match(routes, /path:\s*"\/blog\/authors\/:slug"/);
+    assert.match(routes, /pages\/AuthorProfile\.vue/);
+    assert.match(article, /articleAuthorProfile/);
+    assert.match(article, /name:\s*'Author'|name:\s*"Author"/);
+    assert.match(article, /articleAuthorSlug/);
+    assert.match(article, /Por[\s\S]*<router-link/);
+    assert.match(authorPage, /\/api\/contentful\/author\/\$\{this\.\$route\.params\.slug\}/);
+    assert.match(authorPage, /publicAuthorProfile/);
+    assert.match(authorPage, /authorInitials/);
+    assert.doesNotMatch(authorPage, /Identity|app_metadata|user_metadata|roles|invite|email/i);
+  });
+
   it("keeps editor workflow buttons compact", () => {
-    const page = read("../src/pages/Admin.vue");
+    const page = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(page, /label="Save draft"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /label="Submit for review"[\s\S]*dense[\s\S]*no-caps/);
@@ -701,6 +907,7 @@ describe("admin frontend writer workflow", () => {
 
   it("keeps admin layout responsive without relying on a horizontally oversized table shell", () => {
     const page = read("../src/pages/Admin.vue");
+    const editor = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(page, /\.admin-workspace[\s\S]*min-width:\s*0/);
     assert.match(page, /\.admin-topbar[\s\S]*flex-wrap:\s*wrap/);
@@ -710,13 +917,14 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /\.article-table[\s\S]*overflow-x:\s*auto/);
     assert.match(page, /\.status-cell[\s\S]*justify-content:\s*flex-start/);
     assert.match(page, /\.table-actions[\s\S]*display:\s*flex/);
-    assert.match(page, /\.editor-drawer[\s\S]*width:\s*min\(560px,\s*100vw\)/);
-    assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*\.editor-drawer/);
+    assert.match(editor, /\.editor-shell[\s\S]*max-width:\s*980px/);
+    assert.match(editor, /@media \(max-width:\s*720px\)/);
     assert.doesNotMatch(page, /letter-spacing:\s*-/);
+    assert.doesNotMatch(editor, /letter-spacing:\s*-/);
   });
 
   it("handles save, validation, authorization, media, and conflict states in the writer UI", () => {
-    const page = read("../src/pages/Admin.vue");
+    const page = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(page, /validateArticleForm/);
     assert.match(page, /adminUserMessage\(error\)/);
@@ -735,8 +943,81 @@ describe("admin frontend writer workflow", () => {
       adminUserMessage(new AdminApiError(502, { error: "Cloudinary API returned api-secret from raw diagnostics" }), { media: true }),
       "Media request failed."
     );
+    assert.equal(
+      adminUserMessage(new AdminApiError(500, { error: "Server configuration error" }), { media: true }),
+      "Media service is not configured for this environment."
+    );
     assert.equal(adminUserMessage(new AdminApiError(401, { error: "raw" })), "Sign in again before saving.");
     assert.equal(adminUserMessage(new AdminApiError(403, { error: "raw" })), "Your account cannot perform this action.");
     assert.equal(adminUserMessage(new AdminApiError(409, { error: "raw" })), "This article changed elsewhere. Reload before saving.");
+  });
+
+  it("configures Cloudinary Media Editor with public image options only", async () => {
+    assert.deepEqual(buildMediaEditorOptions({ cloudName: "demo-cloud", publicId: "folder/image" }), {
+      cloudName: "demo-cloud",
+      publicIds: ["folder/image"],
+      image: {
+        steps: ["resizeAndCrop", "textOverlays", "export"],
+        resizeAndCrop: {
+          cropPresets: ["original", "square", "landscape-16:9", "landscape-4:3"],
+        },
+        export: {
+          formats: ["jpg", "png", "webp"],
+          quality: ["auto", "best", "good"],
+          download: false,
+          share: false,
+        },
+      },
+    });
+
+    assert.deepEqual(normalizeMediaEditorExport({ assets: [{ public_id: "folder/image", secure_url: "https://res.cloudinary.com/demo/image/upload/f_auto/folder/image.jpg" }] }), {
+      publicId: "folder/image",
+      secureUrl: "https://res.cloudinary.com/demo/image/upload/f_auto/folder/image.jpg",
+      transformation: "",
+    });
+
+    let updateOptions = null;
+    let exportHandler = null;
+    let shown = false;
+    const windowRef = {
+      cloudinary: {
+        mediaEditor() {
+          return {
+            update(options) {
+              updateOptions = options;
+            },
+            on(eventName, handler) {
+              if (eventName === "export") {
+                exportHandler = handler;
+              }
+            },
+            show() {
+              shown = true;
+            },
+          };
+        },
+      },
+    };
+    const exported = [];
+
+    await openCloudinaryMediaEditor({
+      cloudName: "demo-cloud",
+      publicId: "folder/image",
+      onExport: (asset) => exported.push(asset),
+      windowRef,
+    });
+    exportHandler({ public_id: "folder/image", url: "https://res.cloudinary.com/demo/image/upload/c_crop/folder/image.jpg" });
+
+    assert.equal(shown, true);
+    assert.equal(updateOptions.cloudName, "demo-cloud");
+    assert.deepEqual(updateOptions.publicIds, ["folder/image"]);
+    assert.deepEqual(exported, [
+      {
+        publicId: "folder/image",
+        secureUrl: "https://res.cloudinary.com/demo/image/upload/c_crop/folder/image.jpg",
+        transformation: "",
+      },
+    ]);
+    assert.doesNotMatch(JSON.stringify(updateOptions), /api.?key|secret/i);
   });
 });

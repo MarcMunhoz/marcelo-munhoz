@@ -4,6 +4,7 @@ export {
   CloudinaryMediaRequestError,
   ContentfulAdminAuthorizationError,
   ContentfulAdminConfigurationError,
+  ContentfulAuthorProfileResolutionError,
   ContentfulAdminNotImplementedError,
   contentfulAdminHandler,
   ContentfulManagementRequestError,

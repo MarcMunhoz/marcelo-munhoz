@@ -19,6 +19,14 @@ const routes = [
         component: () => import("components/BlogArticle.vue"),
       },
       {
+        path: "/blog/authors/:slug",
+        name: "Author",
+        component: () => import("pages/AuthorProfile.vue"),
+        meta: {
+          title: "Author",
+        },
+      },
+      {
         path: "/blog/tags/:tag",
         name: "Artigos Tags",
         component: () => import("components/ArticlesTags.vue"),
@@ -32,6 +40,33 @@ const routes = [
         component: () => import("pages/Admin.vue"),
         meta: {
           title: "Admin",
+          requiresAdmin: true,
+        },
+      },
+      {
+        path: "/admin/articles/new",
+        name: "Admin Article New",
+        component: () => import("pages/AdminArticleEditor.vue"),
+        meta: {
+          title: "New Article",
+          requiresAdmin: true,
+        },
+      },
+      {
+        path: "/admin/articles/:entryId/edit",
+        name: "Admin Article Edit",
+        component: () => import("pages/AdminArticleEditor.vue"),
+        meta: {
+          title: "Edit Article",
+          requiresAdmin: true,
+        },
+      },
+      {
+        path: "/admin/profile",
+        name: "Author Profile",
+        component: () => import("pages/AdminProfile.vue"),
+        meta: {
+          title: "Author Profile",
           requiresAdmin: true,
         },
       },
