@@ -794,6 +794,23 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
     }
   };
 
+  const collectMediaPages = async (fetchPage, params) => {
+    let result = await fetchPage(params);
+    const assets = [...result.assets];
+    let pageCount = 1;
+
+    while (result.next_cursor && pageCount < 5) {
+      result = await fetchPage({ ...params, nextCursor: result.next_cursor });
+      assets.push(...result.assets);
+      pageCount += 1;
+    }
+
+    return {
+      assets,
+      ...(result.next_cursor ? { next_cursor: result.next_cursor } : {}),
+    };
+  };
+
   return {
     async getMediaEditorConfig() {
       return {
@@ -806,13 +823,7 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
       const prefixes = uniqueMediaPrefixes(config.folder, DEFAULT_CLOUDINARY_FOLDER);
 
       for (const assetFolder of prefixes) {
-        let result = await fetchMediaResourcesByAssetFolderIfSupported({ config, maxResults, assetFolder });
-        let pageCount = 1;
-
-        while (result.assets.length === 0 && result.next_cursor && pageCount < 5) {
-          result = await fetchMediaResourcesByAssetFolderIfSupported({ config, maxResults, assetFolder, nextCursor: result.next_cursor });
-          pageCount += 1;
-        }
+        const result = await collectMediaPages(fetchMediaResourcesByAssetFolderIfSupported, { config, maxResults, assetFolder });
 
         if (result.assets.length > 0) {
           return result;
@@ -820,28 +831,14 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
       }
 
       for (const prefix of prefixes) {
-        let result = await fetchMediaResources({ config, maxResults, prefix });
-        let pageCount = 1;
-
-        while (result.assets.length === 0 && result.next_cursor && pageCount < 5) {
-          result = await fetchMediaResources({ config, maxResults, prefix, nextCursor: result.next_cursor });
-          pageCount += 1;
-        }
+        const result = await collectMediaPages(fetchMediaResources, { config, maxResults, prefix });
 
         if (result.assets.length > 0) {
           return result;
         }
       }
 
-      let result = await fetchMediaResources({ config, maxResults });
-      let pageCount = 1;
-
-      while (result.assets.length === 0 && result.next_cursor && pageCount < 5) {
-        result = await fetchMediaResources({ config, maxResults, nextCursor: result.next_cursor });
-        pageCount += 1;
-      }
-
-      return result;
+      return collectMediaPages(fetchMediaResources, { config, maxResults });
     },
     async uploadMedia({ data = {} } = {}) {
       const config = cloudinaryConfigFromEnv(env, fetchImpl);

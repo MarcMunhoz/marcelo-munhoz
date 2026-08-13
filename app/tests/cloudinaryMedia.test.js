@@ -254,6 +254,48 @@ describe("cloudinary media facade", () => {
     ]);
   });
 
+  it("combines paginated media results instead of dropping later non-empty pages", async () => {
+    const calls = [];
+    const facade = createCloudinaryMediaFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (calls.length === 1) {
+          return createResponse(200, {
+            resources: [
+              {
+                public_id: "first-page-cover",
+                asset_folder: "marcelo-munhoz-website",
+                secure_url: "https://res.cloudinary.com/demo-cloud/image/upload/first-page-cover.jpg",
+              },
+            ],
+            next_cursor: "cursor-2",
+          });
+        }
+
+        return createResponse(200, {
+          resources: [
+            {
+              public_id: "robot",
+              asset_folder: "marcelo-munhoz-website",
+              secure_url: "https://res.cloudinary.com/demo-cloud/image/upload/robot.jpg",
+            },
+          ],
+        });
+      },
+    });
+
+    const result = await facade.listMedia({ query: { max_results: "24" } });
+
+    assert.equal(calls.length, 2);
+    assert.equal(new URL(calls[1].url).searchParams.get("next_cursor"), "cursor-2");
+    assert.deepEqual(
+      result.assets.map((asset) => asset.public_id),
+      ["first-page-cover", "robot"]
+    );
+  });
+
   it("uploads image data with a server-generated signature and folder scope", async () => {
     const calls = [];
     const facade = createCloudinaryMediaFacade({
