@@ -66,7 +66,7 @@
 
 - [x] 10.1 Run unit tests covering admin session controls, author mapping, profile APIs, editor routes, and action permissions.
 - [x] 10.2 Run build and credential scans to confirm Contentful and Cloudinary secrets are not bundled or exposed.
-- [ ] 10.3 Smoke test staging with Netlify Identity login/logout, Contentful author profile data, article editing permissions, public byline links, date rendering, and Cloudinary image workflows.
+- [x] 10.3 Smoke test staging with Netlify Identity login/logout, Contentful author profile data, article editing permissions, public byline links, date rendering, and Cloudinary image workflows.
 - [x] 10.4 Update operational documentation for required Contentful author fields, Cloudinary permissions, and staging smoke steps.
 
 ## 11. Canonical Article Locale And Republishing
