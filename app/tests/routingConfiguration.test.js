@@ -48,6 +48,7 @@ describe("routing configuration", () => {
   it("mounts local admin Contentful routes separately from public routes", () => {
     const serverSource = read("../middleware/server.js");
 
+    assert.match(serverSource, /isAllowedCorsOrigin/);
     assert.match(serverSource, /contentfulAdminRoutes/);
     assert.match(serverSource, /app\.use\("\/api\/admin\/contentful", contentfulAdminRoutes\)/);
     assert.match(serverSource, /app\.use\("\/api\/contentful", contentfulRoutes\)/);
