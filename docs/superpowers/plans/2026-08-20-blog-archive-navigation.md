@@ -1,0 +1,607 @@
+# Blog Archive And Article Navigation Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Return completed admin editor actions to the dashboard and replace the three-card public blog pagination with a URL-backed hybrid index plus chronological article navigation.
+
+**Architecture:** A dedicated public `blog-index` API owns filtering, highlight exclusion, and 12-item pagination, while a separate failure-tolerant endpoint resolves chronological article neighbors. Pure frontend route helpers make the query string canonical, focused components render highlights and compact archive rows, and successful terminal editor actions replace the editor route with `/admin`.
+
+**Tech Stack:** Node.js 22, Vue 3 Options API, Vue Router 4, Quasar 2, Netlify Functions, Contentful Delivery API, `node:test`.
+
+**Spec:** `docs/superpowers/specs/2026-08-20-blog-archive-navigation-design.md`
+
+## Global Constraints
+
+- Never read `.env`, `.env.*`, secrets, credentials, or private keys.
+- Install no package, binary, browser, or system dependency.
+- Use the current checkout and existing container; do not create worktrees or duplicate the development stack.
+- Do not run `git add`, commit, push, or pull without explicit authorization for that specific operation.
+- Keep public Article and Contentful content-model fields unchanged.
+- Keep existing article URLs shareable and free of archive-return query parameters.
+- Preserve legacy `/blog/tags/:tag` URLs through an internal redirect.
+- Keep Contentful diagnostics and configuration out of public API errors.
+
+---
+
+### Task 1: OpenSpec Change Contract
+
+**Files:**
+- Create: `openspec/changes/improve-blog-archive-navigation/proposal.md`
+- Create: `openspec/changes/improve-blog-archive-navigation/design.md`
+- Create: `openspec/changes/improve-blog-archive-navigation/specs/blog-public/spec.md`
+- Create: `openspec/changes/improve-blog-archive-navigation/specs/blog-admin/spec.md`
+- Create: `openspec/changes/improve-blog-archive-navigation/tasks.md`
+
+**Interfaces:**
+- Consumes: the approved design document.
+- Produces: delta requirements for `blog-public` plus the admin terminal-action navigation requirement.
+
+- [ ] **Step 1: Create the proposal and design artifacts**
+
+Use change ID `improve-blog-archive-navigation`. The proposal must identify the hybrid archive, canonical URL state, chronological article navigation, and editor return behavior as separate outcomes. The OpenSpec design must reference the approved design rather than redefining conflicting contracts.
+
+- [ ] **Step 2: Write the public delta requirements**
+
+Include literal requirements and scenarios for:
+
+```markdown
+### Requirement: Public Blog Provides A Scalable Hybrid Archive
+The system SHALL present automatic recent highlights and a compact paginated archive whose state is represented by the public URL.
+
+#### Scenario: Reader opens the unfiltered first page
+- **WHEN** the reader opens `/blog` without filters
+- **THEN** the three newest public articles appear as highlights
+- **AND** those articles do not appear in any page of the unfiltered archive dataset
+
+#### Scenario: Reader filters the archive
+- **WHEN** the reader selects search text, year, or tag
+- **THEN** highlights are hidden and all matching public articles participate in the archive results
+- **AND** the filter state is represented in the URL
+```
+
+Add scenarios for 12-item pagination, invalid/out-of-range query normalization, history restoration, empty/error states, and compact responsive rendering.
+
+- [ ] **Step 3: Write article and admin navigation requirements**
+
+Require a clean article URL, a visible archive return action, global chronological older/newer links, failure-tolerant neighbor loading, and `/admin` route replacement after successful Save draft, Submit for review, Request unpublication, and Owner unpublish actions.
+
+- [ ] **Step 4: Write task tracking matching this plan**
+
+Create task sections for API contracts, frontend route state, hybrid layout, article navigation, admin redirect, and verification. Do not mark staging or manual responsive checks complete before they are performed.
+
+- [ ] **Step 5: Validate the new change**
+
+Run:
+
+```bash
+rtk openspec validate improve-blog-archive-navigation --strict
+```
+
+Expected: `Change 'improve-blog-archive-navigation' is valid`.
+
+- [ ] **Step 6: Request authorization for the OpenSpec commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add openspec/changes/improve-blog-archive-navigation docs/superpowers/specs/2026-08-20-blog-archive-navigation-design.md docs/superpowers/plans/2026-08-20-blog-archive-navigation.md
+rtk git commit -m "docs(blog): Adds archive navigation change"
+```
+
+### Task 2: Admin Terminal-Action Redirect
+
+**Files:**
+- Modify: `app/src/pages/AdminArticleEditor.vue`
+- Modify: `app/src/utils/adminDashboard.js`
+- Test: `app/tests/adminFrontend.test.js`
+
+**Interfaces:**
+- Produces: `returnToAdminDashboard(router): Promise<unknown>` using `router.replace("/admin")`.
+- Consumes: successful completion of the existing editor mutations.
+
+- [ ] **Step 1: Write failing redirect tests**
+
+Add a utility behavior test:
+
+```js
+it("replaces the editor route with the dashboard after a terminal action", async () => {
+  const calls = [];
+  const router = { replace: async (path) => calls.push(path) };
+
+  await returnToAdminDashboard(router);
+
+  assert.deepEqual(calls, ["/admin"]);
+});
+```
+
+Add source contract assertions proving `saveDraft`, `submitReview`, `requestUnpublication`, and `ownerUnpublish` await `returnToAdminDashboard(this.$router)` only inside their successful `try` path.
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+```bash
+rtk docker exec marcelo-munhoz_ctn node --test --test-reporter=spec tests/adminFrontend.test.js
+```
+
+Expected: FAIL because `returnToAdminDashboard` is not exported or used.
+
+- [ ] **Step 3: Implement the redirect utility and successful-action calls**
+
+Add:
+
+```js
+export const returnToAdminDashboard = (router) => router.replace("/admin");
+```
+
+Import it in `AdminArticleEditor.vue`. After each successful mutation has updated local state, call:
+
+```js
+await returnToAdminDashboard(this.$router);
+```
+
+Do not call it from any `catch` or `finally` block.
+
+- [ ] **Step 4: Run the focused test and verify GREEN**
+
+Run the Task 2 test command. Expected: all admin frontend tests pass.
+
+- [ ] **Step 5: Request authorization for the admin redirect commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add app/src/pages/AdminArticleEditor.vue app/src/utils/adminDashboard.js app/tests/adminFrontend.test.js
+rtk git commit -m "feat(admin): Returns completed editor actions to dashboard"
+```
+
+### Task 3: Public Blog Index API
+
+**Files:**
+- Modify: `app/netlify/functions/contentfulProxyCore.js`
+- Modify: `app/middleware/routes/contentful.js`
+- Test: `app/tests/contentfulProxy.test.js`
+- Test: `app/tests/routingConfiguration.test.js`
+
+**Interfaces:**
+- Produces: `GET /api/contentful/blog-index?page=&q=&year=&tag=`.
+- Produces response `{ featured, items, total, page, pageSize: 12, totalPages }`.
+- Preserves: existing `/entries`, `/tagged`, `/tags`, `/article/:slug`, and `/author/:slug` contracts during migration.
+
+- [ ] **Step 1: Write failing normalization and query-construction tests**
+
+Cover these literal inputs:
+
+```js
+{ page: "0", q: "  system   design  ", year: "2025", tag: "AI" }
+{ page: "66", q: "x".repeat(120), year: "1800", tag: "bad tag!" }
+```
+
+Assert page defaults to 1, search becomes `system design`, search is capped at 100 characters, invalid year/tag are omitted, and no arbitrary query key reaches `getEntries`.
+
+- [ ] **Step 2: Write failing unfiltered index tests**
+
+For page 1, assert one Contentful request selects the newest three entries and another requests 12 archive entries with `skip: 3`. Assert the returned archive `total` equals `Math.max(0, contentfulTotal - 3)` and no featured ID appears in `items`.
+
+For page 2, assert `featured` is empty and archive skip is:
+
+```js
+3 + (2 - 1) * 12
+```
+
+- [ ] **Step 3: Write failing filtered and out-of-range tests**
+
+Assert filtered requests use only:
+
+```js
+{
+  content_type: "article",
+  order: "-fields.createAt,-sys.createdAt",
+  limit: 12,
+  skip: 0,
+  query: "architecture",
+  "fields.createAt[gte]": "2025-01-01T00:00:00.000Z",
+  "fields.createAt[lt]": "2026-01-01T00:00:00.000Z",
+  "metadata.tags.sys.id[all]": "AI"
+}
+```
+
+Assert a requested page above `totalPages` triggers one corrected archive read and returns the last valid page. Empty collections return page 1 and `totalPages: 1`.
+
+- [ ] **Step 4: Run proxy tests and verify RED**
+
+```bash
+rtk docker exec marcelo-munhoz_ctn node --test --test-reporter=spec tests/contentfulProxy.test.js tests/routingConfiguration.test.js
+```
+
+Expected: FAIL because `/blog-index` is not routed.
+
+- [ ] **Step 5: Implement allowlisted query normalization**
+
+Add constants:
+
+```js
+const BLOG_FEATURED_LIMIT = 3;
+const BLOG_ARCHIVE_LIMIT = 12;
+const BLOG_SEARCH_LIMIT = 100;
+```
+
+Implement private helpers that return only normalized `page`, `q`, `year`, and `tag`. Use `fields.createAt` then `sys.createdAt` for every blog-index ordering.
+
+- [ ] **Step 6: Implement index assembly and page correction**
+
+For unfiltered data, offset every archive page by `BLOG_FEATURED_LIMIT` and subtract three from the Contentful total. Fetch `featured` only on page 1. For filtered data, use no featured offset and return `featured: []`. When the first archive response proves the page is out of range, repeat only the archive request with the corrected skip.
+
+- [ ] **Step 7: Mount the local route**
+
+Add `/blog-index` to the Express public route list without changing admin routing or CORS behavior.
+
+- [ ] **Step 8: Run focused tests and verify GREEN**
+
+Run the Task 3 command. Expected: all proxy and routing tests pass.
+
+- [ ] **Step 9: Request authorization for the blog-index API commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add app/netlify/functions/contentfulProxyCore.js app/middleware/routes/contentful.js app/tests/contentfulProxy.test.js app/tests/routingConfiguration.test.js
+rtk git commit -m "feat(blog): Adds scalable archive API"
+```
+
+### Task 4: Chronological Article Navigation API
+
+**Files:**
+- Modify: `app/netlify/functions/contentfulProxyCore.js`
+- Modify: `app/middleware/routes/contentful.js`
+- Test: `app/tests/contentfulProxy.test.js`
+
+**Interfaces:**
+- Produces: `GET /api/contentful/article-navigation/:slug`.
+- Produces: `{ previous: ArticleLink | null, next: ArticleLink | null }` where `ArticleLink` is `{ title, slug }`.
+- Consumes: the same `fields.createAt`, then `sys.createdAt`, chronology used by `/blog-index`.
+
+- [ ] **Step 1: Write failing middle and boundary tests**
+
+Use a current article plus older/newer fixtures. Assert:
+
+```js
+assert.deepEqual(payload, {
+  previous: { title: "Older article", slug: "older-article" },
+  next: { title: "Newer article", slug: "newer-article" },
+});
+```
+
+Add oldest/newest cases where one value is `null`, a missing slug case returning 404, and a response-body assertion that rejects `body`, author identity metadata, and upstream diagnostics.
+
+- [ ] **Step 2: Write failing equal-date ordering tests**
+
+Use entries with identical `fields.createAt` and distinct `sys.createdAt`. Assert the immediately older/lower `sys.createdAt` entry is `previous` and the immediately newer/higher entry is `next` before falling across editorial dates.
+
+- [ ] **Step 3: Run navigation tests and verify RED**
+
+```bash
+rtk docker exec marcelo-munhoz_ctn node --test --test-reporter=spec --test-name-pattern="article navigation|chronological neighbor" tests/contentfulProxy.test.js
+```
+
+Expected: FAIL with a 404 unknown route or missing neighbor payload.
+
+- [ ] **Step 4: Implement neighbor lookup**
+
+Resolve the current entry by slug, then query same-date neighbors using `sys.createdAt[lt]`/`[gt]` before querying adjacent editorial dates using `fields.createAt[lt]`/`[gt]`. Prefer same-date candidates and use ascending order for the nearest newer candidate, descending order for the nearest older candidate.
+
+Map every result through:
+
+```js
+const publicArticleLink = (entry) => ({
+  title: String(entry.fields?.title || ""),
+  slug: String(entry.fields?.slug || ""),
+});
+```
+
+When `fields.createAt` is absent, compare `sys.createdAt` only.
+
+- [ ] **Step 5: Mount the local route and verify GREEN**
+
+Add `/article-navigation/:slug` to the Express route matcher and rerun all proxy tests. Expected: all pass.
+
+- [ ] **Step 6: Request authorization for the navigation API commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add app/netlify/functions/contentfulProxyCore.js app/middleware/routes/contentful.js app/tests/contentfulProxy.test.js
+rtk git commit -m "feat(blog): Adds chronological article navigation"
+```
+
+### Task 5: Canonical Blog Route State
+
+**Files:**
+- Create: `app/src/utils/blogArchive.js`
+- Modify: `app/src/router/index.js`
+- Test: `app/tests/blogArchive.test.js`
+- Test: `app/tests/routingConfiguration.test.js`
+
+**Interfaces:**
+- Produces: `normalizeBlogRouteQuery(query): BlogArchiveState`.
+- Produces: `blogRouteQuery(state): Record<string, string>`.
+- Produces: `blogArticleLocation(article, currentFullPath): RouteLocationRaw`.
+- Produces: `blogReturnLocation(historyState): string`.
+
+- [ ] **Step 1: Write failing pure route-state tests**
+
+Assert:
+
+```js
+assert.deepEqual(normalizeBlogRouteQuery({ page: "4", q: "  architecture  ", year: "2025", tag: "AI" }), {
+  page: 4,
+  q: "architecture",
+  year: "2025",
+  tag: "AI",
+});
+
+assert.deepEqual(blogRouteQuery({ page: 1, q: "", year: "", tag: "" }), {});
+assert.equal(blogReturnLocation({ blogReturnTo: "/blog?page=66&tag=AI" }), "/blog?page=66&tag=AI");
+assert.equal(blogReturnLocation({ blogReturnTo: "https://untrusted.example.test" }), "/blog");
+```
+
+Assert `blogArticleLocation` returns a clean named article route plus `{ blogReturnTo: currentFullPath }` in router history state.
+
+- [ ] **Step 2: Write failing saved-scroll test**
+
+Update routing configuration coverage to require:
+
+```js
+scrollBehavior(_to, _from, savedPosition) {
+  return savedPosition || { left: 0, top: 0 };
+}
+```
+
+- [ ] **Step 3: Run route-state tests and verify RED**
+
+```bash
+rtk docker exec marcelo-munhoz_ctn node --test --test-reporter=spec tests/blogArchive.test.js tests/routingConfiguration.test.js
+```
+
+Expected: FAIL because the helper module and saved-position behavior do not exist.
+
+- [ ] **Step 4: Implement route-state helpers**
+
+Use the same parameter bounds as the backend. `blogReturnLocation` must accept only strings equal to `/blog` or beginning with `/blog?`; reject protocol-relative paths and all other routes.
+
+- [ ] **Step 5: Implement router saved-position restoration**
+
+Replace the unconditional top reset with the tested `savedPosition` fallback. Do not change history mode or route guards.
+
+- [ ] **Step 6: Run focused tests and verify GREEN**
+
+Run the Task 5 command. Expected: all pass.
+
+- [ ] **Step 7: Request authorization for the route-state commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add app/src/utils/blogArchive.js app/src/router/index.js app/tests/blogArchive.test.js app/tests/routingConfiguration.test.js
+rtk git commit -m "feat(blog): Preserves archive route state"
+```
+
+### Task 6: Hybrid Public Blog Layout
+
+**Files:**
+- Create: `app/src/components/BlogHighlights.vue`
+- Create: `app/src/components/BlogArchiveList.vue`
+- Modify: `app/src/pages/Blog.vue`
+- Delete: `app/src/components/ArticlesList.vue`
+- Test: `app/tests/blogFrontend.test.js`
+- Modify: `app/tests/adminFrontend.test.js` only if shared public markup assertions currently live there.
+
+**Interfaces:**
+- `BlogHighlights` consumes `articles: Article[]` and `returnTo: string`.
+- `BlogArchiveList` consumes `articles: Article[]` and `returnTo: string`.
+- `Blog.vue` consumes `/api/contentful/blog-index` and `/api/contentful/tags`.
+
+- [ ] **Step 1: Write failing component contract tests**
+
+Assert source-level contracts for:
+
+- one primary and two secondary highlight positions;
+- real article images through `articleCardImageUrl`;
+- compact archive rows containing title, description, author, date, and tags;
+- accessible labels `Search articles`, `Year`, and `Tag`;
+- stable image aspect ratios and mobile stacking classes;
+- article links built with `blogArticleLocation` rather than raw slug-only routes.
+
+- [ ] **Step 2: Write failing Blog page state tests**
+
+Require a route-query watcher, `normalizeBlogRouteQuery`, `blogRouteQuery`, a debounced search update, page reset on filter changes, `/blog-index`, 12-item pagination metadata, retry state, empty state, and tags loaded from `/api/contentful/tags`.
+
+- [ ] **Step 3: Run frontend tests and verify RED**
+
+```bash
+rtk docker exec marcelo-munhoz_ctn node --test --test-reporter=spec tests/blogFrontend.test.js tests/adminFrontend.test.js
+```
+
+Expected: FAIL because hybrid components and route-backed behavior do not exist.
+
+- [ ] **Step 4: Implement `BlogHighlights.vue`**
+
+Use an editorial CSS grid with one primary article and two secondary articles on desktop, a single column below the mobile breakpoint, fixed image aspect ratios, visible focus states, and no nested cards. Render nothing for an empty `articles` array.
+
+- [ ] **Step 5: Implement `BlogArchiveList.vue`**
+
+Render unframed rows with a constrained thumbnail track and flexible text track. Use `publicArticleDates` and `articleLocaleFromArticle` for localized date display. Allow long titles and descriptions to wrap without moving controls or overlapping metadata.
+
+- [ ] **Step 6: Rewrite `Blog.vue` as the orchestration surface**
+
+Read canonical state from `$route.query`, request:
+
+```js
+buildApiUrl(`/api/contentful/blog-index?${new URLSearchParams(blogRouteQuery(state))}`)
+```
+
+Keep `searchInput` separate from committed route state for debounce. Use router `replace` for filter typing and router `push` for explicit page changes so browser history remains useful. Hide highlights whenever the API returns none. Preserve controls during loading and errors.
+
+- [ ] **Step 7: Remove the obsolete three-card list**
+
+Delete `ArticlesList.vue` only after `rg "ArticlesList|ArticleList" app/src` proves no remaining import or component registration.
+
+- [ ] **Step 8: Run focused tests and verify GREEN**
+
+Run Task 6 tests plus lint. Expected: all pass.
+
+- [ ] **Step 9: Request authorization for the hybrid layout commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add app/src/components/BlogHighlights.vue app/src/components/BlogArchiveList.vue app/src/pages/Blog.vue app/src/components/ArticlesList.vue app/tests/blogFrontend.test.js app/tests/adminFrontend.test.js
+rtk git commit -m "feat(blog): Adds hybrid article archive"
+```
+
+### Task 7: Article Return And Previous/Next Controls
+
+**Files:**
+- Modify: `app/src/components/BlogArticle.vue`
+- Modify: `app/src/utils/articleDates.js`
+- Modify: `app/src/router/routes.js`
+- Delete: `app/src/components/ArticlesTags.vue`
+- Test: `app/tests/blogFrontend.test.js`
+- Test: `app/tests/adminFrontend.test.js`
+- Test: `app/tests/routingConfiguration.test.js`
+
+**Interfaces:**
+- Consumes: `/api/contentful/article-navigation/:slug`.
+- Consumes: `blogReturnLocation(window.history.state)`.
+- Produces: locale-aware archive, previous, and next labels.
+- Preserves: `/blog/tags/:tag` as a redirect to `/blog?tag=:tag`.
+
+- [ ] **Step 1: Write failing article navigation tests**
+
+Require `BlogArticle.vue` to load navigation independently from the article, render a top archive action, render bottom previous/next titles only when present, and keep article rendering successful when the navigation response fails.
+
+Add PT/EN label assertions:
+
+```js
+assert.deepEqual(articleNavigationLabels("pt-BR"), {
+  all: "Todos os artigos",
+  previous: "Artigo anterior",
+  next: "Próximo artigo",
+});
+assert.deepEqual(articleNavigationLabels("en-US"), {
+  all: "All articles",
+  previous: "Previous article",
+  next: "Next article",
+});
+```
+
+- [ ] **Step 2: Write failing legacy-tag redirect tests**
+
+Assert `/blog/tags/:tag` redirects to named route `Meus Artigos` with query `{ tag }`, and article tag links target that same query-based route.
+
+- [ ] **Step 3: Run focused tests and verify RED**
+
+```bash
+rtk docker exec marcelo-munhoz_ctn node --test --test-reporter=spec tests/blogFrontend.test.js tests/adminFrontend.test.js tests/routingConfiguration.test.js
+```
+
+Expected: FAIL because article navigation and tag redirects are absent.
+
+- [ ] **Step 4: Implement failure-tolerant article navigation**
+
+After the article request succeeds, request its navigation payload in a separate `try/catch`. Navigation failure sets `{ previous: null, next: null }` and must not reset the article or loading state. Watch the route slug so clicking previous/next reloads the same component instance correctly.
+
+- [ ] **Step 5: Implement return behavior and localized labels**
+
+Use an icon-plus-text archive action linked to the validated return location. Previous/next links use clean named article routes and localize their labels using the article locale while always showing adjacent titles.
+
+- [ ] **Step 6: Redirect old tag routes and remove the obsolete tag page**
+
+Replace the `ArticlesTags.vue` route component with:
+
+```js
+redirect: (to) => ({ name: "Meus Artigos", query: { tag: to.params.tag } })
+```
+
+Update article tag links to `/blog?tag=...`. Delete `ArticlesTags.vue` only after verifying it has no remaining imports.
+
+- [ ] **Step 7: Run focused tests and verify GREEN**
+
+Run the Task 7 command. Expected: all pass.
+
+- [ ] **Step 8: Request authorization for the article navigation commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add app/src/components/BlogArticle.vue app/src/utils/articleDates.js app/src/router/routes.js app/src/components/ArticlesTags.vue app/tests/blogFrontend.test.js app/tests/adminFrontend.test.js app/tests/routingConfiguration.test.js
+rtk git commit -m "feat(blog): Adds chronological reading navigation"
+```
+
+### Task 8: Integrated Verification And Staging Handoff
+
+**Files:**
+- Modify: `README.md`
+- Modify: `openspec/changes/improve-blog-archive-navigation/tasks.md`
+- Create: `openspec/changes/improve-blog-archive-navigation/staging-handoff.md`
+- Create: `app/tests/blogNavigationRoundTrip.test.js`
+- Test: all application tests.
+
+**Interfaces:**
+- Consumes: all prior task contracts.
+- Produces: verified implementation plus explicit manual staging checks.
+
+- [ ] **Step 1: Add a cross-layer blog navigation contract test**
+
+Pass a controlled article fixture through blog-index assembly, route-state serialization, article route state, public article lookup, and chronological navigation. Assert the same slug and editorial order survive every boundary.
+
+- [ ] **Step 2: Run the complete automated suite**
+
+```bash
+rtk docker exec marcelo-munhoz_ctn node --test --test-reporter=spec
+rtk docker exec marcelo-munhoz_ctn npm run lint
+rtk docker exec marcelo-munhoz_ctn npm run build
+rtk docker exec marcelo-munhoz_ctn npm run scan:build-credentials
+```
+
+Expected: every command exits 0; no credential pattern is reported.
+
+- [ ] **Step 3: Validate OpenSpec and repository hygiene**
+
+```bash
+rtk openspec validate improve-blog-archive-navigation --strict
+rtk git diff --check
+```
+
+Expected: strict validation succeeds and `git diff --check` emits no output.
+
+- [ ] **Step 4: Restart only the local backend process**
+
+Because `node middleware/server.js` does not watch backend files, stop and restart that process inside the existing container. Do not restart through the Compose command because it invokes `npm i`.
+
+- [ ] **Step 5: Perform responsive local smoke checks**
+
+At desktop and mobile widths, verify:
+
+- unfiltered page 1 shows exactly three highlights and no duplicate archive entries;
+- filtered states hide highlights;
+- page/filter URL state survives article navigation and browser Back;
+- direct article access falls back to `/blog`;
+- oldest/newest article boundaries show only the available direction;
+- loading, empty, error, and long-title states do not overlap;
+- successful terminal admin actions return to `/admin` while failed actions stay in the editor.
+
+- [ ] **Step 6: Document staging checks**
+
+Record only sanitized observations. Include public index/search/filter/history checks, clean shared article URLs, chronological links, legacy tag redirects, and admin terminal-action redirects. Leave staging tasks unchecked until the deployed branch is tested.
+
+- [ ] **Step 7: Request authorization for the final verification commit**
+
+Stop and request explicit authorization. Only after approval:
+
+```bash
+rtk git add README.md openspec/changes/improve-blog-archive-navigation app/tests
+rtk git commit -m "test(blog): Adds archive navigation verification"
+```
+
+- [ ] **Step 8: Stop before merge, sync, or archive**
+
+Report the working-tree state, verification evidence, and remaining staging checks. Do not push, merge, sync specs, or archive the OpenSpec change without the user's next explicit instruction. When archive is later authorized, synchronize the delta specs before archiving as required by repository policy.
