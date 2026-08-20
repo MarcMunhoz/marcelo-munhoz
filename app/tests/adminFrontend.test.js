@@ -44,6 +44,8 @@ import {
   ownerReviewQueues,
   removeArticleById,
   reconcileAdminDashboardData,
+  returnToAdminDashboard,
+  runTerminalAdminAction,
   slugFromTitle,
   statusLabel,
   summarizeArticleStatuses,
@@ -57,6 +59,76 @@ import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfu
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("admin frontend writer workflow", () => {
+  it("replaces the editor route with the dashboard after a terminal action", async () => {
+    const calls = [];
+    const router = { replace: async (path) => calls.push(path) };
+
+    await returnToAdminDashboard(router);
+
+    assert.deepEqual(calls, ["/admin"]);
+  });
+
+  it("does not redirect when a terminal operation rejects", async () => {
+    const calls = [];
+    const router = { replace: async (path) => calls.push(path) };
+
+    await assert.rejects(
+      runTerminalAdminAction({
+        operation: async () => {
+          throw new Error("mutation failed");
+        },
+        router,
+      }),
+      /mutation failed/
+    );
+
+    assert.deepEqual(calls, []);
+  });
+
+  it("runs successful state work before redirecting", async () => {
+    const events = [];
+    const result = await runTerminalAdminAction({
+      operation: async () => {
+        events.push("operation");
+        return "response";
+      },
+      onSuccess: async (response) => {
+        events.push(`success:${response}`);
+      },
+      router: {
+        replace: async (path) => {
+          events.push(`redirect:${path}`);
+        },
+      },
+    });
+
+    assert.equal(result, "response");
+    assert.deepEqual(events, ["operation", "success:response", "redirect:/admin"]);
+  });
+
+  it("delegates terminal editor redirects through the executable action helper", () => {
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+    const methods = ["saveDraft", "submitReview", "requestUnpublication", "ownerUnpublish"];
+
+    for (const method of methods) {
+      const methodStart = editor.indexOf(`    async ${method}()`);
+      assert.notEqual(methodStart, -1, `${method} should exist`);
+      const methodEnd = editor.indexOf("    async ", methodStart + 1);
+      const methodSource = editor.slice(methodStart, methodEnd === -1 ? editor.length : methodEnd);
+      const tryBlock = methodSource.match(/try \{([\s\S]*?)\n      \} catch/);
+      const catchBlock = methodSource.match(/\} catch \(error\) \{([\s\S]*?)\n      \} finally/);
+
+      assert.ok(tryBlock, `${method} should have a try block`);
+      assert.ok(catchBlock, `${method} should have a catch block`);
+      assert.match(tryBlock[1], /await runTerminalAdminAction\(/);
+      assert.match(tryBlock[1], /operation:/);
+      assert.match(tryBlock[1], /onSuccess:/);
+      assert.match(tryBlock[1], /router: this\.\$router/);
+      assert.doesNotMatch(catchBlock[1], /returnToAdminDashboard/);
+      assert.doesNotMatch(methodSource.match(/finally \{([\s\S]*?)\n    \}/)?.[1] || "", /returnToAdminDashboard/);
+    }
+  });
+
   it("registers protected admin routes for writer drafting", () => {
     const routes = read("../src/router/routes.js");
 

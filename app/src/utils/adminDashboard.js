@@ -343,6 +343,19 @@ export const reconcileAdminDashboardData = (payload = {}) => {
   };
 };
 
+export const returnToAdminDashboard = (router) => router.replace("/admin");
+
+export const runTerminalAdminAction = async ({ operation, onSuccess, router }) => {
+  const response = await operation();
+
+  if (onSuccess) {
+    await onSuccess(response);
+  }
+
+  await returnToAdminDashboard(router);
+  return response;
+};
+
 export const filterAdminArticles = (articles = [], filters = {}) => {
   const search = normalize(filters.search);
   const status = normalize(filters.status);

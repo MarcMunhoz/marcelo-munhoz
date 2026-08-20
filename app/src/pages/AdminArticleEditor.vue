@@ -337,6 +337,7 @@ import {
   formatMarkdownSelection,
   mediaLibraryState,
   reconcileAdminDashboardData,
+  runTerminalAdminAction,
   slugFromTitle,
 } from "../utils/adminDashboard.js";
 import { getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
@@ -681,25 +682,30 @@ export default defineComponent({
 
       try {
         const payload = buildArticlePayload(this.articleForm);
-        const response = this.articleForm.id
-          ? await updateArticleDraft({ articleId: this.articleForm.id, article: payload, session: this.session })
-          : await createArticleDraft({ article: payload, session: this.session });
+        await runTerminalAdminAction({
+          operation: () =>
+            this.articleForm.id
+              ? updateArticleDraft({ articleId: this.articleForm.id, article: payload, session: this.session })
+              : createArticleDraft({ article: payload, session: this.session }),
+          onSuccess: (response) => {
+            this.articleForm = applyArticleResponseToForm(this.articleForm, response);
+            const previousLifecycleStatus = this.loadedArticle?.lifecycleStatus || this.loadedArticle?.status;
+            const savedStatus = ["published", "changed"].includes(previousLifecycleStatus) ? "changed" : "draft";
 
-        this.articleForm = applyArticleResponseToForm(this.articleForm, response);
-        const previousLifecycleStatus = this.loadedArticle?.lifecycleStatus || this.loadedArticle?.status;
-        const savedStatus = ["published", "changed"].includes(previousLifecycleStatus) ? "changed" : "draft";
-
-        this.loadedArticle = {
-          ...(this.loadedArticle || {}),
-          id: this.articleForm.id,
-          status: savedStatus,
-          lifecycleStatus: savedStatus,
-          authorEntryId: this.articleForm.authorEntryId,
-          writerSubject: this.session?.subject || this.loadedArticle?.writerSubject || "",
-        };
-        this.statusMessage = "Draft saved";
-        this.snapshotForm();
-        this.showFeedback("Draft saved.", "success");
+            this.loadedArticle = {
+              ...(this.loadedArticle || {}),
+              id: this.articleForm.id,
+              status: savedStatus,
+              lifecycleStatus: savedStatus,
+              authorEntryId: this.articleForm.authorEntryId,
+              writerSubject: this.session?.subject || this.loadedArticle?.writerSubject || "",
+            };
+            this.statusMessage = "Draft saved";
+            this.snapshotForm();
+            this.showFeedback("Draft saved.", "success");
+          },
+          router: this.$router,
+        });
       } catch (error) {
         this.handleAdminError(error);
       } finally {
@@ -710,14 +716,20 @@ export default defineComponent({
       this.loadingAction = "review";
 
       try {
-        await submitArticleForReview({
-          articleId: this.articleForm.id,
-          version: this.articleForm.version,
-          notes: "",
-          session: this.session,
+        await runTerminalAdminAction({
+          operation: () =>
+            submitArticleForReview({
+              articleId: this.articleForm.id,
+              version: this.articleForm.version,
+              notes: "",
+              session: this.session,
+            }),
+          onSuccess: () => {
+            this.snapshotForm();
+            this.showFeedback("Submitted for owner review.", "success");
+          },
+          router: this.$router,
         });
-        this.snapshotForm();
-        this.showFeedback("Submitted for owner review.", "success");
       } catch (error) {
         this.handleAdminError(error);
       } finally {
@@ -728,14 +740,20 @@ export default defineComponent({
       this.loadingAction = "unpublish";
 
       try {
-        await requestArticleUnpublication({
-          articleId: this.articleForm.id,
-          version: this.articleForm.version,
-          notes: "",
-          session: this.session,
+        await runTerminalAdminAction({
+          operation: () =>
+            requestArticleUnpublication({
+              articleId: this.articleForm.id,
+              version: this.articleForm.version,
+              notes: "",
+              session: this.session,
+            }),
+          onSuccess: () => {
+            this.snapshotForm();
+            this.showFeedback("Unpublication request sent.", "success");
+          },
+          router: this.$router,
         });
-        this.snapshotForm();
-        this.showFeedback("Unpublication request sent.", "success");
       } catch (error) {
         this.handleAdminError(error);
       } finally {
@@ -746,14 +764,20 @@ export default defineComponent({
       this.loadingAction = "owner-unpublish";
 
       try {
-        await unpublishArticle({
-          articleId: this.articleForm.id,
-          version: this.articleForm.version,
-          session: this.session,
+        await runTerminalAdminAction({
+          operation: () =>
+            unpublishArticle({
+              articleId: this.articleForm.id,
+              version: this.articleForm.version,
+              session: this.session,
+            }),
+          onSuccess: () => {
+            this.loadedArticle = { ...(this.loadedArticle || {}), status: "unpublished" };
+            this.snapshotForm();
+            this.showFeedback("Article unpublished.", "success");
+          },
+          router: this.$router,
         });
-        this.loadedArticle = { ...(this.loadedArticle || {}), status: "unpublished" };
-        this.snapshotForm();
-        this.showFeedback("Article unpublished.", "success");
       } catch (error) {
         this.handleAdminError(error);
       } finally {
