@@ -45,6 +45,7 @@ import {
   removeArticleById,
   reconcileAdminDashboardData,
   slugFromTitle,
+  statusLabel,
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../src/utils/adminDashboard.js";
@@ -208,7 +209,7 @@ describe("admin frontend writer workflow", () => {
     };
     const session = { token: "owner-token" };
 
-    await publishArticle({ articleId: "article-1", version: 7, session, fetchImpl });
+    await publishArticle({ articleId: "article-1", version: 7, requestId: "request-1", requestVersion: 3, session, fetchImpl });
     await unpublishArticle({ articleId: "article-1", version: 8, session, fetchImpl });
     await archiveArticle({ articleId: "article-1", version: 9, session, fetchImpl });
     await unarchiveArticle({ articleId: "article-1", version: 10, session, fetchImpl });
@@ -217,7 +218,7 @@ describe("admin frontend writer workflow", () => {
     assert.deepEqual(
       calls.map((call) => [call.url, call.options.method, JSON.parse(call.options.body)]),
       [
-        ["/api/admin/contentful/articles/article-1/publish", "POST", { version: 7 }],
+        ["/api/admin/contentful/articles/article-1/publish", "POST", { version: 7, requestId: "request-1", requestVersion: 3 }],
         ["/api/admin/contentful/articles/article-1/unpublish", "POST", { version: 8 }],
         ["/api/admin/contentful/articles/article-1/archive", "POST", { version: 9 }],
         ["/api/admin/contentful/articles/article-1/unarchive", "POST", { version: 10 }],
@@ -430,6 +431,7 @@ describe("admin frontend writer workflow", () => {
       { status: "published" },
       { status: "draft" },
       { status: "unpublished" },
+      { status: "changed" },
       { status: "review" },
       { status: "review" },
       { status: "archived" },
@@ -437,11 +439,12 @@ describe("admin frontend writer workflow", () => {
 
     assert.deepEqual(summary, {
       published: 1,
-      drafts: 2,
+      drafts: 3,
       review: 2,
       archived: 1,
-      total: 6,
+      total: 7,
     });
+    assert.equal(statusLabel("changed"), "Unpublished changes");
   });
 
   it("filters article table rows by search, status, tag, date, and author", () => {
@@ -828,6 +831,7 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canRequestUnpublicationAction(null, writer), false);
     assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
     assert.equal(canPrepareReviewAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), false);
+    assert.equal(canPrepareReviewAction({ id: "changed-1", status: "changed", writerSubject: "writer-1" }, writer), true);
     assert.equal(canPrepareReviewAction({ id: "", status: "draft", writerSubject: "writer-1" }, writer), false);
 
     assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), true);
@@ -857,12 +861,19 @@ describe("admin frontend writer workflow", () => {
 
     assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "owner-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-1", status: "published", authorEntryId: "author-1" }, owner), true);
+    assert.equal(canEditArticleAction({ id: "changed-1", status: "changed", authorEntryId: "author-1" }, owner), true);
     assert.equal(canEditArticleAction({ id: "published-2", status: "published", authorEntryId: "author-2" }, owner), false);
     assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, owner), true);
+    assert.equal(canOwnerPublishAction({ id: "changed-1", status: "changed" }, owner), true);
+    assert.equal(canOwnerPublishAction({ id: "changed-review-1", status: "review", lifecycleStatus: "changed" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, owner), true);
+    assert.equal(canOwnerUnpublishAction({ id: "changed-1", status: "changed" }, owner), true);
+    assert.equal(canOwnerUnpublishAction({ id: "changed-review-1", status: "review", lifecycleStatus: "changed" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, identityOwner), true);
     assert.equal(canOwnerUnpublishAction({ id: "take-down-1", status: "unpublicationRequested" }, owner), true);
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, owner), true);
+    assert.equal(canArchiveArticleAction({ id: "changed-1", status: "changed" }, owner), false);
+    assert.equal(canArchiveArticleAction({ id: "changed-review-1", status: "review", lifecycleStatus: "changed" }, owner), false);
 
     assert.equal(canPrepareReviewAction({ id: "review-1", status: "review" }, owner), false);
     assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published" }, owner), false);
@@ -1056,6 +1067,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /Submit for review/);
     assert.match(editor, /Request unpublication/);
     assert.match(page, /Publish/);
+    assert.match(page, /:label="article\.lifecycleStatus === 'changed' \? 'Publish changes' : 'Publish'"/);
     assert.match(page, /Unpublish/);
     assert.match(page, /Archive/);
     assert.match(page, /Delete permanently/);
@@ -1190,18 +1202,25 @@ describe("admin frontend writer workflow", () => {
 
   it("infers English byline labels from English article text when no locale field exists", () => {
     const article = read("../src/components/BlogArticle.vue");
+    const articleDates = read("../src/utils/articleDates.js");
 
     assert.match(article, /articleLocaleFromArticle/);
     assert.match(article, /isArticleLanguageTag/);
+    assert.doesNotMatch(articleDates, /articleLocaleFromTags/);
     assert.deepEqual(articleBylineLabels("", { title: "During 9 years my career changed", body: "When I decide to write about software" }), {
       by: "By",
       on: "on",
       updated: "Updated on",
     });
-    assert.deepEqual(articleBylineLabels("", { tags: ["article-lang-en-us"], title: "Texto misto" }), {
+    assert.deepEqual(articleBylineLabels("", { slug: "what-id-learned-last-years", title: "Texto misto" }), {
       by: "By",
       on: "on",
       updated: "Updated on",
+    });
+    assert.deepEqual(articleBylineLabels("", { tags: ["article-lang-en-us"], title: "Texto misto" }), {
+      by: "Por",
+      on: "em",
+      updated: "Atualizado em",
     });
     assert.deepEqual(articleBylineLabels("", { title: "Trabalho remoto no mundo Linux", body: "Você precisa aprender sempre mais" }), {
       by: "Por",
@@ -1214,7 +1233,7 @@ describe("admin frontend writer workflow", () => {
     const page = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(page, /:label="saveButtonLabel"[\s\S]*dense[\s\S]*no-caps/);
-    assert.match(page, /return this\.loadedArticle\?\.status === "published" \? "Save" : "Save draft"/);
+    assert.match(page, /\["published", "changed"\]\.includes\(this\.loadedArticle\?\.status\) \? "Save" : "Save draft"/);
     assert.match(page, /label="Submit for review"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /label="Request unpublication"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /label="Unpublish"[\s\S]*dense[\s\S]*no-caps/);

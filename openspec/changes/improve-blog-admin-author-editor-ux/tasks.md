@@ -68,3 +68,12 @@
 - [x] 10.2 Run build and credential scans to confirm Contentful and Cloudinary secrets are not bundled or exposed.
 - [ ] 10.3 Smoke test staging with Netlify Identity login/logout, Contentful author profile data, article editing permissions, public byline links, date rendering, and Cloudinary image workflows.
 - [x] 10.4 Update operational documentation for required Contentful author fields, Cloudinary permissions, and staging smoke steps.
+
+## 11. Canonical Article Locale And Republishing
+
+- [x] 11.1 Add failing management tests proving the environment-default locale is canonical and a PT or EN selection is written consistently to every enabled locale slot.
+- [x] 11.2 Replace `article-lang-*` tag persistence with the Contentful `locale` field while preserving text inference for legacy articles with no stored locale.
+- [x] 11.3 Add failing lifecycle tests proving a newer draft over a published version is normalized as `changed` and can be explicitly republished by an owner.
+- [x] 11.4 Update admin labels and action eligibility for unpublished changes, including writer review and owner publish-changes flows.
+- [x] 11.5 Add an end-to-end contract test covering editor payload, Contentful normalization, publication, public API locale, and localized byline labels for PT and EN.
+- [x] 11.6 Document locale value reconciliation and the optional controlled migration of the Contentful `locale` field from localized to non-localized.

@@ -80,11 +80,17 @@ Action labels and availability must follow this model:
 ```text
 writer + draft/submission -> edit, submit for review
 writer + published        -> request unpublication
+writer + changed          -> edit, submit changes for review
 owner + draft/review      -> edit, publish, archive/delete when eligible
 owner + published         -> edit, unpublish, archive/delete when eligible
+owner + changed           -> edit, publish changes, unpublish when eligible
 ```
 
 Owners execute lifecycle operations directly. Writers request owner review. Published articles should not show publication request actions.
+
+Contentful entries with `sys.publishedVersion` and a newer draft version are `changed`, not fully published. The dashboard and editor must expose that distinction so saved locale or content changes are not mistaken for live content.
+
+Lifecycle state and editorial review state are separate. `blogEditorialRequest` stores the submitted Contentful article version in a non-localized Integer field named `articleVersion`. A publication request applies only while that version still matches the current article draft; later saves make the request stale. Publishing the reviewed version closes the request so an old `readyForReview` record cannot overwrite the article's current lifecycle state.
 
 Rationale: this preserves the authorization model and makes the UI match editorial language.
 

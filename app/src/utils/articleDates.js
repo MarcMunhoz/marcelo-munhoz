@@ -4,35 +4,19 @@ export const normalizeArticleLocale = (locale = "", fallbackLocale = "pt-BR") =>
   return ["pt-BR", "en-US"].includes(normalized) ? normalized : fallbackLocale;
 };
 
-export const articleLocaleFromTags = (tags = []) => {
-  const tagIds = (Array.isArray(tags) ? tags : [])
-    .map((tag) => tag?.sys?.id || tag?.id || tag)
-    .map((tag) => String(tag || "").trim());
-
-  if (tagIds.includes("article-lang-en-us")) {
-    return "en-US";
-  }
-
-  if (tagIds.includes("article-lang-pt-br")) {
-    return "pt-BR";
-  }
-
-  return "";
-};
-
 export const isArticleLanguageTag = (tag = "") => ["article-lang-en-us", "article-lang-pt-br"].includes(String(tag || "").trim());
 
 const normalizedLocale = (locale = "") => String(locale || "").trim() || "pt-BR";
 
 export const articleLocaleFromArticle = (article = {}, fallbackLocale = "pt-BR") => {
-  const explicitLocale = article.locale || article.language || article.lang || articleLocaleFromTags(article.tags || article.metadata?.tags);
+  const explicitLocale = article.locale || article.language || article.lang;
 
   if (explicitLocale) {
     return explicitLocale;
   }
 
-  const text = [article.title, article.description, article.body].map((value) => String(value || "")).join(" ").toLowerCase();
-  const englishSignals = /\b(the|and|when|during|career|people|software|with|about|you|your|my|in|for|to|of)\b/g;
+  const text = [article.slug, article.title, article.description, article.body].map((value) => String(value || "")).join(" ").toLowerCase();
+  const englishSignals = /\b(the|and|what|when|during|career|people|software|with|about|you|your|my|in|for|to|of|learned|last|years)\b/g;
   const portugueseSignals = /\b(e|de|do|da|dos|das|em|para|por|com|voce|você|que|uma|um|os|as|no|na)\b/g;
   const englishCount = (text.match(englishSignals) || []).length;
   const portugueseCount = (text.match(portugueseSignals) || []).length;

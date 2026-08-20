@@ -514,6 +514,21 @@ describe("contentful admin handler", () => {
     const fetchImpl = async (url, options) => {
       calls.push({ url: String(url), options });
 
+      if (String(url).endsWith("/locales")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              items: [
+                { code: "en-US", default: true },
+                { code: "pt-BR", default: false },
+              ],
+            };
+          },
+        };
+      }
+
       if (!String(url).includes("content_type=")) {
         return {
           ok: true,
@@ -523,12 +538,13 @@ describe("contentful admin handler", () => {
               items: [
                 {
                   sys: { id: "article-1", version: 7, publishedVersion: 5, updatedAt: "2026-08-11T10:00:00Z", contentType: { sys: { id: "article" } } },
-                  metadata: { tags: [{ sys: { id: "contentful" } }, { sys: { id: "article-lang-en-us" } }] },
+                  metadata: { tags: [{ sys: { id: "contentful" } }] },
                   fields: {
                     title: { "pt-BR": "Published article" },
                     slug: { "pt-BR": "published-article" },
                     description: { "pt-BR": "Published description" },
                     body: { "pt-BR": "# Published" },
+                    locale: { "en-US": "en-US", "pt-BR": "pt-BR" },
                     createAt: { "pt-BR": "2026-08-11" },
                     author: { "pt-BR": { sys: { id: "author-1" }, fields: { name: { "pt-BR": "Marcelo Munhoz" } } } },
                     thumbnail: { "pt-BR": { public_id: "folder/published", secure_url: "https://example.test/published.jpg" } },
@@ -551,9 +567,20 @@ describe("contentful admin handler", () => {
                     requestType: { "pt-BR": "publication" },
                     status: { "pt-BR": "readyForReview" },
                     article: { "pt-BR": { sys: { id: "article-2" } } },
+                    articleVersion: { "en-US": 3 },
                     writerSubject: { "pt-BR": "writer-123" },
                     writerName: { "pt-BR": "Guest Writer" },
                     createdAt: { "pt-BR": "2026-08-10T11:00:00Z" },
+                  },
+                },
+                {
+                  sys: { id: "request-stale", version: 2, contentType: { sys: { id: "blogEditorialRequest" } } },
+                  fields: {
+                    requestType: { "pt-BR": "publication" },
+                    status: { "pt-BR": "readyForReview" },
+                    article: { "pt-BR": { sys: { id: "article-1" } } },
+                    articleVersion: { "en-US": 4 },
+                    writerSubject: { "pt-BR": "writer-123" },
                   },
                 },
                 {
@@ -589,17 +616,21 @@ describe("contentful admin handler", () => {
         authorEntryId: article.authorEntryId,
         tags: article.tags,
         requestId: article.requestId,
+        requestVersion: article.requestVersion,
+        reviewStatus: article.reviewStatus,
         locale: article.locale,
       })),
       [
         {
           id: "article-1",
           title: "Published article",
-          status: "published",
+          status: "changed",
           author: "Marcelo Munhoz",
           authorEntryId: "author-1",
           tags: ["contentful"],
           requestId: undefined,
+          requestVersion: undefined,
+          reviewStatus: undefined,
           locale: "en-US",
         },
         {
@@ -610,17 +641,20 @@ describe("contentful admin handler", () => {
           authorEntryId: "author-2",
           tags: [],
           requestId: "request-1",
+          requestVersion: 2,
+          reviewStatus: "readyForReview",
           locale: undefined,
         },
       ]
     );
-    assert.deepEqual(dashboard.summary, { published: 1, drafts: 0, review: 1, archived: 0, total: 2 });
+    assert.deepEqual(dashboard.summary, { published: 0, drafts: 1, review: 1, archived: 0, total: 2 });
     assert.deepEqual(dashboard.reviewRequests, [
       {
         id: "request-1",
         articleId: "article-2",
         requestType: "publication",
         status: "readyForReview",
+        articleVersion: 3,
         writerSubject: "writer-123",
         writerName: "Guest Writer",
         createdAt: "2026-08-10T11:00:00Z",
@@ -630,8 +664,9 @@ describe("contentful admin handler", () => {
     assert.match(calls[0].url, /\/entries\?/);
     assert.match(calls[0].url, /limit=100/);
     assert.doesNotMatch(calls[0].url, /content_type=|include=|order=/);
-    assert.equal(calls.length, 2);
-    assert.match(calls[1].url, /\/entries\/author-2$/);
+    assert.equal(calls.length, 3);
+    assert.match(calls[1].url, /\/locales$/);
+    assert.match(calls[2].url, /\/entries\/author-2$/);
     assert.equal(calls[0].options.headers.authorization, "Bearer management-token");
   });
 
@@ -689,6 +724,7 @@ describe("contentful admin handler", () => {
                   requestType: { "pt-BR": "publication" },
                   status: { "pt-BR": "readyForReview" },
                   article: { "pt-BR": { sys: { id: "own-review-1" } } },
+                  articleVersion: { "pt-BR": 3 },
                   writerSubject: { "pt-BR": "writer-123" },
                 },
               },
@@ -698,6 +734,7 @@ describe("contentful admin handler", () => {
                   requestType: { "pt-BR": "publication" },
                   status: { "pt-BR": "readyForReview" },
                   article: { "pt-BR": { sys: { id: "other-review-1" } } },
+                  articleVersion: { "pt-BR": 3 },
                   writerSubject: { "pt-BR": "writer-999" },
                 },
               },

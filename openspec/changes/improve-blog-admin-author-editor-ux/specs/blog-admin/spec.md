@@ -142,6 +142,26 @@ The system SHALL persist article creation and update timestamps as timezone-safe
 - **AND** the system stores the selected editorial language when the Contentful Article model supports it
 - **AND** public byline labels prefer the selected editorial language over legacy Contentful technical locale defaults
 
+#### Scenario: Localized Contentful locale values disagree
+- **WHEN** the Contentful Article `locale` field is localized across multiple environment locales
+- **THEN** the admin reads the editorial language from the Contentful environment default locale used by public Delivery API responses
+- **AND** saving a language selection writes the same editorial value to every enabled locale slot
+
+#### Scenario: Legacy article has no explicit editorial locale
+- **WHEN** a public article has no stored `locale` value
+- **THEN** the system may infer Portuguese or English conservatively from article text
+- **AND** language metadata tags do not override an explicit Contentful `locale` field
+
+#### Scenario: Published article has saved changes
+- **WHEN** an authenticated author saves changes to an already published Contentful entry
+- **THEN** the admin reports that the article has unpublished changes
+- **AND** the public article remains unchanged until an authorized owner publishes the new entry version
+
+#### Scenario: Owner publishes saved changes
+- **WHEN** an owner publishes an article with unpublished changes
+- **THEN** the latest saved editorial locale and content become publicly visible together
+- **AND** the admin reports the article as published after reloading its Contentful state
+
 ### Requirement: Article Editor Hides Technical Contentful And Cloudinary Fields
 The system SHALL keep technical Contentful and Cloudinary identifiers out of primary article editing controls.
 

@@ -119,7 +119,7 @@
                       <q-tooltip>Request unpublication</q-tooltip>
                     </q-btn>
                     <q-btn v-if="canOwnerPublishAction(props.row, session)" dense flat round color="blue-grey-8" icon="publish" @click="publishSelectedArticle(props.row)">
-                      <q-tooltip>Publish</q-tooltip>
+                      <q-tooltip>{{ props.row.lifecycleStatus === "changed" ? "Publish changes" : "Publish" }}</q-tooltip>
                     </q-btn>
                     <q-btn v-if="canOwnerUnpublishAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" @click="unpublishSelectedArticle(props.row)">
                       <q-tooltip>Unpublish</q-tooltip>
@@ -157,7 +157,7 @@
                       <span>{{ article.displayAuthor }} · {{ article.displayDate }}</span>
                     </div>
                     <div class="owner-actions">
-                      <q-btn dense unelevated color="blue-grey-8" icon="publish" label="Publish" :loading="loadingAction === `publish-${article.id}`" @click="publishSelectedArticle(article)" />
+                      <q-btn dense unelevated color="blue-grey-8" icon="publish" :label="article.lifecycleStatus === 'changed' ? 'Publish changes' : 'Publish'" :loading="loadingAction === `publish-${article.id}`" @click="publishSelectedArticle(article)" />
                       <q-btn v-if="canArchiveArticleAction(article, session)" dense outline color="blue-grey-7" icon="archive" label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="archiveSelectedArticle(article)" />
                     </div>
                   </div>
@@ -279,6 +279,7 @@ export default defineComponent({
       ],
       statusOptions: [
         { label: "Published", value: "published" },
+        { label: "Unpublished changes", value: "changed" },
         { label: "Draft", value: "draft" },
         { label: "Unpublished", value: "unpublished" },
         { label: "Unpublication requested", value: "unpublicationRequested" },
@@ -416,6 +417,7 @@ export default defineComponent({
     statusColor(status) {
       return {
         published: "teal-8",
+        changed: "deep-orange-8",
         draft: "blue-grey-7",
         unpublished: "amber-9",
         unpublicationRequested: "amber-9",
@@ -426,6 +428,7 @@ export default defineComponent({
     statusLabel(status) {
       return {
         published: "Published",
+        changed: "Unpublished changes",
         draft: "Draft",
         unpublished: "Unpublished",
         unpublicationRequested: "Unpublication requested",
@@ -483,14 +486,20 @@ export default defineComponent({
       this.loadingAction = `${actionName}-${article.id}`;
 
       try {
-        await operation({
+        const result = await operation({
           articleId: article.id,
           version: article.version,
+          requestId: article.requestId,
+          requestVersion: article.requestVersion,
           session: this.session,
         });
         afterSuccess?.();
         await this.loadArticleDashboard();
-        this.showFeedback(successMessage, "success");
+        if (result?.editorialRequestClosurePending) {
+          this.showFeedback("Article published. Review cleanup is pending.", "info");
+        } else {
+          this.showFeedback(successMessage, "success");
+        }
       } catch (error) {
         this.handleAdminError(error);
       } finally {
@@ -498,7 +507,8 @@ export default defineComponent({
       }
     },
     publishSelectedArticle(article) {
-      return this.runOwnerLifecycleAction(article, "publish", publishArticle, "Article published.", () => this.updateArticleStatus(article.id, "published"));
+      const successMessage = article.lifecycleStatus === "changed" ? "Article changes published." : "Article published.";
+      return this.runOwnerLifecycleAction(article, "publish", publishArticle, successMessage, () => this.updateArticleStatus(article.id, "published"));
     },
     unpublishSelectedArticle(article) {
       return this.runOwnerLifecycleAction(article, "unpublish", unpublishArticle, "Article unpublished.", () => this.updateArticleStatus(article.id, "unpublished"));

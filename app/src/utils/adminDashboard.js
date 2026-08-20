@@ -10,6 +10,14 @@ const ownsArticle = (article = {}, session = {}) =>
     (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
       (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
   );
+const articleLifecycleStatus = (article = {}) => {
+  if (article.lifecycleStatus) {
+    return normalize(article.lifecycleStatus);
+  }
+
+  const status = normalize(article.status);
+  return status === "review" ? "draft" : status === "unpublicationrequested" ? "published" : status;
+};
 
 export const slugFromTitle = (title = "") =>
   String(title || "")
@@ -230,6 +238,7 @@ export const mediaLibraryState = ({ assets = [], error = "", isLoading = false }
 export const statusLabel = (status) =>
   ({
     published: "Published",
+    changed: "Unpublished changes",
     draft: "Draft",
     unpublished: "Unpublished",
     unpublicationRequested: "Unpublication requested",
@@ -310,7 +319,7 @@ export const summarizeArticleStatuses = (articles = []) =>
 
       if (status === "published") {
         summary.published += 1;
-      } else if (status === "draft" || status === "unpublished" || status === "unpublicationrequested") {
+      } else if (status === "draft" || status === "changed" || status === "unpublished" || status === "unpublicationrequested") {
         summary.drafts += 1;
       } else if (status === "review") {
         summary.review += 1;
@@ -356,7 +365,7 @@ export const filterAdminArticles = (articles = [], filters = {}) => {
 };
 
 export const ownerReviewQueues = (articles = []) => ({
-  submissions: articles.filter((article) => ["draft", "review"].includes(normalize(article.status))),
+  submissions: articles.filter((article) => ["draft", "changed", "review"].includes(normalize(article.status))),
   unpublicationRequests: articles.filter((article) => normalize(article.status) === "unpublicationrequested"),
 });
 
@@ -411,7 +420,7 @@ export const canEditArticleAction = (article = {}, session) => {
     return false;
   }
 
-  return ["draft", "review", "published", "unpublished", "unpublicationrequested"].includes(normalize(article.status));
+  return ["draft", "changed", "review", "published", "unpublished", "unpublicationrequested"].includes(normalize(article.status));
 };
 
 export const canPrepareReviewAction = (article = {}, session = { roles: ["writer"] }) => {
@@ -421,7 +430,7 @@ export const canPrepareReviewAction = (article = {}, session = { roles: ["writer
     return false;
   }
 
-  return ["draft", "unpublished"].includes(normalize(article.status));
+  return ["draft", "changed", "unpublished"].includes(normalize(article.status));
 };
 
 export const canRequestUnpublicationAction = (article = {}, session = { roles: ["writer"] }) => {
@@ -433,19 +442,19 @@ export const canRequestUnpublicationAction = (article = {}, session = { roles: [
 export const canOwnerPublishAction = (article = {}, session) => {
   article = article || {};
 
-  return Boolean(article.id && isOwner(session) && normalize(article.status) === "review");
+  return Boolean(article.id && isOwner(session) && (normalize(article.status) === "review" || articleLifecycleStatus(article) === "changed"));
 };
 
 export const canOwnerUnpublishAction = (article = {}, session) => {
   article = article || {};
 
-  return Boolean(article.id && isOwner(session) && ["published", "unpublicationrequested"].includes(normalize(article.status)));
+  return Boolean(article.id && isOwner(session) && ["changed", "published"].includes(articleLifecycleStatus(article)));
 };
 
 export const canArchiveArticleAction = (article = {}, session) => {
   article = article || {};
 
-  return Boolean(article.id && isOwner(session) && ["draft", "review", "unpublished"].includes(normalize(article.status)));
+  return Boolean(article.id && isOwner(session) && ["draft", "unpublished"].includes(articleLifecycleStatus(article)));
 };
 
 export const canUnarchiveArticleAction = (article = {}, session) => {

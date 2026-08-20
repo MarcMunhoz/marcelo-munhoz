@@ -102,7 +102,11 @@ describe("contentful management facade", () => {
 
         if (url.toString().endsWith("/locales")) {
           return createResponse(200, {
-            items: [{ code: "en-US", default: true }],
+            items: [
+              { code: "en-US", default: true },
+              { code: "pt-BR", default: false },
+              { code: "es-ES", default: false },
+            ],
           });
         }
 
@@ -171,7 +175,11 @@ describe("contentful management facade", () => {
 
         if (url.toString().endsWith("/locales")) {
           return createResponse(200, {
-            items: [{ code: "en-US", default: true }],
+            items: [
+              { code: "en-US", default: true },
+              { code: "pt-BR", default: false },
+              { code: "es-ES", default: false },
+            ],
           });
         }
 
@@ -183,7 +191,7 @@ describe("contentful management facade", () => {
               { id: "description" },
               { id: "body" },
               { id: "createAt" },
-              { id: "locale" },
+              { id: "locale", localized: true },
               { id: "author" },
             ],
           });
@@ -213,10 +221,14 @@ describe("contentful management facade", () => {
       calls.some((call) => new URL(call.url).pathname === "/spaces/space-id/environments/staging/content_types/article"),
       true
     );
-    assert.equal(body.fields.locale["en-US"], "pt-BR");
+    assert.deepEqual(body.fields.locale, {
+      "en-US": "pt-BR",
+      "pt-BR": "pt-BR",
+      "es-ES": "pt-BR",
+    });
   });
 
-  it("persists editorial article locale as internal metadata when the model has no locale field", async () => {
+  it("rejects locale saves when the article model has no locale field", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({
       env: createEnv(),
@@ -248,30 +260,81 @@ describe("contentful management facade", () => {
       },
     });
 
-    await facade.createArticleDraft({
-      data: {
-        title: "Draft title",
-        slug: "draft-title",
-        description: "Draft description",
-        body: "# Draft",
-        createAt: "2026-08-11",
-        locale: "en-US",
-        author: "author-1",
-        tags: ["ai"],
+    await assert.rejects(
+      () =>
+        facade.createArticleDraft({
+          data: {
+            title: "Draft title",
+            slug: "draft-title",
+            description: "Draft description",
+            body: "# Draft",
+            createAt: "2026-08-11",
+            locale: "en-US",
+            author: "author-1",
+            tags: ["ai"],
+          },
+          session: { subject: "writer-123", authorEntryId: "author-1" },
+        }),
+      ContentfulAdminConfigurationError
+    );
+
+    assert.equal(calls.some((call) => call.url.includes("/tags/article-lang-")), false);
+    assert.equal(calls.some((call) => call.options.method === "POST"), false);
+  });
+
+  it("rejects unsupported editorial locales before calling Contentful", async () => {
+    let called = false;
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        called = true;
+        return createResponse(200, {});
       },
-      session: { subject: "writer-123", authorEntryId: "author-1" },
     });
 
-    const createCall = calls.find((call) => call.options.method === "POST");
-    const languageTagCall = calls.find((call) => call.options.method === "PUT" && call.url.endsWith("/tags/article-lang-en-us"));
-    const body = JSON.parse(createCall.options.body);
+    await assert.rejects(
+      () =>
+        facade.createArticleDraft({
+          data: { title: "Article", locale: "fr-FR", author: "author-1" },
+          session: { subject: "writer-1", authorEntryId: "author-1" },
+        }),
+      ContentfulAdminConfigurationError
+    );
+    assert.equal(called, false);
+  });
 
-    assert.equal(languageTagCall.options.headers["x-contentful-tag-visibility"], "public");
-    assert.equal(body.fields.locale, undefined);
-    assert.deepEqual(body.metadata.tags, [
-      { sys: { type: "Link", linkType: "Tag", id: "ai" } },
-      { sys: { type: "Link", linkType: "Tag", id: "article-lang-en-us" } },
-    ]);
+  it("fails locale saves safely when Contentful schema or locale metadata is unavailable", async () => {
+    for (const unavailableResource of ["content_type", "locales"]) {
+      const calls = [];
+      const facade = createContentfulManagementFacade({
+        env: createEnv(),
+        async fetchImpl(url, options) {
+          calls.push({ url: url.toString(), options });
+
+          if (url.toString().endsWith("/content_types/article")) {
+            return unavailableResource === "content_type"
+              ? createResponse(500, { message: "Unavailable" })
+              : createResponse(200, { fields: [{ id: "locale", type: "Symbol", localized: true }] });
+          }
+
+          if (url.toString().endsWith("/locales")) {
+            return createResponse(500, { message: "Unavailable" });
+          }
+
+          return createResponse(200, { items: [] });
+        },
+      });
+
+      await assert.rejects(
+        () =>
+          facade.createArticleDraft({
+            data: { title: "Article", locale: "pt-BR", author: "author-1", tags: [] },
+            session: { subject: "writer-1", authorEntryId: "author-1" },
+          }),
+        ContentfulManagementRequestError
+      );
+      assert.equal(calls.some((call) => call.options.method === "POST"), false);
+    }
   });
 
   it("updates article drafts with the supplied version header", async () => {
@@ -416,6 +479,167 @@ describe("contentful management facade", () => {
     assert.equal(calls[5].options.headers["x-contentful-version"], "14");
   });
 
+  it("closes the matching editorial request after publishing its reviewed article version", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: { ...createEnv(), CONTENTFUL_DEFAULT_LOCALE: "pt-BR" },
+      now: () => "2026-08-20T15:30:00.000Z",
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        const pathname = new URL(url).pathname;
+
+        if (pathname.endsWith("/entries/request-1") && options.method === "GET") {
+          return createResponse(200, {
+            sys: { id: "request-1", version: 4 },
+            fields: {
+              requestType: { "en-US": "publication" },
+              status: { "en-US": "readyForReview" },
+              article: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "article-1" } } },
+              articleVersion: { "en-US": 7 },
+              writerSubject: { "en-US": "writer-1" },
+            },
+          });
+        }
+
+        return createResponse(200, { sys: { id: "article-1", version: 8 } });
+      },
+    });
+
+    await facade.publishArticle({
+      articleId: "article-1",
+      data: { version: 7, requestId: "request-1", requestVersion: 4 },
+    });
+
+    assert.equal(calls.length, 3);
+    assert.equal(new URL(calls[0].url).pathname.endsWith("/entries/request-1"), true);
+    assert.equal(new URL(calls[1].url).pathname.endsWith("/entries/article-1/published"), true);
+    assert.equal(calls[2].options.method, "PUT");
+    assert.equal(calls[2].options.headers["x-contentful-version"], "4");
+
+    const closedRequest = JSON.parse(calls[2].options.body);
+    assert.equal(closedRequest.fields.status["en-US"], "closed");
+    assert.equal(closedRequest.fields.status["pt-BR"], undefined);
+    assert.equal(closedRequest.fields.updatedAt["en-US"], "2026-08-20T15:30:00.000Z");
+    assert.equal(closedRequest.fields.updatedAt["pt-BR"], undefined);
+    assert.equal(closedRequest.fields.writerSubject["en-US"], "writer-1");
+  });
+
+  it("reports review cleanup as pending when the article published but closing the request failed", async () => {
+    let callCount = 0;
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        callCount += 1;
+        const pathname = new URL(url).pathname;
+
+        if (pathname.endsWith("/entries/request-1") && options.method === "GET") {
+          return createResponse(200, {
+            sys: { id: "request-1", version: 4 },
+            fields: {
+              requestType: { "en-US": "publication" },
+              status: { "en-US": "readyForReview" },
+              article: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "article-1" } } },
+              articleVersion: { "en-US": 7 },
+            },
+          });
+        }
+
+        if (pathname.endsWith("/entries/article-1/published")) {
+          return createResponse(200, { sys: { id: "article-1", version: 8, publishedVersion: 7 } });
+        }
+
+        return createResponse(500, { message: "Cleanup unavailable" });
+      },
+    });
+
+    const result = await facade.publishArticle({
+      articleId: "article-1",
+      data: { version: 7, requestId: "request-1", requestVersion: 4 },
+    });
+
+    assert.equal(callCount, 3);
+    assert.equal(result.sys.publishedVersion, 7);
+    assert.equal(result.editorialRequestClosurePending, true);
+  });
+
+  it("rejects editorial requests for another author's article", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        return createResponse(200, {
+          sys: { id: "article-1", version: 7, contentType: { sys: { id: "article" } } },
+          fields: { author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-2" } } } },
+        });
+      },
+    });
+
+    await assert.rejects(
+      () =>
+        facade.submitArticleForReview({
+          articleId: "article-1",
+          data: { version: 7 },
+          session: { subject: "writer-1", authorEntryId: "author-1" },
+        }),
+      /cannot edit this article/
+    );
+    assert.equal(calls.length, 1);
+  });
+
+  it("rejects stale and lifecycle-ineligible editorial requests before creating workflow entries", async () => {
+    const scenarios = [
+      { operation: "submitArticleForReview", sys: { version: 7 }, requestedVersion: 6, expected: ContentfulVersionConflictError },
+      { operation: "submitArticleForReview", sys: { version: 7, publishedVersion: 6 }, requestedVersion: 7, expected: /not eligible/ },
+      { operation: "requestUnpublication", sys: { version: 8, publishedVersion: 6 }, requestedVersion: 7, expected: ContentfulVersionConflictError },
+      { operation: "requestUnpublication", sys: { version: 7 }, requestedVersion: 7, expected: /not eligible/ },
+    ];
+
+    for (const scenario of scenarios) {
+      const calls = [];
+      const facade = createContentfulManagementFacade({
+        env: createEnv(),
+        async fetchImpl(url, options) {
+          calls.push({ url: url.toString(), options });
+          return createResponse(200, {
+            sys: { id: "article-1", contentType: { sys: { id: "article" } }, ...scenario.sys },
+            fields: { author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } } },
+          });
+        },
+      });
+
+      await assert.rejects(
+        () =>
+          facade[scenario.operation]({
+            articleId: "article-1",
+            data: { version: scenario.requestedVersion },
+            session: { subject: "writer-1", authorEntryId: "author-1" },
+          }),
+        scenario.expected
+      );
+      assert.equal(calls.length, 1);
+      assert.equal(calls.some((call) => call.options.method === "POST"), false);
+    }
+  });
+
+  it("requires unpublication before archiving an article with unpublished changes", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        return createResponse(200, { sys: { id: "article-1", version: 7, publishedVersion: 5 } });
+      },
+    });
+
+    await assert.rejects(
+      () => facade.archiveArticle({ articleId: "article-1", data: { version: 7 } }),
+      /Published articles must be unpublished before archiving/
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.method, "GET");
+  });
+
   it("lists Contentful metadata tags for controlled admin selection", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({
@@ -479,6 +703,36 @@ describe("contentful management facade", () => {
       env: createEnv(),
       async fetchImpl(url, options) {
         calls.push({ url: url.toString(), options });
+
+        if (url.toString().endsWith("/content_types/blogEditorialRequest")) {
+          return createResponse(200, {
+            fields: [{ id: "articleVersion", type: "Integer", localized: false }],
+          });
+        }
+
+        if (url.toString().endsWith("/locales")) {
+          return createResponse(200, {
+            items: [
+              { code: "en-US", default: true },
+              { code: "pt-BR", default: false },
+            ],
+          });
+        }
+
+        if (url.toString().endsWith("/entries/article-1")) {
+          return createResponse(200, {
+            sys: { id: "article-1", version: 7, contentType: { sys: { id: "article" } } },
+            fields: { author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } } },
+          });
+        }
+
+        if (url.toString().endsWith("/entries/article-2")) {
+          return createResponse(200, {
+            sys: { id: "article-2", version: 8, publishedVersion: 7, contentType: { sys: { id: "article" } } },
+            fields: { author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-2" } } } },
+          });
+        }
+
         return createResponse(201, { sys: { id: `request-${calls.length}`, version: 1 } });
       },
       now: () => "2026-08-11T12:00:00.000Z",
@@ -486,20 +740,20 @@ describe("contentful management facade", () => {
 
     await facade.submitArticleForReview({
       articleId: "article-1",
-      session: { subject: "writer-1", name: "Guest Writer" },
+      session: { subject: "writer-1", name: "Guest Writer", authorEntryId: "author-1" },
       data: { version: 7 },
     });
     await facade.requestUnpublication({
       articleId: "article-2",
-      session: { subject: "writer-2", name: "Owner Writer" },
+      session: { subject: "writer-2", name: "Owner Writer", authorEntryId: "author-2" },
       data: { version: 8 },
     });
 
-    assert.equal(calls.length, 2);
-    assert.equal(calls[0].options.headers["x-contentful-content-type"], "blogEditorialRequest");
-    assert.equal(calls[1].options.headers["x-contentful-content-type"], "blogEditorialRequest");
+    assert.equal(calls.length, 8);
+    assert.equal(calls[3].options.headers["x-contentful-content-type"], "blogEditorialRequest");
+    assert.equal(calls[7].options.headers["x-contentful-content-type"], "blogEditorialRequest");
 
-    const reviewBody = JSON.parse(calls[0].options.body);
+    const reviewBody = JSON.parse(calls[3].options.body);
     assert.equal(reviewBody.fields.requestType["en-US"], "publication");
     assert.equal(reviewBody.fields.status["en-US"], "readyForReview");
     assert.deepEqual(reviewBody.fields.article["en-US"], {
@@ -507,10 +761,11 @@ describe("contentful management facade", () => {
     });
     assert.equal(reviewBody.fields.writerSubject["en-US"], "writer-1");
     assert.equal(reviewBody.fields.writerName["en-US"], "Guest Writer");
+    assert.equal(reviewBody.fields.articleVersion["en-US"], 7);
     assert.equal(reviewBody.fields.createdAt["en-US"], "2026-08-11T12:00:00.000Z");
     assert.equal(reviewBody.fields.updatedAt["en-US"], "2026-08-11T12:00:00.000Z");
 
-    const unpublicationBody = JSON.parse(calls[1].options.body);
+    const unpublicationBody = JSON.parse(calls[7].options.body);
     assert.equal(unpublicationBody.fields.requestType["en-US"], "unpublication");
     assert.equal(unpublicationBody.fields.status["en-US"], "readyForReview");
     assert.deepEqual(unpublicationBody.fields.article["en-US"], {
@@ -518,6 +773,7 @@ describe("contentful management facade", () => {
     });
     assert.equal(unpublicationBody.fields.writerSubject["en-US"], "writer-2");
     assert.equal(unpublicationBody.fields.writerName["en-US"], "Owner Writer");
+    assert.equal(unpublicationBody.fields.articleVersion["en-US"], 8);
   });
 
   it("rejects missing management configuration before calling Contentful", async () => {

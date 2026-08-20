@@ -98,7 +98,7 @@ describe("contentful proxy handler", () => {
     assert.deepEqual(JSON.parse(response.body), article);
   });
 
-  it("exposes public article language metadata from private editorial tags", async () => {
+  it("does not derive public article language from legacy metadata tags", async () => {
     const article = {
       sys: { id: "article-1" },
       fields: { slug: "hello" },
@@ -117,13 +117,7 @@ describe("contentful proxy handler", () => {
     const response = await handler({ path: "/article/hello", query: {} });
 
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(JSON.parse(response.body), {
-      sys: { id: "article-1" },
-      fields: { slug: "hello", locale: "en-US" },
-      metadata: {
-        tags: [{ sys: { id: "career" } }],
-      },
-    });
+    assert.deepEqual(JSON.parse(response.body), article);
   });
 
   it("returns a public author profile and author articles without identity metadata", async () => {

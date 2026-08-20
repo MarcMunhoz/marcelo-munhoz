@@ -212,6 +212,9 @@ const localized = (value, locale) => (value === undefined ? undefined : { [local
 
 const uniqueLocales = (locales = []) => [...new Set(locales.filter(Boolean))];
 
+const replaceLocalizedValues = (values = {}, value, locales) =>
+  Object.fromEntries(uniqueLocales([...Object.keys(values || {}), ...[locales].flat()]).map((key) => [key, value]));
+
 const localizedForLocales = (value, locales = []) =>
   value === undefined ? undefined : Object.fromEntries(uniqueLocales(locales).map((locale) => [locale, value]));
 
@@ -224,24 +227,7 @@ const normalizedTagIds = (tags = []) =>
 
 const tagsFromIds = (tags = []) => normalizedTagIds(tags).map((id) => contentfulLink("Tag", id));
 
-const ARTICLE_LANGUAGE_TAGS = {
-  "pt-BR": "article-lang-pt-br",
-  "en-US": "article-lang-en-us",
-};
-
-const articleLocaleFromTagIds = (tags = []) => {
-  if (tags.includes(ARTICLE_LANGUAGE_TAGS["en-US"])) {
-    return "en-US";
-  }
-
-  if (tags.includes(ARTICLE_LANGUAGE_TAGS["pt-BR"])) {
-    return "pt-BR";
-  }
-
-  return "";
-};
-
-const isArticleLanguageTag = (tagId = "") => Object.values(ARTICLE_LANGUAGE_TAGS).includes(tagId);
+const isArticleLanguageTag = (tagId = "") => ["article-lang-en-us", "article-lang-pt-br"].includes(tagId);
 
 const existingTagIds = async ({ request }) => {
   const payload = await request({ method: "GET", path: "/tags?limit=1000" });
@@ -262,46 +248,15 @@ const tagIdFromName = (name = "") =>
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-const filterExistingTagIds = async ({ tags, request, extraTags = [] }) => {
+const filterExistingTagIds = async ({ tags, request }) => {
   const ids = normalizedTagIds(tags);
-  const extraIds = normalizedTagIds(extraTags);
 
-  if (ids.length === 0 && extraIds.length === 0) {
+  if (ids.length === 0) {
     return [];
   }
 
   const existingIds = await existingTagIds({ request });
-  return [...ids.filter((id) => existingIds.has(id)), ...extraIds];
-};
-
-const ensureArticleLanguageTag = async ({ locale, request }) => {
-  const tagId = ARTICLE_LANGUAGE_TAGS[locale];
-
-  if (!tagId || typeof request !== "function") {
-    return [];
-  }
-
-  try {
-    await request({
-      method: "PUT",
-      path: `/tags/${encodeURIComponent(tagId)}`,
-      headers: {
-        "x-contentful-tag-visibility": "public",
-      },
-      body: {
-        name: locale === "en-US" ? "Article language: English" : "Article language: Portuguese",
-        sys: {
-          id: tagId,
-          type: "Tag",
-          visibility: "private",
-        },
-      },
-    });
-
-    return [tagId];
-  } catch {
-    return [];
-  }
+  return ids.filter((id) => existingIds.has(id));
 };
 
 const thumbnailFromData = (data = {}) => data.thumbnail || (Array.isArray(data.cloudinary) ? data.cloudinary[0] : undefined);
@@ -339,13 +294,13 @@ const contentfulEnvironmentLocales = async ({ request }) => {
   };
 };
 
-const articleWriteLocales = async ({ locale, request }) => {
+const articleWriteLocales = async ({ locale, request, environmentLocales }) => {
   if (typeof request !== "function") {
     return uniqueLocales([locale]);
   }
 
   try {
-    const { codes, defaultCode } = await contentfulEnvironmentLocales({ request });
+    const { codes, defaultCode } = environmentLocales || (await contentfulEnvironmentLocales({ request }));
     const requestedLocales = uniqueLocales([locale, defaultCode]);
     const availableRequestedLocales = requestedLocales.filter((requestedLocale) => codes.includes(requestedLocale));
 
@@ -355,7 +310,7 @@ const articleWriteLocales = async ({ locale, request }) => {
   }
 };
 
-const contentTypeFieldIds = async ({ contentTypeId, request }) => {
+const contentTypeFields = async ({ contentTypeId, request, required = false }) => {
   if (typeof request !== "function") {
     return null;
   }
@@ -364,15 +319,17 @@ const contentTypeFieldIds = async ({ contentTypeId, request }) => {
     const payload = await request({ method: "GET", path: `/content_types/${encodeURIComponent(contentTypeId)}` });
     const fields = Array.isArray(payload.fields) ? payload.fields : [];
 
-    return new Set(fields.map((field) => field?.id).filter(Boolean));
-  } catch {
+    return new Map(fields.filter((field) => field?.id).map((field) => [field.id, field]));
+  } catch (error) {
+    if (required) {
+      throw error;
+    }
+
     return null;
   }
 };
 
-const contentTypeSupportsField = (fieldIds, fieldId) => !fieldIds || fieldIds.has(fieldId);
-
-const optionalContentTypeSupportsField = (fieldIds, fieldId) => Boolean(fieldIds && fieldIds.has(fieldId));
+const optionalContentTypeSupportsField = (fields, fieldId) => Boolean(fields && fields.has(fieldId));
 
 const articleDateTimeValue = (value) => {
   const text = String(value || "").trim();
@@ -390,7 +347,7 @@ const articleDateTimeValue = (value) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 
-const articleFieldsFromData = (data = {}, writeLocales, { supportedFieldIds = null } = {}) => {
+const articleFieldsFromData = (data = {}, writeLocales, { supportedFields = null, editorialLocaleWriteLocales = writeLocales } = {}) => {
   const locales = uniqueLocales(writeLocales);
   const createAt = articleDateTimeValue(data.createAt);
   const updatedAt = articleDateTimeValue(data.updatedAt);
@@ -402,8 +359,13 @@ const articleFieldsFromData = (data = {}, writeLocales, { supportedFieldIds = nu
     ["description", localizedForLocales(data.description, locales)],
     ["body", localizedForLocales(data.body, locales)],
     ["createAt", localizedForLocales(createAt, locales)],
-    ["updatedAt", updatedAt && optionalContentTypeSupportsField(supportedFieldIds, "updatedAt") ? localizedForLocales(updatedAt, locales) : undefined],
-    ["locale", editorialLocale && optionalContentTypeSupportsField(supportedFieldIds, "locale") ? localizedForLocales(editorialLocale, locales) : undefined],
+    ["updatedAt", updatedAt && optionalContentTypeSupportsField(supportedFields, "updatedAt") ? localizedForLocales(updatedAt, locales) : undefined],
+    [
+      "locale",
+      editorialLocale && optionalContentTypeSupportsField(supportedFields, "locale")
+        ? localizedForLocales(editorialLocale, editorialLocaleWriteLocales)
+        : undefined,
+    ],
     ["alt", localizedForLocales(data.alt, locales)],
     ["author", data.author ? localizedForLocales(contentfulLink("Entry", data.author), locales) : undefined],
     ["cloudinary", localizedForLocales(cloudinaryMediaFromData(data), locales)],
@@ -411,6 +373,12 @@ const articleFieldsFromData = (data = {}, writeLocales, { supportedFieldIds = nu
 };
 
 const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
+  const editorialLocale = String(data.locale || "").trim();
+
+  if (editorialLocale && !["pt-BR", "en-US"].includes(editorialLocale)) {
+    throw new ContentfulAdminConfigurationError();
+  }
+
   if (data.fields) {
     return {
       fields: data.fields,
@@ -418,31 +386,49 @@ const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
     };
   }
 
-  const supportedFieldIds =
-    data.updatedAt || data.locale ? await contentTypeFieldIds({ contentTypeId: "article", request }) : null;
-  const editorialLocale = ["pt-BR", "en-US"].includes(String(data.locale || "").trim()) ? String(data.locale).trim() : "";
-  const shouldStoreLocaleAsTag = editorialLocale && !optionalContentTypeSupportsField(supportedFieldIds, "locale");
+  const hasEditorialLocale = Boolean(editorialLocale);
+  const supportedFields =
+    data.updatedAt || hasEditorialLocale
+      ? await contentTypeFields({ contentTypeId: "article", request, required: hasEditorialLocale })
+      : null;
+
+  if (hasEditorialLocale && !optionalContentTypeSupportsField(supportedFields, "locale")) {
+    throw new ContentfulAdminConfigurationError();
+  }
   const tagIds =
     request && Array.isArray(data.tags)
-      ? await filterExistingTagIds({
-          tags: data.tags,
-          request,
-          extraTags: shouldStoreLocaleAsTag ? await ensureArticleLanguageTag({ locale: editorialLocale, request }) : [],
-        })
+      ? await filterExistingTagIds({ tags: data.tags, request })
       : normalizedTagIds(data.tags);
-  const writeLocales = await articleWriteLocales({ locale, request });
+  let environmentLocales;
+
+  try {
+    environmentLocales = await contentfulEnvironmentLocales({ request });
+  } catch (error) {
+    if (hasEditorialLocale) {
+      throw error;
+    }
+
+    environmentLocales = { codes: [locale], defaultCode: locale };
+  }
+
+  const writeLocales = await articleWriteLocales({ locale, request, environmentLocales });
+  const localeField = supportedFields?.get("locale");
+  const editorialLocaleWriteLocales = localeField?.localized
+    ? environmentLocales.codes
+    : uniqueLocales([environmentLocales.defaultCode || locale]);
 
   return {
-    fields: articleFieldsFromData(data, writeLocales, { supportedFieldIds }),
+    fields: articleFieldsFromData(data, writeLocales, { supportedFields, editorialLocaleWriteLocales }),
     ...(tagIds.length > 0 ? { metadata: { tags: tagsFromIds(tagIds) } } : {}),
   };
 };
 
-const editorialRequestPayloadFromData = ({ requestType, articleId, session = {}, now, locale }) => ({
+const editorialRequestPayloadFromData = ({ requestType, articleId, articleVersion, session = {}, now, locale }) => ({
   fields: definedEntries([
     ["requestType", localized(requestType, locale)],
     ["status", localized("readyForReview", locale)],
     ["article", localized(contentfulLink("Entry", articleId), locale)],
+    ["articleVersion", localized(articleVersion, locale)],
     ["writerSubject", localized(session.subject, locale)],
     ["writerName", localized(session.name || "Writer", locale)],
     ["createdAt", localized(now, locale)],
@@ -573,6 +559,10 @@ const normalizedEntryStatus = (sys = {}) => {
   }
 
   if (sys.publishedVersion) {
+    if (Number(sys.version) > Number(sys.publishedVersion) + 1) {
+      return "changed";
+    }
+
     return "published";
   }
 
@@ -719,10 +709,11 @@ const articleDataForSession = (data = {}, session = {}) => ({
   writerSubject: session.subject || data.writerSubject || "",
 });
 
-const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
+const normalizedArticle = (entry = {}, locale, entryMap = new Map(), editorialLocale = locale) => {
   const fields = entry.fields || {};
   const authorData = normalizedAuthor(resolvedEntry(firstLocalizedValue(fields, "author", locale), entryMap), locale);
-  const tagIds = allNormalizedTags(entry.metadata);
+  const lifecycleStatus = normalizedEntryStatus(entry.sys);
+  const articleLocale = firstLocalizedValue(fields, "locale", editorialLocale);
 
   return {
     id: entry.sys?.id || "",
@@ -730,16 +721,15 @@ const normalizedArticle = (entry = {}, locale, entryMap = new Map()) => {
     slug: firstLocalizedValue(fields, "slug", locale) || "",
     description: firstLocalizedValue(fields, "description", locale) || "",
     body: firstLocalizedValue(fields, "body", locale) || "",
-    ...(firstLocalizedValue(fields, "locale", locale) || articleLocaleFromTagIds(tagIds)
-      ? { locale: firstLocalizedValue(fields, "locale", locale) || articleLocaleFromTagIds(tagIds) }
-      : {}),
+    ...(articleLocale ? { locale: articleLocale } : {}),
     createAt: firstLocalizedValue(fields, "createAt", locale) || entry.sys?.createdAt || "",
     thumbnail: firstLocalizedValue(fields, "thumbnail", locale) || firstLocalizedValue(fields, "cloudinary", locale)?.[0],
     alt: firstLocalizedValue(fields, "alt", locale) || "",
     ...authorData,
     writerSubject: firstLocalizedValue(fields, "writerSubject", locale) || "",
     tags: normalizedTags(entry.metadata),
-    status: normalizedEntryStatus(entry.sys),
+    status: lifecycleStatus,
+    lifecycleStatus,
     version: entry.sys?.version || null,
     updatedAt: entry.sys?.updatedAt || "",
   };
@@ -765,6 +755,7 @@ const normalizedEditorialRequest = (entry = {}, locale) => {
     articleId: firstLocalizedValue(fields, "article", locale)?.sys?.id || "",
     requestType: firstLocalizedValue(fields, "requestType", locale) || "",
     status: firstLocalizedValue(fields, "status", locale) || "",
+    articleVersion: Number(firstLocalizedValue(fields, "articleVersion", locale)) || null,
     writerSubject: firstLocalizedValue(fields, "writerSubject", locale) || "",
     writerName: firstLocalizedValue(fields, "writerName", locale) || "",
     createdAt: firstLocalizedValue(fields, "createdAt", locale) || entry.sys?.createdAt || "",
@@ -795,7 +786,7 @@ const summarizeAdminArticles = (articles = []) =>
     (summary, article) => {
       if (article.status === "published") {
         summary.published += 1;
-      } else if (article.status === "draft" || article.status === "unpublished" || article.status === "unpublicationRequested") {
+      } else if (article.status === "draft" || article.status === "changed" || article.status === "unpublished" || article.status === "unpublicationRequested") {
         summary.drafts += 1;
       } else if (article.status === "review") {
         summary.review += 1;
@@ -1089,6 +1080,25 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
     };
   };
 
+  const validatedEditorialArticle = async ({ articleId, data, session, config, allowedStatuses }) => {
+    const authorResolution = await resolveSessionAuthorProfile({ session, config });
+    const articleEntry = await request({ method: "GET", path: articlePath(articleId) });
+    const article = normalizedArticle(articleEntry, config.locale);
+    const version = requiredVersion(data);
+
+    ensureCanEditArticle(article, authorResolution.session);
+
+    if (Number(article.version) !== Number(version)) {
+      throw new ContentfulVersionConflictError();
+    }
+
+    if (!allowedStatuses.includes(article.lifecycleStatus)) {
+      throw new ContentfulAdminLifecycleError("This article is not eligible for the requested editorial action.");
+    }
+
+    return version;
+  };
+
   return {
     async listTags() {
       const payload = await request({ method: "GET", path: "/tags?limit=1000" });
@@ -1149,6 +1159,17 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       const resolvedSession = authorResolution.session;
       const entryMap = entriesById(entries);
       const articleEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "article");
+      let editorialLocale = config.locale;
+
+      if (articleEntries.some((entry) => entry.fields?.locale)) {
+        try {
+          const environmentLocales = await contentfulEnvironmentLocales({ request });
+          editorialLocale = environmentLocales.defaultCode || editorialLocale;
+        } catch {
+          // Keep the configured content locale when locale metadata is unavailable.
+        }
+      }
+
       const missingAuthorIds = [
         ...new Set(articleEntries.map((entry) => linkedAuthorIdFromArticle(entry, config.locale)).filter((authorId) => authorId && !entryMap.has(authorId))),
       ];
@@ -1161,18 +1182,26 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       });
       const workflowEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "blogEditorialRequest");
       const allReviewRequests = workflowEntries.map((entry) => normalizedEditorialRequest(entry, config.locale));
-      const reviewRequests = allReviewRequests.filter((request) => isOwner(resolvedSession) || request.writerSubject === resolvedSession?.subject);
+      const normalizedArticles = articleEntries.map((entry) => normalizedArticle(entry, config.locale, entryMap, editorialLocale));
+      const articlesById = new Map(normalizedArticles.map((article) => [article.id, article]));
+      const reviewRequests = allReviewRequests.filter((request) => {
+        const article = articlesById.get(request.articleId);
+        const belongsToSession = isOwner(resolvedSession) || request.writerSubject === resolvedSession?.subject;
+
+        return belongsToSession && openReviewRequest(request) && request.articleVersion === article?.version;
+      });
       const requestsByArticle = requestByArticleId(reviewRequests);
-      const articles = articleEntries
-        .map((entry) => {
-          const article = normalizedArticle(entry, config.locale, entryMap);
+      const articles = normalizedArticles
+        .map((article) => {
           const request = requestsByArticle.get(article.id);
           const requestStatus = statusFromRequest(request);
 
           return {
             ...article,
             ...(requestStatus ? { status: requestStatus } : {}),
+            ...(requestStatus ? { reviewStatus: request.status } : {}),
             ...(request?.id ? { requestId: request.id } : {}),
+            ...(request?.version ? { requestVersion: request.version } : {}),
             ...(request?.writerSubject ? { writerSubject: request.writerSubject } : {}),
             ...(request?.writerName ? { writerName: request.writerName } : {}),
           };
@@ -1245,13 +1274,60 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       });
     },
     async publishArticle({ articleId, data }) {
-      return request({
+      const version = requiredVersion(data);
+      let editorialRequest;
+
+      if (data?.requestId) {
+        const requestEntry = await request({ method: "GET", path: articlePath(data.requestId) });
+        const normalizedRequest = normalizedEditorialRequest(requestEntry, managementConfigFromEnv(env, fetchImpl).locale);
+        const requestVersion = requiredVersion({ version: data.requestVersion });
+
+        if (
+          normalizedRequest.articleId !== articleId ||
+          normalizedRequest.requestType !== "publication" ||
+          !openReviewRequest(normalizedRequest) ||
+          normalizedRequest.articleVersion !== Number(version) ||
+          Number(requestEntry.sys?.version) !== Number(requestVersion)
+        ) {
+          throw new ContentfulAdminLifecycleError("The editorial review no longer matches this article version.");
+        }
+
+        editorialRequest = { entry: requestEntry, version: requestVersion };
+      }
+
+      const publishedArticle = await request({
         method: "PUT",
         path: `${articlePath(articleId)}/published`,
         headers: {
-          "x-contentful-version": requiredVersion(data),
+          "x-contentful-version": version,
         },
       });
+
+      if (editorialRequest) {
+        const locale = managementConfigFromEnv(env, fetchImpl).locale;
+        const fields = editorialRequest.entry.fields || {};
+
+        try {
+          await request({
+            method: "PUT",
+            path: articlePath(data.requestId),
+            headers: {
+              "x-contentful-version": editorialRequest.version,
+            },
+            body: {
+              fields: {
+                ...fields,
+                status: replaceLocalizedValues(fields.status, "closed", Object.keys(fields.status || {}).length ? [] : [locale]),
+                updatedAt: replaceLocalizedValues(fields.updatedAt, now(), Object.keys(fields.status || {}).length ? Object.keys(fields.status) : [locale]),
+              },
+            },
+          });
+        } catch {
+          return { ...publishedArticle, editorialRequestClosurePending: true };
+        }
+      }
+
+      return publishedArticle;
     },
     async unpublishArticle({ articleId, data }) {
       return request({
@@ -1266,7 +1342,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       const existingEntry = await request({ method: "GET", path: articlePath(articleId) });
       const currentStatus = normalizedEntryStatus(existingEntry.sys);
 
-      if (currentStatus === "published") {
+      if (currentStatus === "published" || currentStatus === "changed") {
         throw new ContentfulAdminLifecycleError("Published articles must be unpublished before archiving.");
       }
 
@@ -1296,8 +1372,24 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         },
       });
     },
-    async submitArticleForReview({ articleId, session }) {
+    async submitArticleForReview({ articleId, data, session }) {
       const config = managementConfigFromEnv(env, fetchImpl);
+      const articleVersion = await validatedEditorialArticle({
+        articleId,
+        data,
+        session,
+        config,
+        allowedStatuses: ["draft", "changed"],
+      });
+      const requestFields = await contentTypeFields({ contentTypeId: "blogEditorialRequest", request });
+      const articleVersionField = requestFields?.get("articleVersion");
+
+      if (articleVersionField?.type !== "Integer" || articleVersionField.localized !== false) {
+        throw new ContentfulAdminConfigurationError();
+      }
+
+      const environmentLocales = await contentfulEnvironmentLocales({ request });
+      const requestLocale = environmentLocales.defaultCode || config.locale;
 
       return request({
         method: "POST",
@@ -1308,14 +1400,31 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         body: editorialRequestPayloadFromData({
           requestType: "publication",
           articleId,
+          articleVersion: Number(articleVersion),
           session,
           now: now(),
-          locale: config.locale,
+          locale: requestLocale,
         }),
       });
     },
-    async requestUnpublication({ articleId, session }) {
+    async requestUnpublication({ articleId, data, session }) {
       const config = managementConfigFromEnv(env, fetchImpl);
+      const articleVersion = await validatedEditorialArticle({
+        articleId,
+        data,
+        session,
+        config,
+        allowedStatuses: ["published", "changed"],
+      });
+      const requestFields = await contentTypeFields({ contentTypeId: "blogEditorialRequest", request });
+      const articleVersionField = requestFields?.get("articleVersion");
+
+      if (articleVersionField?.type !== "Integer" || articleVersionField.localized !== false) {
+        throw new ContentfulAdminConfigurationError();
+      }
+
+      const environmentLocales = await contentfulEnvironmentLocales({ request });
+      const requestLocale = environmentLocales.defaultCode || config.locale;
 
       return request({
         method: "POST",
@@ -1326,9 +1435,10 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         body: editorialRequestPayloadFromData({
           requestType: "unpublication",
           articleId,
+          articleVersion: Number(articleVersion),
           session,
           now: now(),
-          locale: config.locale,
+          locale: requestLocale,
         }),
       });
     },

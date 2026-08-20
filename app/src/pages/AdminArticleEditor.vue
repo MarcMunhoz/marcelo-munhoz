@@ -421,7 +421,7 @@ export default defineComponent({
       return canOwnerUnpublishAction(this.loadedArticle, this.session);
     },
     saveButtonLabel() {
-      return this.loadedArticle?.status === "published" ? "Save" : "Save draft";
+      return ["published", "changed"].includes(this.loadedArticle?.status) ? "Save" : "Save draft";
     },
     articleBodyPreview() {
       return marked.parse(this.articleForm.body || "");
@@ -686,10 +686,14 @@ export default defineComponent({
           : await createArticleDraft({ article: payload, session: this.session });
 
         this.articleForm = applyArticleResponseToForm(this.articleForm, response);
+        const previousLifecycleStatus = this.loadedArticle?.lifecycleStatus || this.loadedArticle?.status;
+        const savedStatus = ["published", "changed"].includes(previousLifecycleStatus) ? "changed" : "draft";
+
         this.loadedArticle = {
           ...(this.loadedArticle || {}),
           id: this.articleForm.id,
-          status: this.loadedArticle?.status || "draft",
+          status: savedStatus,
+          lifecycleStatus: savedStatus,
           authorEntryId: this.articleForm.authorEntryId,
           writerSubject: this.session?.subject || this.loadedArticle?.writerSubject || "",
         };

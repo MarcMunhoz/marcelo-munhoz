@@ -64,3 +64,12 @@
 - [x] 9.3 Run `openspec validate refine-blog-admin-experience --strict`.
 - [x] 9.4 Document optional staging smoke checks for Netlify Identity login/logout, role metadata, admin Function redirects, Contentful operations, and Cloudinary listing/upload using disposable content.
 - [ ] 9.5 When production-like behavior must be verified, push to `staging` and complete the documented smoke checks before merging onward. Staging smoke is partially complete; see `staging-handoff.md` for confirmed behavior and the remaining Cloudinary media-library diagnostic.
+
+## 10. Changed Article Lifecycle
+
+- [x] 10.1 Add failing tests for Contentful `changed` state normalization and display.
+- [x] 10.2 Add failing owner and writer action-matrix tests for changed articles.
+- [x] 10.3 Implement changed-state labels, writer review eligibility, and owner publish-changes eligibility.
+- [x] 10.4 Verify that saving a published article does not claim the public version was updated before publication.
+- [x] 10.5 Persist the submitted Contentful version in the private workflow entry, ignore stale review requests, and close the matching request after publication.
+- [x] 10.6 Document the required non-localized Integer `blogEditorialRequest.articleVersion` field before staging validation.

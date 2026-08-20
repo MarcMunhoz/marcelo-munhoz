@@ -56,6 +56,20 @@ Byline labels such as "By", "on", "Por", and "em" must come from the article/sit
 
 Alternative considered: use Portuguese labels everywhere because the owner is Brazilian. That breaks English articles and makes the public blog look inconsistent.
 
+### Use One Canonical Editorial Locale
+
+The Contentful Article `locale` field is editorial metadata, not translated prose. The admin must resolve its canonical value from the Contentful environment default locale, which is also the value exposed by ordinary Delivery API reads. While the field remains localized in the current content model, saves must write the selected value consistently to every enabled Contentful locale so the admin and public site cannot observe different languages for the same article.
+
+Legacy articles without an explicit `locale` value may continue to use conservative text inference. Contentful metadata tags must not become a second source of truth for article language. Once existing values are reconciled, the Contentful field can be changed to non-localized in a controlled model migration.
+
+Alternative considered: store language in `article-lang-*` metadata tags. This duplicates the content-model field, depends on tag visibility and publication behavior, and makes failures silent when field and tag values disagree.
+
+### Distinguish Published Content From Unpublished Changes
+
+Contentful entries with a `publishedVersion` can still contain a newer unpublished draft. The admin must expose that state as `changed`, not `published`. Saving a published article updates its draft only; the owner must then be able to publish those changes explicitly. Writer-owned changes continue through the existing review workflow before an owner publishes them.
+
+Alternative considered: automatically publish every owner save. Keeping save and publish separate preserves editorial intent and avoids making unrelated content edits live accidentally.
+
 ### Preserve Creator-Scoped Editing
 
 Writers and owners may edit only articles with a trusted creator match to their account. Owner controls for other authors remain moderation actions: publish where appropriate, unpublish, archive, permanently delete, and eventually leave feedback or moderation notes.
@@ -83,6 +97,8 @@ Alternative considered: build crop/overlay tooling in the app. That would duplic
 - Dedicated editor routes add navigation complexity → implement route guards, unsaved-change prompts, and return paths from the beginning.
 - Public author pages expose profile content → only render fields intended for public display and avoid exposing Identity e-mail or role metadata.
 - Widget scripts are external runtime dependencies → lazy-load them only when needed and keep secrets in server-side signing/config endpoints.
+- Localized `locale` values can diverge across Contentful locales → read the environment-default value and overwrite all enabled locale slots on save until the field is migrated to non-localized.
+- A saved change to a published entry is not immediately public → expose the `changed` state and require an explicit publish-changes action.
 
 ## Migration Plan
 
@@ -92,6 +108,7 @@ Alternative considered: build crop/overlay tooling in the app. That would duplic
 4. Add author profile APIs and UI, then connect public byline rendering.
 5. Add image interaction and Cloudinary widget adapter behind a feature-detecting workflow.
 6. Smoke test in staging with Netlify Identity, Contentful author data, and Cloudinary assets before merging onward.
+7. Reconcile article locale values, publish the corrected drafts, and only then disable localization on the Contentful `locale` field if the model migration is performed.
 
 Rollback is straightforward while the change is route/UI focused: keep existing admin API contracts stable, and disable new route links or widget entry points if staging validation fails.
 

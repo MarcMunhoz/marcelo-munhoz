@@ -120,6 +120,20 @@ The admin dashboard is the first `/admin` screen. It loads real article rows, st
 
 Editorial workflow records are stored separately from public `article` entries, using the admin-only workflow content type selected for this change. That separation keeps writer identity and review state out of the public blog read API.
 
+### Contentful Editorial Fields
+
+The Article `locale` field is the only persisted source of article language and accepts `pt-BR` or `en-US`. While that field is localized in Contentful, the admin mirrors the selected value into every enabled locale slot so Management API reads and the default Delivery API response agree. Existing articles without a stored value keep a conservative text-and-slug fallback; `article-lang-*` tags are legacy metadata and are not used to determine language.
+
+Before deploying the versioned review workflow, add `articleVersion` to the private `blogEditorialRequest` content type with these settings:
+
+- Type: `Integer`
+- Localization: disabled
+- Public use: none; the field is admin workflow state
+
+The admin rejects new review and unpublication requests when that field is missing or configured differently. An open request applies only to the exact Contentful article version stored in `articleVersion`; later saves make it stale, and publishing the reviewed version closes it.
+
+For the optional Article model migration, first open each legacy article in the admin, select the correct PT or EN value, save it, and explicitly publish the resulting `Unpublished changes`. Confirm the public article byline language, including `what-id-learned-last-years`, before disabling localization on Article `locale`. Do not disable localization until every enabled locale slot has been reconciled and published.
+
 Cloudinary media management is backend-mediated. The browser can request image listing or upload through the admin API, but Cloudinary API credentials and upload signatures stay server-side. The returned Cloudinary metadata is saved to the article thumbnail field, while alt text remains a separate article field.
 
 Because Cloudinary exposes only `Master Admin` and `Media Library User` for the configured account, use `Master Admin` for the server-side API credentials. Keep those credentials scoped to Netlify Functions/runtime only and never expose them through frontend build variables.

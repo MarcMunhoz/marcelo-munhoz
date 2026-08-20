@@ -184,11 +184,11 @@ export const uploadMediaAsset = ({ file, filename, session, fetchImpl }) =>
     fetchImpl,
   });
 
-export const publishArticle = ({ articleId, version, session, fetchImpl }) =>
+export const publishArticle = ({ articleId, version, requestId, requestVersion, session, fetchImpl }) =>
   adminRequest({
     path: `/articles/${encodeURIComponent(articleId)}/publish`,
     method: "POST",
-    body: { version },
+    body: { version, ...(requestId ? { requestId, requestVersion } : {}) },
     session,
     fetchImpl,
   });

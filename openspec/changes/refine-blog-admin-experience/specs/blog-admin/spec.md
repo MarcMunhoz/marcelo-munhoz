@@ -80,6 +80,35 @@ The system SHALL show article actions that match the current admin role and arti
 - **THEN** the system offers direct owner moderation actions such as unpublish, archive, or permanent delete where eligible
 - **AND** the system does not require the owner to request unpublication
 
+#### Scenario: Admin views unpublished changes to a published article
+- **WHEN** Contentful reports a published version and a newer draft version for the same article
+- **THEN** the admin labels the article as having unpublished changes instead of fully published
+- **AND** the public version remains live until the newer draft is explicitly published
+
+#### Scenario: Owner republishes changed article
+- **WHEN** an owner views an eligible article with unpublished changes
+- **THEN** the system offers a publish-changes action using the latest Contentful entry version
+- **AND** the action does not require unpublishing the currently live version first
+
+#### Scenario: Writer submits changed article
+- **WHEN** a writer saves changes to an article they own that already has a published version
+- **THEN** the system allows the writer to submit those changes for owner review
+- **AND** the writer cannot publish the changes directly
+
+#### Scenario: Writer submits a specific article version
+- **WHEN** a writer submits an article for publication review
+- **THEN** the editorial request records the current Contentful article version in `articleVersion`
+- **AND** the request applies only to that submitted version
+
+#### Scenario: Writer changes an article after submission
+- **WHEN** the current article version no longer matches the open request's `articleVersion`
+- **THEN** the admin treats the request as stale and does not present the newer draft as reviewed
+
+#### Scenario: Owner publishes a reviewed version
+- **WHEN** an owner publishes the article version referenced by an open publication request
+- **THEN** the system closes that editorial request
+- **AND** the closed request no longer overrides the article lifecycle state
+
 #### Scenario: Admin views an article created by another author
 - **WHEN** an authenticated owner or writer views an article without a trusted creator match to their account
 - **THEN** the system does not offer article editing for that article

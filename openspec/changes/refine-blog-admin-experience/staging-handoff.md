@@ -64,6 +64,11 @@ The owner-name fallback exists only to support legacy owner-authored content alr
 
 ## Resume Checklist
 
+- Add the non-localized Integer `articleVersion` field to the private `blogEditorialRequest` content type before testing review submission.
+- Save and publish the correct PT or EN selection for existing articles whose localized `locale` slots disagree.
+- Confirm `what-id-learned-last-years` renders English byline labels and the Portuguese article renders Portuguese labels after publication.
+- Confirm saving a published article shows `Unpublished changes`, keeps the old public version live, and exposes `Publish changes` to an owner.
+- Confirm saving after review makes the old request stale and publishing the matching reviewed version closes its request.
 - Wait for the latest staging deploy to finish.
 - Hard refresh `/admin` in the staging branch deploy.
 - Confirm login closes automatically after successful sign-in.
