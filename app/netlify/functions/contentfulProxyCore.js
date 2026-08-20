@@ -1,4 +1,8 @@
 const ARTICLE_LIMIT = 3;
+const BLOG_FEATURED_LIMIT = 3;
+const BLOG_ARCHIVE_LIMIT = 12;
+const BLOG_SEARCH_LIMIT = 100;
+const BLOG_MAX_PAGE = Math.floor((Number.MAX_SAFE_INTEGER - BLOG_FEATURED_LIMIT) / BLOG_ARCHIVE_LIMIT) + 1;
 const CONTENTFUL_HOST = "https://cdn.contentful.com";
 
 const jsonResponse = (statusCode, payload) => ({
@@ -25,6 +29,155 @@ const pageFromQuery = (query = {}) => {
 };
 
 const skipFromPage = (page) => (page - 1) * ARTICLE_LIMIT;
+
+const normalizeBlogIndexQuery = (query = {}) => {
+  const pageValue = String(firstQueryValue(query.page) ?? "").trim();
+  const pageNumber = Number(pageValue);
+  const page =
+    /^\d+$/.test(pageValue) && Number.isSafeInteger(pageNumber) && pageNumber > 0 && pageNumber <= BLOG_MAX_PAGE ? pageNumber : 1;
+  const search = String(firstQueryValue(query.q) ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, BLOG_SEARCH_LIMIT);
+  const yearValue = String(firstQueryValue(query.year) ?? "").trim();
+  const tagValue = String(firstQueryValue(query.tag) ?? "").trim();
+  const year = /^(?:19\d{2}|20\d{2}|2100)$/.test(yearValue) ? yearValue : "";
+  const tag = /^[A-Za-z0-9_-]{1,128}$/.test(tagValue) ? tagValue : "";
+
+  return { page, q: search, year, tag };
+};
+
+const blogIndexEntriesQuery = ({ q, year, tag, skip }) => {
+  const entriesQuery = {
+    content_type: "article",
+    order: "-fields.createAt,-sys.createdAt",
+    limit: BLOG_ARCHIVE_LIMIT,
+    skip,
+  };
+
+  if (q) {
+    entriesQuery.query = q;
+  }
+
+  if (year) {
+    entriesQuery["fields.createAt[gte]"] = `${year}-01-01T00:00:00.000Z`;
+    entriesQuery["fields.createAt[lt]"] = `${Number(year) + 1}-01-01T00:00:00.000Z`;
+  }
+
+  if (tag) {
+    entriesQuery["metadata.tags.sys.id[all]"] = tag;
+  }
+
+  return entriesQuery;
+};
+
+const blogFeaturedEntriesQuery = () => ({
+  content_type: "article",
+  order: "-fields.createAt,-sys.createdAt",
+  limit: BLOG_FEATURED_LIMIT,
+  skip: 0,
+});
+
+const blogArchiveSkip = (page, hasFilters) => (page - 1) * BLOG_ARCHIVE_LIMIT + (hasFilters ? 0 : BLOG_FEATURED_LIMIT);
+
+const numericTotal = (entries = {}) => {
+  const total = Number(entries.total);
+  return Number.isFinite(total) && total > 0 ? total : 0;
+};
+
+const firstEntry = (entries = {}) => (entries.items || [])[0] || null;
+
+const publicArticleLink = (entry) => ({
+  title: String(entry.fields?.title || ""),
+  slug: String(entry.fields?.slug || ""),
+});
+
+const articleChronologyKey = (entry = {}) => ({
+  effectiveCreatedAt: String(entry.fields?.createAt || entry.sys?.createdAt || ""),
+  systemCreatedAt: String(entry.sys?.createdAt || ""),
+});
+
+const compareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+
+const compareArticleChronology = (left, right) => {
+  const leftKey = articleChronologyKey(left);
+  const rightKey = articleChronologyKey(right);
+
+  return (
+    compareText(leftKey.effectiveCreatedAt, rightKey.effectiveCreatedAt) || compareText(leftKey.systemCreatedAt, rightKey.systemCreatedAt)
+  );
+};
+
+const nearestCandidate = (currentEntry, candidates, direction) => {
+  const isPrevious = direction === "previous";
+  const eligible = candidates.filter(Boolean).filter((candidate) => {
+    const comparison = compareArticleChronology(candidate, currentEntry);
+    return isPrevious ? comparison < 0 : comparison > 0;
+  });
+
+  return eligible.reduce((nearest, candidate) => {
+    if (!nearest) {
+      return candidate;
+    }
+
+    const comparison = compareArticleChronology(candidate, nearest);
+    return isPrevious ? (comparison > 0 ? candidate : nearest) : comparison < 0 ? candidate : nearest;
+  }, null);
+};
+
+const findDatedNeighborCandidate = async (contentfulClient, currentEntry, direction) => {
+  const isPrevious = direction === "previous";
+  const effectiveCreatedAt = articleChronologyKey(currentEntry).effectiveCreatedAt;
+  const systemCreatedAt = String(currentEntry.sys?.createdAt || "");
+  const sysComparison = isPrevious ? "lt" : "gt";
+  const sysOrder = isPrevious ? "-sys.createdAt" : "sys.createdAt";
+  const sameDateEntries = await contentfulClient.getEntries({
+    content_type: "article",
+    "fields.createAt": effectiveCreatedAt,
+    [`sys.createdAt[${sysComparison}]`]: systemCreatedAt,
+    order: sysOrder,
+    limit: 1,
+  });
+  const sameDateNeighbor = firstEntry(sameDateEntries);
+
+  if (sameDateNeighbor) {
+    return sameDateNeighbor;
+  }
+
+  const editorialComparison = isPrevious ? "lt" : "gt";
+  const editorialOrder = isPrevious ? "-fields.createAt,-sys.createdAt" : "fields.createAt,sys.createdAt";
+  const adjacentDateEntries = await contentfulClient.getEntries({
+    content_type: "article",
+    [`fields.createAt[${editorialComparison}]`]: effectiveCreatedAt,
+    order: editorialOrder,
+    limit: 1,
+  });
+
+  return firstEntry(adjacentDateEntries);
+};
+
+const findUndatedNeighborCandidate = async (contentfulClient, currentEntry, direction) => {
+  const isPrevious = direction === "previous";
+  const effectiveCreatedAt = articleChronologyKey(currentEntry).effectiveCreatedAt;
+  const sysComparison = isPrevious ? "lt" : "gt";
+  const sysOrder = isPrevious ? "-sys.createdAt" : "sys.createdAt";
+  const entries = await contentfulClient.getEntries({
+    content_type: "article",
+    "fields.createAt[exists]": false,
+    [`sys.createdAt[${sysComparison}]`]: effectiveCreatedAt,
+    order: sysOrder,
+    limit: 1,
+  });
+
+  return firstEntry(entries);
+};
+
+const findChronologicalNeighbor = async (contentfulClient, currentEntry, direction) => {
+  const datedCandidate = await findDatedNeighborCandidate(contentfulClient, currentEntry, direction);
+  const undatedCandidate = await findUndatedNeighborCandidate(contentfulClient, currentEntry, direction);
+
+  return nearestCandidate(currentEntry, [datedCandidate, undatedCandidate], direction);
+};
 
 const isContentfulLink = (value) => value?.sys?.type === "Link" && value.sys.linkType && value.sys.id;
 
@@ -251,6 +404,105 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
           skip: skipFromPage(page),
         });
       }, "Failed to fetch content");
+    }
+
+    if (routePath === "/blog-index") {
+      return runWithClient(async (contentfulClient) => {
+        const normalizedQuery = normalizeBlogIndexQuery(query);
+        const hasFilters = Boolean(normalizedQuery.q || normalizedQuery.year || normalizedQuery.tag);
+        let page = normalizedQuery.page;
+        let featured = [];
+        let featuredLoaded = false;
+
+        const fetchFeatured = async () => {
+          const featuredEntries = await contentfulClient.getEntries(blogFeaturedEntriesQuery());
+          featured = featuredEntries.items || [];
+          featuredLoaded = true;
+        };
+
+        if (!hasFilters && page === 1) {
+          await fetchFeatured();
+        }
+
+        const fetchArchive = (archivePage) =>
+          contentfulClient.getEntries(
+            blogIndexEntriesQuery({
+              ...normalizedQuery,
+              skip: blogArchiveSkip(archivePage, hasFilters),
+            })
+          );
+        let archiveEntries = await fetchArchive(page);
+        const total = Math.max(0, numericTotal(archiveEntries) - (hasFilters ? 0 : BLOG_FEATURED_LIMIT));
+        const totalPages = Math.max(1, Math.ceil(total / BLOG_ARCHIVE_LIMIT));
+
+        if (page > totalPages) {
+          page = totalPages;
+
+          if (!hasFilters && page === 1 && !featuredLoaded) {
+            await fetchFeatured();
+          }
+
+          archiveEntries = await fetchArchive(page);
+        }
+
+        const featuredIds = new Set(featured.map(entryId).filter(Boolean));
+        const items = (archiveEntries.items || []).filter((entry) => !featuredIds.has(entryId(entry)));
+
+        return {
+          featured,
+          items,
+          total,
+          page,
+          pageSize: BLOG_ARCHIVE_LIMIT,
+          totalPages,
+        };
+      }, "Failed to fetch blog index");
+    }
+
+    if (routePath.startsWith("/article-navigation/")) {
+      let slug;
+
+      try {
+        slug = decodeURIComponent(routePath.replace("/article-navigation/", ""));
+      } catch (error) {
+        logger.error("Contentful proxy request failed:", error?.message || error);
+        return jsonResponse(500, { error: "Failed to fetch article navigation" });
+      }
+
+      if (!slug.trim()) {
+        return jsonResponse(404, { error: "Article not found" });
+      }
+
+      const contentfulClient = getClient();
+
+      if (!contentfulClient) {
+        logger.error("Contentful runtime configuration is missing");
+        return jsonResponse(500, { error: "Server configuration error" });
+      }
+
+      try {
+        const currentEntries = await contentfulClient.getEntries({
+          content_type: "article",
+          "fields.slug": slug,
+          limit: 1,
+        });
+        const currentEntry = firstEntry(currentEntries);
+
+        if (!currentEntry) {
+          return jsonResponse(404, { error: "Article not found" });
+        }
+
+        const previousEntry = await findChronologicalNeighbor(contentfulClient, currentEntry, "previous");
+        const nextEntry = await findChronologicalNeighbor(contentfulClient, currentEntry, "next");
+
+        return jsonResponse(200, {
+          previous: previousEntry ? publicArticleLink(previousEntry) : null,
+          next: nextEntry ? publicArticleLink(nextEntry) : null,
+        });
+      } catch (error) {
+        logger.error("Contentful proxy request failed:", error?.message || error);
+        return jsonResponse(500, { error: "Failed to fetch article navigation" });
+      }
     }
 
     if (routePath === "/tags") {

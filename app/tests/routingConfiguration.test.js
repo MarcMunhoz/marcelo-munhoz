@@ -2,9 +2,18 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import contentfulRoutes from "../middleware/routes/contentful.js";
+
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("routing configuration", () => {
+  it("mounts the public blog-index endpoint locally", () => {
+    const publicRoute = contentfulRoutes.stack.find((layer) => layer.route);
+
+    assert.ok(publicRoute);
+    assert.equal(publicRoute.route.path.includes("/blog-index"), true);
+  });
+
   it("keeps blog components on the shared API URL helper without legacy external defaults", () => {
     const files = [
       "../src/pages/Blog.vue",
