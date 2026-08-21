@@ -4,11 +4,12 @@
 
 Improve editorial and reading navigation without coupling the public blog experience to the ongoing Contentful locale and review-workflow changes.
 
-The change has three outcomes:
+The change has four outcomes:
 
 - successful terminal actions in the article editor return to the admin dashboard;
 - the public blog becomes a scalable hybrid of recent highlights and a compact searchable archive;
 - article pages provide a reliable return path plus global chronological previous/next navigation.
+- owners can manage article tags safely in the admin, and article tag chips become direct filters.
 
 ## Current Problems
 
@@ -16,6 +17,7 @@ The change has three outcomes:
 - The public blog keeps its page only in component memory. Browser history therefore loses pagination state after leaving and returning.
 - The public API fixes article pages at three entries, and the public list renders every entry as a large fixed-width card.
 - Article pages have no visible route back to the archive and no chronological continuation.
+- Tag deletion requires Contentful access, tag usage is not summarized in the admin, and article-table tag chips do not apply the existing filter.
 
 ## Admin Editor Flow
 
@@ -68,6 +70,18 @@ The archive provides:
 - pagination.
 
 Changing search or filters resets the page to 1. Empty results retain the active controls and present a clear empty state.
+
+The archive tag control excludes the reserved legacy language IDs `article-lang-pt-br` and `article-lang-en-us`. Article language is stored in the explicit editorial locale field, so these IDs are not reader-facing classifications.
+
+## Admin Tag Management
+
+An owner-only tag-management area lists non-reserved article tags with name, immutable Contentful ID, visibility, and article usage count. The count covers articles across editorial states and is informational; the page does not embed or duplicate the article list. Owners can create public tags using the existing creation contract. Tag renaming and bulk replacement are outside this change.
+
+Deletion is unavailable while the article count is greater than zero. For an unused tag, deletion requires two sequential confirmations: one names the tag and explains the irreversible action, and the second asks the owner to confirm certainty immediately before the request. The server recalculates usage before deletion and returns a sanitized conflict if usage changed or Contentful still reports another reference.
+
+In the article table, clicking a tag chip applies that tag to the existing tag filter and preserves all other active filters. The selected chip uses inverse foreground/background colors. Clicking the active tag chip again clears only the tag filter.
+
+The reserved language IDs are omitted from public tag filters, article-editor choices, and the tag-management area even if an upstream environment still returns them.
 
 ## URL And History State
 
@@ -146,6 +160,8 @@ Either property may be `null` at a collection boundary. `previous` means the imm
 - A failed article-navigation request leaves the article readable and hides only previous/next navigation.
 - A direct article URL always has a valid `/blog` fallback.
 - Admin redirect occurs only after a successful mutation response.
+- Tag deletion occurs only after zero usage is revalidated server-side and both client confirmations succeed.
+- Tag deletion conflicts retain the tag and expose a safe actionable message without provider diagnostics.
 - Public API error payloads remain sanitized and do not expose Contentful diagnostics or configuration.
 
 ## Accessibility And Responsive Behavior
@@ -173,6 +189,10 @@ Automated coverage must verify:
 - return-to-list fallback and stored archive state;
 - article rendering remains available when navigation loading fails;
 - responsive markup and required accessible labels;
+- owner-only tag-management authorization and article usage counts;
+- both destructive confirmations, zero-usage revalidation, and stale-count conflicts;
+- article-chip filter toggling, preserved unrelated filters, and inverse selected styling;
+- reserved language-tag exclusion across public and admin choices;
 - full unit suite, lint, production build, credential scan, and strict OpenSpec validation.
 
 ## Scope Boundaries
@@ -184,4 +204,5 @@ This change does not introduce:
 - a new search service;
 - changes to Contentful article fields;
 - changes to the editorial review lifecycle;
+- tag renaming or bulk tag replacement;
 - analytics-driven ranking or recommendations.

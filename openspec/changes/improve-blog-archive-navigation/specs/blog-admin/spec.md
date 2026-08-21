@@ -63,3 +63,50 @@ The system SHALL restrict article publication lifecycle operations to the owner 
 - **WHEN** an owner unpublication request fails
 - **THEN** the system remains in the editor
 - **AND** it preserves current form values and error feedback without navigating
+
+## ADDED Requirements
+
+### Requirement: Owner Safely Manages Article Tags
+The system SHALL let the owner review and manage Contentful article tags from the admin area without exposing destructive tag operations to writers.
+
+#### Scenario: Owner opens tag management
+- **WHEN** the owner opens the tag-management area
+- **THEN** the system lists each non-reserved article tag with its name, stable ID, visibility, and article usage count
+- **AND** it does not expand the list into the individual articles using each tag
+
+#### Scenario: Owner creates a tag
+- **WHEN** the owner submits a valid unique tag name
+- **THEN** the system creates a public Contentful tag and adds it to the management list
+
+#### Scenario: Owner attempts to delete a tag in use
+- **WHEN** a tag has an article usage count greater than zero
+- **THEN** the destructive action is unavailable
+- **AND** the interface directs the owner to remove the tag from matching articles first
+
+#### Scenario: Owner deletes an unused tag
+- **WHEN** the owner requests deletion of a tag with zero article usage
+- **THEN** the interface presents two sequential confirmations before sending the deletion request
+- **AND** the server revalidates usage before deleting the Contentful tag
+
+#### Scenario: Tag deletion conflicts with current Contentful state
+- **WHEN** usage changes after the displayed count or Contentful rejects deletion because a reference remains
+- **THEN** the system keeps the tag and returns a safe conflict message
+- **AND** it does not expose provider diagnostics or configuration
+
+#### Scenario: Writer accesses tag management
+- **WHEN** an authenticated non-owner requests the tag-management page or destructive API
+- **THEN** the system denies the owner-only operation
+
+#### Scenario: Admin filters articles from a tag chip
+- **WHEN** an admin activates a tag chip in an article row
+- **THEN** the existing tag filter is set to that tag without clearing unrelated filters
+- **AND** the selected chip uses inverse colors to communicate the active state
+
+#### Scenario: Admin clears a tag chip filter
+- **WHEN** an admin activates the currently selected tag chip again
+- **THEN** the tag filter is cleared while unrelated filters remain unchanged
+
+#### Scenario: Reserved language tags are returned upstream
+- **WHEN** Contentful returns `article-lang-pt-br` or `article-lang-en-us`
+- **THEN** the system excludes those legacy IDs from public filters, article-editor choices, and tag management
+- **AND** article locale continues to use the explicit editorial locale field

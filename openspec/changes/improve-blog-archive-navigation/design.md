@@ -12,10 +12,12 @@ This change implements the approved [Blog Archive And Article Navigation Design]
 - Keep the first unfiltered archive useful with three automatic recent highlights while making the complete collection pageable and filterable.
 - Provide clean article URLs, a safe archive return action, and globally chronological neighbors.
 - Replace the editor route with `/admin` after confirmed terminal mutations.
+- Let owners review article-tag usage and delete unused tags without opening Contentful.
+- Make article-table tag chips directly apply the existing tag filter.
 
 **Non-Goals:**
 
-- Manual featured-article curation, infinite scrolling, a new search service, Contentful field changes, editorial review-lifecycle changes, or ranking and recommendation work.
+- Manual featured-article curation, infinite scrolling, a new search service, Contentful field changes, editorial review-lifecycle changes, tag renaming, bulk tag replacement, or ranking and recommendation work.
 
 ## Decisions
 
@@ -45,12 +47,24 @@ Save draft, submit for review, request unpublication, and owner unpublish call `
 
 Alternative considered: use `router.push('/admin')` or redirect before the response. Push permits reopening stale editor state with Back, while an optimistic redirect discards actionable failure feedback.
 
+### Owner Tag Management And Article Filtering
+
+The admin provides an owner-only tag-management area that lists each non-reserved article tag with its stable Contentful ID, visibility, and article usage count. Counts include editable articles across editorial states but do not expand the management area into an article browser. Existing tag creation remains available; renaming and bulk replacement are out of scope.
+
+Deletion is available only when the displayed article count is zero. It requires two sequential confirmations: the first identifies the tag and irreversible action, and the second asks the owner to confirm certainty immediately before the request. The server revalidates usage and maps any Contentful refusal to a safe conflict response, preventing stale counts or non-article references from producing an unsafe success state.
+
+In the existing article table, activating a tag chip applies that value to the current tag filter without clearing unrelated filters. The active tag uses the inverse chip colors shown by other selected admin actions; activating it again clears the tag filter.
+
+The reserved legacy IDs `article-lang-pt-br` and `article-lang-en-us` are never offered as public archive filters, article-editor choices, or manageable editorial tags. Article language continues to come from the explicit editorial locale field.
+
 ## Risks / Trade-offs
 
 - Filtering and pagination can produce invalid or stale query values: normalize them at the public boundary and synchronize the returned canonical page.
 - Excluding highlights changes the unfiltered archive total: compute total and page count from the post-exclusion dataset on every unfiltered page.
 - Neighbor lookups can fail independently from article loading: preserve readable article content and fail closed for navigation controls.
 - A stored return URL is browser-local state: direct and shared article URLs must always retain `/blog` as a valid fallback.
+- Tag counts can become stale between display and deletion: revalidate on the server and fail with a safe conflict instead of deleting.
+- Contentful can retain references outside active articles: surface the provider refusal without exposing diagnostics and leave the tag intact.
 
 ## Migration Plan
 
@@ -58,7 +72,8 @@ Alternative considered: use `router.push('/admin')` or redirect before the respo
 2. Synchronize the `/blog` route state and introduce the hybrid archive layout.
 3. Add article return and chronological-neighbor controls.
 4. Apply successful terminal admin redirect behavior.
-5. Verify automated coverage, responsive behavior, production build, credential scan, and strict OpenSpec validation.
+5. Add owner tag management, clickable article tags, reserved-tag filtering, and destructive-action safeguards.
+6. Verify automated coverage, responsive behavior, production build, credential scan, and strict OpenSpec validation.
 
 Rollback can restore the current list route and editor post-mutation behavior because no content model migration is introduced.
 

@@ -23,6 +23,11 @@ The system SHALL present automatic recent highlights and a compact paginated arc
 - **THEN** the filter lists only distinct years represented by published articles
 - **AND** a failure to load the year list does not prevent the archive itself from loading
 
+#### Scenario: Public tag choices include legacy language metadata
+- **WHEN** the public tag source returns `article-lang-pt-br` or `article-lang-en-us`
+- **THEN** the archive tag control omits those reserved legacy IDs
+- **AND** ordinary public article tags remain available
+
 #### Scenario: Archive URL omits default state
 - **WHEN** the canonical archive state is page 1 with no search, year, or tag filter
 - **THEN** the public URL is `/blog`

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Return completed admin editor actions to the dashboard and replace the three-card public blog pagination with a URL-backed hybrid index plus chronological article navigation.
+**Goal:** Return completed admin editor actions to the dashboard, replace the three-card public blog pagination with a URL-backed hybrid index plus chronological article navigation, and add safe owner tag management.
 
-**Architecture:** A dedicated public `blog-index` API owns filtering, highlight exclusion, and 12-item pagination, while a separate failure-tolerant endpoint resolves chronological article neighbors. Pure frontend route helpers make the query string canonical, focused components render highlights and compact archive rows, and successful terminal editor actions replace the editor route with `/admin`.
+**Architecture:** A dedicated public `blog-index` API owns filtering, highlight exclusion, and 12-item pagination, while a separate failure-tolerant endpoint resolves chronological article neighbors. Pure frontend route helpers make the query string canonical, focused components render highlights and compact archive rows, and successful terminal editor actions replace the editor route with `/admin`. The authenticated admin facade owns bounded tag usage counts and zero-usage deletion revalidation; the UI keeps tag management separate from the existing article list while reusing its tag filter.
 
 **Tech Stack:** Node.js 22, Vue 3 Options API, Vue Router 4, Quasar 2, Netlify Functions, Contentful Delivery API, `node:test`.
 
@@ -20,6 +20,9 @@
 - Keep existing article URLs shareable and free of archive-return query parameters.
 - Preserve legacy `/blog/tags/:tag` URLs through an internal redirect.
 - Keep Contentful diagnostics and configuration out of public API errors.
+- Restrict tag deletion and tag-management access to the owner role.
+- Require two sequential confirmations and server-side zero-usage revalidation before deleting a tag.
+- Exclude `article-lang-pt-br` and `article-lang-en-us` from public and administrative tag choices.
 
 ---
 
@@ -605,3 +608,138 @@ rtk git commit -m "test(blog): Adds archive navigation verification"
 - [ ] **Step 8: Stop before merge, sync, or archive**
 
 Report the working-tree state, verification evidence, and remaining staging checks. Do not push, merge, sync specs, or archive the OpenSpec change without the user's next explicit instruction. When archive is later authorized, synchronize the delta specs before archiving as required by repository policy.
+
+### Task 9: Owner Tag Management API
+
+**Files:**
+- Modify: `app/netlify/functions/contentfulAdminCore.js`
+- Modify: `app/src/utils/adminApi.js`
+- Test: `app/tests/contentfulManagementFacade.test.js`
+- Test: `app/tests/contentfulAdmin.test.js`
+- Test: `app/tests/adminFrontend.test.js`
+
+**Interfaces:**
+- Produces: `listTags()` returning `{ tags: Array<{ id, label, visibility, articleCount }> }`.
+- Produces: `deleteTag({ tagId })` through `DELETE /api/admin/contentful/tags/:tagId`.
+- Preserves: existing `GET /tags`, `POST /tags`, article mutations, and sanitized admin errors.
+
+- [ ] **Step 1: Write failing usage-count and reserved-tag tests**
+
+Use active, draft, changed, and archived article fixtures. Assert counts are grouped by metadata tag ID and that `article-lang-pt-br` and `article-lang-en-us` are absent from the response.
+
+```js
+assert.deepEqual(result.tags, [
+  { id: "ai", label: "AI", visibility: "public", articleCount: 2 },
+]);
+```
+
+- [ ] **Step 2: Write failing authorization and deletion tests**
+
+Assert writers receive 403, zero-use deletion sends the versioned Contentful delete request, a changed usage count returns 409 before deletion, and a provider reference conflict becomes a sanitized 409 response.
+
+- [ ] **Step 3: Run focused API tests and verify RED**
+
+```bash
+rtk docker compose exec -T app node --test --test-reporter=spec tests/contentfulManagementFacade.test.js tests/contentfulAdmin.test.js tests/adminFrontend.test.js
+```
+
+Expected: FAIL because usage counts, owner-only delete routing, and the frontend delete helper do not exist.
+
+- [ ] **Step 4: Implement bounded counting and safe deletion**
+
+Traverse article metadata with explicit Contentful page limits, count tag IDs across editorial states, and fail closed if the bounded collection cannot be proven complete. Before deletion, recompute the selected tag count; delete only at zero and translate upstream reference/version conflicts without returning raw diagnostics.
+
+- [ ] **Step 5: Add the authenticated frontend helper**
+
+Add `deleteContentfulTag({ tagId, session, fetchImpl })` using the existing `adminRequest` path and authorization behavior. Do not place provider identifiers or credentials in client logs.
+
+- [ ] **Step 6: Run focused API tests and verify GREEN**
+
+Run the Task 9 command. Expected: all pass.
+
+### Task 10: Tag Management UI And Clickable Article Tags
+
+**Files:**
+- Modify: `app/src/pages/Admin.vue`
+- Modify: `app/src/pages/AdminArticleEditor.vue`
+- Modify: `app/src/router/routes.js`
+- Create: `app/src/pages/AdminTags.vue`
+- Modify: `app/src/utils/adminDashboard.js`
+- Test: `app/tests/adminFrontend.test.js`
+- Test: `app/tests/routingConfiguration.test.js`
+- Test: `app/tests/blogFrontend.test.js`
+
+**Interfaces:**
+- Consumes: Task 9 tag list, create, and delete contracts.
+- Produces: owner-only `/admin/tags` UI and `toggleArticleTagFilter(current, selected)` behavior.
+- Preserves: all non-tag article filters and the existing article editor tag workflow.
+
+- [ ] **Step 1: Write failing UI and route tests**
+
+Assert the owner navigation exposes tag management, writers cannot enter it, each row shows label/ID/visibility/count, and reserved language tags are removed from public and editor option normalization.
+
+- [ ] **Step 2: Write failing article-chip toggle tests**
+
+```js
+assert.equal(toggleArticleTagFilter("", "ai"), "ai");
+assert.equal(toggleArticleTagFilter("ai", "ai"), "");
+assert.equal(toggleArticleTagFilter("career", "ai"), "ai");
+```
+
+Assert the selected tag chip uses the inverse style and other filter-model values remain unchanged.
+
+- [ ] **Step 3: Write failing double-confirmation tests**
+
+Assert cancelling either dialog sends no request. Assert deletion is disabled for `articleCount > 0`; for zero usage, exactly two accepted confirmations precede one delete request and the refreshed list omits the deleted tag.
+
+- [ ] **Step 4: Run focused frontend tests and verify RED**
+
+```bash
+rtk docker compose exec -T app node --test --test-reporter=spec tests/adminFrontend.test.js tests/blogFrontend.test.js tests/routingConfiguration.test.js
+```
+
+Expected: FAIL because the page, route, filter toggle, reserved-tag option filter, and confirmation flow are absent.
+
+- [ ] **Step 5: Implement the focused UI**
+
+Build the management table without embedded article results. Reuse the existing tag creation flow, show a remove-tags-first explanation for nonzero counts, and implement two sequential Quasar confirmations for zero-count deletion. Make table tag chips keyboard-operable and toggle only the tag filter.
+
+- [ ] **Step 6: Run focused frontend tests and verify GREEN**
+
+Run the Task 10 command. Expected: all pass.
+
+### Task 11: Tag Management Verification And Review
+
+**Files:**
+- Modify: `openspec/changes/improve-blog-archive-navigation/tasks.md`
+- Modify: `openspec/changes/improve-blog-archive-navigation/staging-handoff.md`
+- Test: all application tests.
+
+**Interfaces:**
+- Consumes: Tasks 9 and 10.
+- Produces: verified tag management with unchecked staging evidence until deployed testing occurs.
+
+- [ ] **Step 1: Run full automated verification**
+
+```bash
+rtk docker compose exec -T app node --test --test-reporter=spec
+rtk docker compose exec -T app npm run lint
+rtk docker compose exec -T app npm run build
+rtk docker compose exec -T app npm run scan:build-credentials
+rtk openspec validate improve-blog-archive-navigation --strict
+rtk git diff --check
+```
+
+Expected: every command exits 0 and the credential scan reports no credential pattern.
+
+- [ ] **Step 2: Request focused review**
+
+Request review specifically for owner authorization, complete count semantics, stale-count/provider conflicts, reserved-tag filtering, double confirmation, and preservation of unrelated article filters. Resolve findings before checking OpenSpec Task 8.3.
+
+- [ ] **Step 3: Perform staging smoke checks**
+
+With disposable tags, verify create, zero/nonzero counts, blocked in-use deletion, both confirmation cancellations, successful unused deletion, writer denial, tag-chip toggle styling, and preservation of other article filters. Keep OpenSpec Task 8.4 unchecked until this deployed check succeeds.
+
+- [ ] **Step 4: Update only verified checklist items**
+
+Mark Tasks 7 and 8 complete only where implementation, automated evidence, focused review, and staging evidence actually exist. Do not archive the change; when later authorized, synchronize delta specs before archival.

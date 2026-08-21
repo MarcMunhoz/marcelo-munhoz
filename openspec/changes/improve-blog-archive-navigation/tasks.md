@@ -39,3 +39,18 @@
 - [x] 6.2 Run the full unit suite, lint, production build, and credential scan.
 - [x] 6.3 Run strict OpenSpec validation.
 - [ ] 6.4 Perform staging smoke checks for public archive, article navigation, and terminal editor redirects.
+
+## 7. Admin Tag Management
+
+- [ ] 7.1 Add owner-only admin contracts to list tags with article usage counts, create tags, revalidate zero usage, and delete an unused tag with sanitized conflict handling.
+- [ ] 7.2 Add a tag-management area showing name, ID, visibility, and count without embedding article results.
+- [ ] 7.3 Require two sequential confirmations before deletion and disable deletion while the article usage count is greater than zero.
+- [ ] 7.4 Make article-table tag chips toggle the existing tag filter and render the active chip with inverse colors while preserving unrelated filters.
+- [ ] 7.5 Exclude `article-lang-pt-br` and `article-lang-en-us` from public filters, article-editor choices, and tag management.
+
+## 8. Tag Management Verification
+
+- [ ] 8.1 Add focused API, authorization, stale-count conflict, UI interaction, and reserved-tag regression tests using TDD.
+- [ ] 8.2 Run focused tests, the full unit suite, lint, production build, credential scan, strict OpenSpec validation, and repository hygiene checks.
+- [ ] 8.3 Request focused review of tag deletion safety, permissions, count semantics, and article-filter interaction before considering the work complete.
+- [ ] 8.4 Perform owner tag-management and article-chip filtering smoke checks in staging.
