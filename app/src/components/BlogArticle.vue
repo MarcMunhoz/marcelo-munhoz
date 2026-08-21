@@ -3,6 +3,11 @@
     <q-circular-progress v-if="progress" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
 
     <article class="w-full" :class="progress && 'hidden'">
+      <router-link :to="archiveLocation" class="article-return">
+        <q-icon name="fa-solid fa-arrow-left" aria-hidden="true" />
+        <span>{{ navigationLabels.all }}</span>
+      </router-link>
+
       <img v-if="articleImg" :src="articleImg" :title="article.title" :alt="article.alt || article.title" class="max-h-[380px] w-full lg:w-[1000px] object-cover m-auto mt-5" />
 
       <div class="border-dashed border-2 border-blue-grey-3 p-4 my-[3em] font-bold text-lg">
@@ -87,25 +92,85 @@
       <section class="my-4">
         <ul class="flex flex-row gap-4 justify-center">
           <li v-for="tag in articleTags" :key="tag" class="cursor-pointer bg-blue-grey-1 text-blue-grey-3 font-bold p-1">
-            <router-link :to="{ name: 'Artigos Tags', params: { tag: tag } }">#{{ tag }}</router-link>
+            <router-link :to="{ name: 'Meus Artigos', query: { tag } }">#{{ tag }}</router-link>
           </li>
         </ul>
       </section>
+
+      <nav
+        v-if="articleNavigation.previous || articleNavigation.next"
+        class="article-navigation"
+        :aria-label="`${navigationLabels.previous} / ${navigationLabels.next}`"
+      >
+        <router-link
+          v-if="articleNavigation.previous"
+          :to="articleNeighborLocation(articleNavigation.previous)"
+          class="article-neighbor article-neighbor--previous"
+        >
+          <span class="article-neighbor__label">{{ navigationLabels.previous }}</span>
+          <strong>{{ articleNavigation.previous.title }}</strong>
+        </router-link>
+        <router-link
+          v-if="articleNavigation.next"
+          :to="articleNeighborLocation(articleNavigation.next)"
+          class="article-neighbor article-neighbor--next"
+        >
+          <span class="article-neighbor__label">{{ navigationLabels.next }}</span>
+          <strong>{{ articleNavigation.next.title }}</strong>
+        </router-link>
+      </nav>
     </article>
   </q-page>
 </template>
 
 <script>
 import { defineComponent } from "vue";
-import { marked } from "marked";
+import { Marked } from "marked";
 import { mangle } from "marked-mangle";
 import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
-import { articleBylineLabels, articleLocaleFromArticle, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
+import { articleBylineLabels, articleLocaleFromArticle, articleNavigationLabels, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
 import { articleAuthorProfile } from "../utils/authorProfiles.js";
+import { blogArticleLocation, blogReturnLocation } from "../utils/blogArchive.js";
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
+
+const articleMarkdown = new Marked(mangle(), gfmHeadingId({ prefix: "marked-" }));
+
+const nonEmptyString = (value) => typeof value === "string" && Boolean(value.trim());
+
+const isRenderableArticlePayload = (article) => {
+  if (!article || typeof article !== "object" || Array.isArray(article)) {
+    return false;
+  }
+
+  const { fields, metadata, sys } = article;
+  const authorName = fields?.author?.fields?.name || fields?.author?.name;
+  const tags = metadata?.tags;
+
+  return (
+    sys &&
+    typeof sys === "object" &&
+    nonEmptyString(sys.createdAt) &&
+    fields &&
+    typeof fields === "object" &&
+    !Array.isArray(fields) &&
+    nonEmptyString(fields.title) &&
+    nonEmptyString(fields.slug) &&
+    typeof fields.description === "string" &&
+    nonEmptyString(fields.body) &&
+    nonEmptyString(authorName) &&
+    metadata &&
+    typeof metadata === "object" &&
+    Array.isArray(tags) &&
+    tags.every((tag) => nonEmptyString(tag?.sys?.id)) &&
+    (fields.locale === undefined || typeof fields.locale === "string") &&
+    (fields.createAt === undefined || typeof fields.createAt === "string") &&
+    (fields.updatedAt === undefined || typeof fields.updatedAt === "string") &&
+    (fields.alt === undefined || typeof fields.alt === "string")
+  );
+};
 
 export default defineComponent({
   name: "BlogArticle",
@@ -118,6 +183,9 @@ export default defineComponent({
       articleTags: [],
       createAt: null,
       articleLocale: "pt-BR",
+      articleNavigation: { previous: null, next: null },
+      articleRequestId: 0,
+      navigationRequestId: 0,
       progress: true,
     };
   },
@@ -183,17 +251,41 @@ export default defineComponent({
     }),
   ],
   async mounted() {
-    await this.loadArticle();
+    await this.loadArticle(this.$route.params.slug);
+  },
+  watch: {
+    "$route.params.slug"(slug) {
+      this.loadArticle(slug);
+    },
   },
   methods: {
-    async loadArticle() {
+    articleNeighborLocation(neighbor) {
+      return blogArticleLocation(neighbor, this.archiveLocation);
+    },
+    async loadArticle(slug = this.$route.params.slug) {
+      const requestedSlug = String(slug || "");
+      const requestId = ++this.articleRequestId;
+      this.navigationRequestId += 1;
+      this.articleNavigation = { previous: null, next: null };
+      this.progress = true;
+
       try {
-        const res = await fetch(buildApiUrl(`/api/contentful/article/${this.$route.params.slug}`));
+        const res = await fetch(buildApiUrl(`/api/contentful/article/${encodeURIComponent(requestedSlug)}`));
+        if (!res.ok) {
+          throw new Error(`Blog API returned ${res.status}`);
+        }
+
         const article = await res.json();
+        if (requestId !== this.articleRequestId || requestedSlug !== String(this.$route.params.slug || "")) {
+          return;
+        }
+        if (!isRenderableArticlePayload(article)) {
+          throw new Error("Blog API returned an invalid article payload");
+        }
 
         this.createAt = article.sys.createdAt;
         this.article = article.fields;
-        this.articleLocale = articleLocaleFromArticle({ ...article.fields, metadata: article.metadata }, this.articleLocale);
+        this.articleLocale = articleLocaleFromArticle({ ...article.fields, metadata: article.metadata }, "pt-BR");
         const author = articleAuthorProfile(article);
         this.articleAuthor = author.name;
         this.articleAuthorSlug = author.slug;
@@ -201,10 +293,7 @@ export default defineComponent({
 
         const rawBody = article.fields.body;
 
-        marked.use(mangle());
-        marked.use(gfmHeadingId({ prefix: "marked-" }));
-
-        const parsedArticleBody = marked.parse(rawBody);
+        const parsedArticleBody = articleMarkdown.parse(rawBody);
 
         const linkToIframe = parsedArticleBody.replace(
           /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi,
@@ -225,14 +314,59 @@ export default defineComponent({
 
         document.title = `Marcelo Munhoz - ${this.article.title}`;
         this.progress = false;
+        await this.loadArticleNavigation(requestedSlug, requestId);
       } catch (err) {
-        console.error("Erro ao carregar artigo:", err);
+        if (requestId === this.articleRequestId) {
+          console.error("Erro ao carregar artigo:", err);
+        }
+      }
+    },
+    async loadArticleNavigation(slug, articleRequestId) {
+      const requestId = ++this.navigationRequestId;
+
+      try {
+        const res = await fetch(buildApiUrl(`/api/contentful/article-navigation/${encodeURIComponent(slug)}`));
+        if (!res.ok) {
+          throw new Error(`Article navigation API returned ${res.status}`);
+        }
+
+        const navigation = await res.json();
+        const isNavigationLink = (value) =>
+          value === null ||
+          (value && typeof value === "object" && typeof value.title === "string" && value.title.trim() && typeof value.slug === "string" && value.slug.trim());
+        if (!navigation || typeof navigation !== "object" || !isNavigationLink(navigation.previous) || !isNavigationLink(navigation.next)) {
+          throw new Error("Article navigation API returned an invalid payload");
+        }
+
+        if (
+          requestId !== this.navigationRequestId ||
+          articleRequestId !== this.articleRequestId ||
+          slug !== String(this.$route.params.slug || "")
+        ) {
+          return;
+        }
+
+        this.articleNavigation = {
+          previous: navigation.previous || null,
+          next: navigation.next || null,
+        };
+      } catch (err) {
+        if (requestId === this.navigationRequestId && articleRequestId === this.articleRequestId) {
+          this.articleNavigation = { previous: null, next: null };
+          console.error("Erro ao carregar navegação do artigo:", err);
+        }
       }
     },
   },
   computed: {
+    archiveLocation() {
+      return blogReturnLocation(typeof window === "undefined" ? {} : window.history.state);
+    },
     getUrlToShare() {
       return document.baseURI;
+    },
+    navigationLabels() {
+      return articleNavigationLabels(this.articleLocale);
     },
     bylineLabels() {
       return articleBylineLabels(this.articleLocale, this.article);
@@ -283,6 +417,55 @@ export default defineComponent({
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
+}
+
+.article-return,
+.article-neighbor {
+  color: $blue-grey-5;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  text-decoration: none;
+}
+
+.article-return {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 0.5rem;
+}
+
+.article-return:focus-visible,
+.article-neighbor:focus-visible {
+  outline-color: currentColor;
+}
+
+.article-navigation {
+  display: flex;
+  gap: 2rem;
+  justify-content: space-between;
+  margin: 3rem 0 1rem;
+}
+
+.article-neighbor {
+  align-items: flex-start;
+  display: flex;
+  flex: 1 1 18rem;
+  flex-direction: column;
+  min-width: 0;
+
+  strong {
+    overflow-wrap: anywhere;
+  }
+}
+
+.article-neighbor--next {
+  align-items: flex-end;
+  margin-left: auto;
+  text-align: right;
+}
+
+.article-neighbor__label {
+  font-size: 0.875rem;
 }
 
 :deep(.rendered-text) {
@@ -347,6 +530,18 @@ export default defineComponent({
   img {
     margin: 1em auto;
     object-fit: cover;
+  }
+}
+
+@media (max-width: 700px) {
+  .article-navigation {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .article-neighbor {
+    flex-basis: auto;
+    width: 100%;
   }
 }
 </style>

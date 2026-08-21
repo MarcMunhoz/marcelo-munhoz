@@ -1,5 +1,5 @@
 <template>
-  <router-view :key="$route.fullPath" />
+  <router-view :key="$route.path" />
 
   <q-dialog v-model="alert" persistent full-width position="bottom" transition-hide="fade" class="text-lg">
     <q-card class="">

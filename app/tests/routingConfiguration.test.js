@@ -3,10 +3,24 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import contentfulRoutes from "../middleware/routes/contentful.js";
+import { scrollBehavior } from "../src/router/index.js";
+import routes from "../src/router/routes.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("routing configuration", () => {
+  it("keeps the routed view mounted when only the query changes", () => {
+    const appSource = read("../src/App.vue");
+
+    assert.match(appSource, /<router-view\s+:key="\$route\.path"\s*\/>/);
+    assert.doesNotMatch(appSource, /<router-view\s+:key="\$route\.fullPath"\s*\/>/);
+  });
+
+  it("restores a saved browser scroll position before using the top fallback", () => {
+    assert.deepEqual(scrollBehavior({}, {}, { left: 18, top: 72 }), { left: 18, top: 72 });
+    assert.deepEqual(scrollBehavior({}, {}, null), { left: 0, top: 0 });
+  });
+
   it("mounts the public blog-index endpoint locally", () => {
     const publicRoute = contentfulRoutes.stack.find((layer) => layer.route);
 
@@ -15,17 +29,25 @@ describe("routing configuration", () => {
   });
 
   it("keeps blog components on the shared API URL helper without legacy external defaults", () => {
-    const files = [
-      "../src/pages/Blog.vue",
-      "../src/components/ArticlesTags.vue",
-      "../src/components/BlogArticle.vue",
-    ];
+    const files = ["../src/pages/Blog.vue", "../src/components/BlogArticle.vue"];
 
     for (const file of files) {
       const source = read(file);
       assert.match(source, /buildApiUrl/);
       assert.doesNotMatch(source, /legacy-api\.example|VITE_API_URL/);
     }
+  });
+
+  it("redirects legacy tag URLs to the canonical named archive query", () => {
+    const mainLayout = routes.find((route) => route.path === "/");
+    const legacyTagRoute = mainLayout.children.find((route) => route.path === "/blog/tags/:tag");
+
+    assert.ok(legacyTagRoute);
+    assert.equal(typeof legacyTagRoute.redirect, "function");
+    assert.deepEqual(legacyTagRoute.redirect({ params: { tag: "architecture" } }), {
+      name: "Meus Artigos",
+      query: { tag: "architecture" },
+    });
   });
 
   it("routes Contentful API requests before the SPA fallback", () => {

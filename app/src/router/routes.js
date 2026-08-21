@@ -28,11 +28,7 @@ const routes = [
       },
       {
         path: "/blog/tags/:tag",
-        name: "Artigos Tags",
-        component: () => import("components/ArticlesTags.vue"),
-        meta: {
-          title: "Artigos por tag",
-        },
+        redirect: (to) => ({ name: "Meus Artigos", query: { tag: to.params.tag } }),
       },
       {
         path: "/admin",

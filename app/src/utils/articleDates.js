@@ -38,6 +38,14 @@ export const articleBylineLabels = (locale = "pt-BR", article = {}) => {
   return { by: "Por", on: "em", updated: "Atualizado em" };
 };
 
+export const articleNavigationLabels = (locale = "pt-BR") => {
+  if (normalizedLocale(locale).toLowerCase().startsWith("en")) {
+    return { all: "All articles", previous: "Previous article", next: "Next article" };
+  }
+
+  return { all: "Todos os artigos", previous: "Artigo anterior", next: "Próximo artigo" };
+};
+
 const dateOnlyFormatter = (locale) =>
   new Intl.DateTimeFormat(normalizedLocale(locale), {
     year: "numeric",
