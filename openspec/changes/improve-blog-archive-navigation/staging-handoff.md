@@ -1,0 +1,51 @@
+# Staging Handoff
+
+This handoff records verified local behavior and the checks that remain pending. It does not claim that a deployed staging environment was tested.
+
+## Implemented Behavior
+
+- The public blog index accepts normalized `page`, `q`, `year`, and `tag` state, presents three recent highlights on the unfiltered first page, and paginates the archive at 12 items per page.
+- The canonical `/blog` query omits defaults, normalizes unsupported values, and remains available as browser-restorable archive state.
+- The year filter loads only distinct publication years from the independent bounded `/api/contentful/blog-years` contract; tag filter labels omit decorative hash prefixes.
+- Public article URLs remain clean. A browser-local history-state value carries the internal archive return URL, with `/blog` as the safe fallback.
+- Article navigation exposes minimal previous and next links in global editorial chronology, using `fields.createAt` with `sys.createdAt` as fallback and tie-breaker.
+- Legacy `/blog/tags/:tag` routes redirect to `/blog?tag=...`.
+- Successful terminal editor actions replace the editor route with `/admin`; rejected actions remain in the editor.
+
+## Local Automated Verification
+
+- `rtk docker compose exec -T app node --test --test-reporter=spec tests/blogNavigationRoundTrip.test.js`: 1 test passed in 1 suite; 0 failed.
+- `rtk docker compose exec -T app node --test --test-reporter=spec`: 259 tests passed in 15 suites; 0 failed, cancelled, skipped, or pending.
+- `rtk docker compose exec -T app npm run lint`: exited successfully with no lint diagnostics.
+- `rtk docker compose exec -T app npm run build`: production SPA build succeeded; the summary contained 34 JavaScript and 8 CSS assets.
+- `rtk docker compose exec -T app npm run scan:build-credentials`: exited successfully and reported no credential pattern.
+- `rtk openspec validate improve-blog-archive-navigation --strict`: the active change is valid.
+- Strict per-spec validation succeeded for all three main specs.
+- `rtk git diff --check`: exited successfully with no output.
+
+## Local Smoke Evidence
+
+The backend Node process was restarted independently without recreating Compose or invoking package installation. The local health endpoint and `/api/contentful/blog-years` returned HTTP 200; the years payload passed shape validation and contained six distinct values. Brave headless captures at desktop and mobile widths showed the expected responsive control, highlight, and archive-row layouts without horizontal overflow or overlap. The persistent consent modal dimmed the captures, and the isolated DevTools port prevented an interactive focus/select check, so responsive interaction remains pending. The deterministic cross-layer test exercised the real exported archive-state helpers and public Contentful handler with a bounded fake client, covering the canonical archive query, selected article slug, clean article route, browser-local return state, article lookup, and older/newer navigation.
+
+## Pending Manual Checks
+
+- Inspect the archive at desktop and mobile widths, including highlight count, non-duplication, compact rows, long content, labelled controls, focus states, pagination, empty state, error/retry state, and absence of overlap.
+- Confirm filter changes and browser Back/Forward restore the expected URL, controls, results, and scroll position.
+- Confirm archive return behavior from an article and the direct-article `/blog` fallback.
+- Confirm oldest and newest article boundaries expose only the available chronological direction.
+- Confirm successful terminal admin actions return to `/admin` and failed actions retain editor state.
+- Deploy the intended branch and repeat public index, search, filters, history, clean article URL, chronological navigation, legacy tag redirect, and terminal admin redirect checks in staging.
+
+The responsive checklist item and staging verification item remain open until these checks are performed against the appropriate runtime.
+
+## Rollback And Safety
+
+- The change introduces no content-model migration and does not mutate provider content or admin data.
+- Public endpoints remain read-only and public error payloads are sanitized.
+- Browser-local return state is optional and always has the safe `/blog` fallback.
+- Rollback can restore the previous public list and route behavior without data migration.
+- Do not synchronize or archive this OpenSpec change until manual and deployed checks are complete and separately authorized.
+
+## Sanitization
+
+This document intentionally excludes local absolute paths, usernames, machine or container identifiers, deploy URLs, provider entry identifiers, tokens, credentials, environment values, and raw provider diagnostics.

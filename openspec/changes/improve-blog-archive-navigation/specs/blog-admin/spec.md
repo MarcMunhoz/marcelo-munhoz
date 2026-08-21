@@ -11,6 +11,10 @@ The system SHALL allow authenticated writers to create and edit article drafts o
 - **WHEN** an authenticated writer edits an article draft or submission they are allowed to modify
 - **THEN** the system saves the changes without publishing them to the public blog
 
+#### Scenario: Writer submits article for review
+- **WHEN** an authenticated writer marks an article draft as ready for review
+- **THEN** the system makes the article visible in the owner review workflow
+
 #### Scenario: Writer saves a draft
 - **WHEN** an authenticated writer successfully saves a draft from the focused editor
 - **THEN** the system replaces the current route with `/admin`

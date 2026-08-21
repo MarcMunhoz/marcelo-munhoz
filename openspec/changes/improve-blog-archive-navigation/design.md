@@ -23,6 +23,8 @@ This change implements the approved [Blog Archive And Article Navigation Design]
 
 The frontend reads and writes `page`, `q`, `year`, and `tag` through Vue Router. Defaults are omitted and user filter changes reset the page to 1. The public index endpoint normalizes values before mapping them to allowlisted Contentful filters, and returns the normalized page so out-of-range URLs converge on a canonical valid URL.
 
+The year control loads independently from a dedicated public endpoint. That endpoint performs one date-only Contentful query with an explicit 1000-entry limit and returns distinct years in descending order. If the reported collection exceeds the bound or the response is incomplete or malformed, it fails closed with a sanitized error rather than claiming that a partial list contains every available year.
+
 Alternative considered: retain archive state in component memory. That would preserve neither shareable filtered URLs nor Back and Forward restoration.
 
 ### Stable Hybrid Dataset

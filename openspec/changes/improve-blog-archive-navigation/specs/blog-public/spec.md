@@ -18,6 +18,11 @@ The system SHALL present automatic recent highlights and a compact paginated arc
 - **THEN** highlights are hidden and all matching public articles participate in the archive results
 - **AND** the filter state is represented in the URL
 
+#### Scenario: Reader chooses a publication year
+- **WHEN** the archive loads the year filter
+- **THEN** the filter lists only distinct years represented by published articles
+- **AND** a failure to load the year list does not prevent the archive itself from loading
+
 #### Scenario: Archive URL omits default state
 - **WHEN** the canonical archive state is page 1 with no search, year, or tag filter
 - **THEN** the public URL is `/blog`
@@ -129,3 +134,17 @@ The system SHALL expose `GET /api/contentful/article-navigation/:slug` for adjac
 - **WHEN** the endpoint cannot load adjacent articles
 - **THEN** it returns a sanitized public error response
 - **AND** it does not expose Contentful diagnostics or configuration
+
+### Requirement: Public Blog Years Use A Bounded Safe Contract
+The system SHALL expose `GET /api/contentful/blog-years` as an independent, complete list of publication years or fail closed without returning a partial list.
+
+#### Scenario: Client requests available publication years
+- **WHEN** the client requests `/api/contentful/blog-years`
+- **THEN** the endpoint makes one Contentful query selecting only `fields.createAt` from published articles with that field
+- **AND** the query uses an explicit limit of 1000 and skip of 0
+- **AND** the response contains unique valid years in descending order
+
+#### Scenario: Available publication years exceed the safe bound
+- **WHEN** Contentful reports more than 1000 matching articles or returns an incomplete or malformed collection
+- **THEN** the endpoint returns a sanitized public error instead of an incomplete year list
+- **AND** it does not expose upstream diagnostics or article data

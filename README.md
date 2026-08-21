@@ -59,6 +59,14 @@ The public `/api/contentful/*` proxy remains read-only and is used by public blo
 - `app/tests/`: deterministic Node test suite.
 - `openspec/`: specification-driven change history and active changes.
 
+## Public Blog Navigation
+
+- `GET /api/contentful/blog-index?page=&q=&year=&tag=` normalizes safe URL-backed archive state. The unfiltered first page returns three recent highlights, while the archive contains up to 12 items per page.
+- `GET /api/contentful/blog-years` returns the distinct publication years used by the archive filter through a bounded date-only query and fails closed rather than returning a partial list.
+- `GET /api/contentful/article-navigation/:slug` returns minimal previous and next article links in global editorial chronology; previous is older and next is newer.
+- `/blog/tags/:tag` redirects internally to the canonical `/blog?tag=...` archive state.
+- Public article URLs remain clean. The archive return URL is kept only in browser history state and falls back safely to `/blog` when unavailable.
+
 ## Environment Variables
 
 Configure these variables in Netlify. Keep Function-scoped values in the server/runtime environment only, not in frontend build variables:
