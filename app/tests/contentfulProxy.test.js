@@ -497,6 +497,82 @@ describe("contentful proxy handler", () => {
     assert.deepEqual(JSON.parse(response.body), { items: [{ sys: { id: "javascript" } }] });
   });
 
+  it("returns only distinct published years from one bounded date-only query", async () => {
+    const calls = [];
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries(query) {
+          calls.push(query);
+          return {
+            items: [
+              { fields: { createAt: "2026-08-20T12:00:00.000Z" } },
+              { fields: { createAt: "2026-01-02T12:00:00.000Z" } },
+              { fields: { createAt: "2024-12-31T23:59:59.000Z" } },
+            ],
+            total: 3,
+          };
+        },
+      }),
+    });
+
+    const response = await handler({ path: "/blog-years", query: { limit: "999999", select: "fields.body" } });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body), { years: ["2026", "2024"] });
+    assert.deepEqual(calls, [
+      {
+        content_type: "article",
+        "fields.createAt[exists]": true,
+        select: "fields.createAt",
+        order: "-fields.createAt",
+        limit: 1_000,
+        skip: 0,
+      },
+    ]);
+  });
+
+  it("fails closed instead of returning an incomplete published-year list", async () => {
+    const messages = [];
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries() {
+          return { items: [{ fields: { createAt: "2026-08-20T12:00:00.000Z" } }], total: 1_001 };
+        },
+      }),
+      logger: { error: (...args) => messages.push(args.join(" ")) },
+    });
+
+    const response = await handler({ path: "/blog-years", query: {} });
+
+    assert.equal(response.statusCode, 500);
+    assert.deepEqual(JSON.parse(response.body), { error: "Failed to fetch blog years" });
+    assert.doesNotMatch(response.body, /2026|1001|Contentful/i);
+    assert.equal(messages.length, 1);
+  });
+
+  for (const [name, upstreamPayload] of [
+    ["malformed collection", { items: "not-an-array", total: 1 }],
+    ["incomplete collection", { items: [], total: 1 }],
+    ["invalid publication date", { items: [{ fields: { createAt: "not-a-date" } }], total: 1 }],
+  ]) {
+    it(`sanitizes ${name} responses from the published-year lookup`, async () => {
+      const handler = createContentfulHandler({
+        client: createClient({
+          async getEntries() {
+            return upstreamPayload;
+          },
+        }),
+        logger: { error() {} },
+      });
+
+      const response = await handler({ path: "/blog-years", query: {} });
+
+      assert.equal(response.statusCode, 500);
+      assert.deepEqual(JSON.parse(response.body), { error: "Failed to fetch blog years" });
+      assert.doesNotMatch(response.body, /not-a-date|not-an-array|stack/i);
+    });
+  }
+
   it("fetches tagged articles with the requested tag and pagination", async () => {
     const calls = [];
     const handler = createContentfulHandler({
@@ -608,6 +684,13 @@ describe("contentful proxy handler", () => {
       },
       {
         content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt": editorialDate,
+        order: "-sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
         "fields.createAt": editorialDate,
         "sys.createdAt[gt]": "2025-06-10T12:00:00.000Z",
         order: "sys.createdAt",
@@ -623,6 +706,13 @@ describe("contentful proxy handler", () => {
         content_type: "article",
         "fields.createAt[exists]": false,
         "sys.createdAt[gt]": editorialDate,
+        order: "sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt": editorialDate,
         order: "sys.createdAt",
         limit: 1,
       },
@@ -802,6 +892,13 @@ describe("contentful proxy handler", () => {
       },
       {
         content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt": editorialDate,
+        order: "-sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
         "fields.createAt": editorialDate,
         "sys.createdAt[gt]": "2025-06-10T12:00:00.000Z",
         order: "sys.createdAt",
@@ -811,6 +908,13 @@ describe("contentful proxy handler", () => {
         content_type: "article",
         "fields.createAt[exists]": false,
         "sys.createdAt[gt]": editorialDate,
+        order: "sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt": editorialDate,
         order: "sys.createdAt",
         limit: 1,
       },
@@ -942,6 +1046,8 @@ describe("contentful proxy handler", () => {
           if (query["fields.slug"]) return { items: [current], total: 1 };
           if (query["fields.createAt[exists]"] === false && query["sys.createdAt[lt]"]) return { items: [undatedOlder], total: 1 };
           if (query["fields.createAt[exists]"] === false && query["sys.createdAt[gt]"]) return { items: [undatedNewer], total: 1 };
+          if (query["fields.createAt[exists]"] === false && query["sys.createdAt[gte]"]) return { items: [undatedOlder], total: 1 };
+          if (query["fields.createAt[exists]"] === false && query["sys.createdAt[lte]"]) return { items: [undatedNewer], total: 1 };
           if (query["fields.createAt[lt]"]) return { items: [datedOlder], total: 1 };
           if (query["fields.createAt[gt]"]) return { items: [datedNewer], total: 1 };
           return { items: [], total: 0 };
@@ -969,7 +1075,21 @@ describe("contentful proxy handler", () => {
         {
           content_type: "article",
           "fields.createAt[exists]": false,
+          "sys.createdAt": currentEffectiveDate,
+          order: "-sys.createdAt",
+          limit: 1,
+        },
+        {
+          content_type: "article",
+          "fields.createAt[exists]": false,
           "sys.createdAt[gt]": currentEffectiveDate,
+          order: "sys.createdAt",
+          limit: 1,
+        },
+        {
+          content_type: "article",
+          "fields.createAt[exists]": false,
+          "sys.createdAt": currentEffectiveDate,
           order: "sys.createdAt",
           limit: 1,
         },
@@ -1061,8 +1181,13 @@ describe("contentful proxy handler", () => {
         async getEntries(query) {
           if (query["fields.slug"] === "dated-article") return { items: [datedArticle], total: 1 };
           if (query["fields.slug"] === "undated-article") return { items: [undatedArticle], total: 1 };
-          if (query["fields.createAt[exists]"] === false && query["sys.createdAt[lt]"]) return { items: [olderUndated], total: 1 };
-          if (query["fields.createAt[exists]"] === false && query["sys.createdAt[gt]"] === "2025-06-10T00:00:00.000Z") {
+          if (query["fields.createAt[exists]"] === false && (query["sys.createdAt[lte]"] || query["sys.createdAt[lt]"])) {
+            return { items: [olderUndated], total: 1 };
+          }
+          if (
+            query["fields.createAt[exists]"] === false &&
+            (query["sys.createdAt[gte]"] === "2025-06-10T00:00:00.000Z" || query["sys.createdAt[gt]"] === "2025-06-10T00:00:00.000Z")
+          ) {
             return { items: [undatedArticle], total: 1 };
           }
           if (query["fields.createAt[lt]"] === "2025-06-11T00:00:00.000Z") return { items: [datedArticle], total: 1 };
@@ -1084,6 +1209,189 @@ describe("contentful proxy handler", () => {
     assert.deepEqual(JSON.parse(undatedResponse.body), {
       previous: { title: "Dated article", slug: "dated-article" },
       next: { title: "Newer dated article", slug: "newer-dated" },
+    });
+  });
+
+  it("selects a chronological neighbor with an equal effective date for a dated article", async () => {
+    const effectiveDate = "2026-06-10T00:00:00.000Z";
+    const current = navigationArticle({
+      title: "Current dated article",
+      slug: "current-dated",
+      createAt: effectiveDate,
+      createdAt: "2026-06-20T00:00:00.000Z",
+    });
+    const undatedPrevious = navigationArticle({
+      title: "Undated previous article",
+      slug: "undated-previous",
+      createdAt: effectiveDate,
+    });
+    const calls = [];
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries(query) {
+          calls.push(query);
+
+          if (query["fields.slug"]) return { items: [current], total: 1 };
+          if (
+            query["fields.createAt[exists]"] === false &&
+            query["sys.createdAt"] === effectiveDate
+          ) {
+            return { items: [undatedPrevious], total: 1 };
+          }
+          return { items: [], total: 0 };
+        },
+      }),
+    });
+
+    const response = await handler({ path: "/article-navigation/current-dated", query: {} });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body), {
+      previous: { title: "Undated previous article", slug: "undated-previous" },
+      next: null,
+    });
+    assert.deepEqual(calls, [
+      {
+        content_type: "article",
+        "fields.slug": "current-dated",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt": effectiveDate,
+        "sys.createdAt[lt]": "2026-06-20T00:00:00.000Z",
+        order: "-sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[lt]": effectiveDate,
+        order: "-fields.createAt,-sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt[lt]": effectiveDate,
+        order: "-sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt": effectiveDate,
+        order: "-sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt": effectiveDate,
+        "sys.createdAt[gt]": "2026-06-20T00:00:00.000Z",
+        order: "sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[gt]": effectiveDate,
+        order: "fields.createAt,sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt[gt]": effectiveDate,
+        order: "sys.createdAt",
+        limit: 1,
+      },
+      {
+        content_type: "article",
+        "fields.createAt[exists]": false,
+        "sys.createdAt": effectiveDate,
+        order: "sys.createdAt",
+        limit: 1,
+      },
+    ]);
+  });
+
+  it("keeps a newer undated chronological neighbor visible past an equal-date previous candidate", async () => {
+    const effectiveDate = "2026-06-10T00:00:00.000Z";
+    const current = navigationArticle({
+      title: "Current dated article",
+      slug: "current-dated",
+      createAt: effectiveDate,
+      createdAt: "2026-06-20T00:00:00.000Z",
+    });
+    const equalPrevious = navigationArticle({
+      title: "Equal-date previous article",
+      slug: "equal-previous",
+      createdAt: effectiveDate,
+    });
+    const undatedNext = navigationArticle({
+      title: "Undated next article",
+      slug: "undated-next",
+      createdAt: "2026-06-11T00:00:00.000Z",
+    });
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries(query) {
+          if (query["fields.slug"]) return { items: [current], total: 1 };
+          if (query["fields.createAt[exists]"] !== false) return { items: [], total: 0 };
+          if (query["sys.createdAt"] === effectiveDate) {
+            return { items: [equalPrevious], total: 1 };
+          }
+          if (query["sys.createdAt[gt]"] === effectiveDate) return { items: [undatedNext], total: 1 };
+          return { items: [], total: 0 };
+        },
+      }),
+    });
+
+    const response = await handler({ path: "/article-navigation/current-dated", query: {} });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body), {
+      previous: { title: "Equal-date previous article", slug: "equal-previous" },
+      next: { title: "Undated next article", slug: "undated-next" },
+    });
+  });
+
+  it("keeps an older undated chronological neighbor visible past an equal-date next candidate", async () => {
+    const effectiveDate = "2026-06-20T00:00:00.000Z";
+    const current = navigationArticle({
+      title: "Current dated article",
+      slug: "current-dated",
+      createAt: effectiveDate,
+      createdAt: "2026-06-10T00:00:00.000Z",
+    });
+    const undatedPrevious = navigationArticle({
+      title: "Undated previous article",
+      slug: "undated-previous",
+      createdAt: "2026-06-19T00:00:00.000Z",
+    });
+    const equalNext = navigationArticle({
+      title: "Equal-date next article",
+      slug: "equal-next",
+      createdAt: effectiveDate,
+    });
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries(query) {
+          if (query["fields.slug"]) return { items: [current], total: 1 };
+          if (query["fields.createAt[exists]"] !== false) return { items: [], total: 0 };
+          if (query["sys.createdAt"] === effectiveDate) {
+            return { items: [equalNext], total: 1 };
+          }
+          if (query["sys.createdAt[lt]"] === effectiveDate) return { items: [undatedPrevious], total: 1 };
+          return { items: [], total: 0 };
+        },
+      }),
+    });
+
+    const response = await handler({ path: "/article-navigation/current-dated", query: {} });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body), {
+      previous: { title: "Undated previous article", slug: "undated-previous" },
+      next: { title: "Equal-date next article", slug: "equal-next" },
     });
   });
 
@@ -1109,6 +1417,13 @@ describe("contentful proxy handler", () => {
 
     assert.ok(publicRoute);
     assert.equal(publicRoute.route.path.includes("/article-navigation/:slug"), true);
+  });
+
+  it("mounts the published-year route locally", () => {
+    const publicRoute = contentfulRoutes.stack.find((layer) => layer.route);
+
+    assert.ok(publicRoute);
+    assert.equal(publicRoute.route.path.includes("/blog-years"), true);
   });
 
   it("does not derive public article language from legacy metadata tags", async () => {
@@ -1560,14 +1875,14 @@ describe("contentful proxy handler", () => {
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(JSON.parse(response.body), { previous: null, next: null });
-    assert.equal(missingDateRequests.length, 2);
+    assert.equal(missingDateRequests.length, 4);
     assert.deepEqual(
       missingDateRequests.map((url) => url.searchParams.get("fields.createAt[exists]")),
-      ["false", "false"]
+      ["false", "false", "false", "false"]
     );
     assert.deepEqual(
       missingDateRequests.map((url) => url.searchParams.get("limit")),
-      ["1", "1"]
+      ["1", "1", "1", "1"]
     );
   });
 

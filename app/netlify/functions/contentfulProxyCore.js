@@ -2,6 +2,7 @@ const ARTICLE_LIMIT = 3;
 const BLOG_FEATURED_LIMIT = 3;
 const BLOG_ARCHIVE_LIMIT = 12;
 const BLOG_SEARCH_LIMIT = 100;
+const BLOG_YEARS_LIMIT = 1_000;
 const BLOG_MAX_PAGE = Math.floor((Number.MAX_SAFE_INTEGER - BLOG_FEATURED_LIMIT) / BLOG_ARCHIVE_LIMIT) + 1;
 const CONTENTFUL_HOST = "https://cdn.contentful.com";
 
@@ -77,6 +78,38 @@ const blogFeaturedEntriesQuery = () => ({
   limit: BLOG_FEATURED_LIMIT,
   skip: 0,
 });
+
+const blogYearsEntriesQuery = () => ({
+  content_type: "article",
+  "fields.createAt[exists]": true,
+  select: "fields.createAt",
+  order: "-fields.createAt",
+  limit: BLOG_YEARS_LIMIT,
+  skip: 0,
+});
+
+const publishedYearsFromEntries = (entries) => {
+  const items = entries?.items;
+  const total = entries?.total;
+
+  if (!Array.isArray(items) || !Number.isInteger(total) || total < 0 || total > BLOG_YEARS_LIMIT || items.length !== total) {
+    throw new TypeError("Invalid blog years collection");
+  }
+
+  const years = items.map((entry) => {
+    const createAt = entry?.fields?.createAt;
+    const parsedDate = typeof createAt === "string" ? new Date(createAt) : null;
+    const year = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.getUTCFullYear() : 0;
+
+    if (year < 1900 || year > 2100) {
+      throw new TypeError("Invalid blog publication date");
+    }
+
+    return String(year);
+  });
+
+  return [...new Set(years)].sort((left, right) => Number(right) - Number(left));
+};
 
 const blogArchiveSkip = (page, hasFilters) => (page - 1) * BLOG_ARCHIVE_LIMIT + (hasFilters ? 0 : BLOG_FEATURED_LIMIT);
 
@@ -156,27 +189,48 @@ const findDatedNeighborCandidate = async (contentfulClient, currentEntry, direct
   return firstEntry(adjacentDateEntries);
 };
 
-const findUndatedNeighborCandidate = async (contentfulClient, currentEntry, direction) => {
+const findUndatedNeighborCandidates = async (contentfulClient, currentEntry, direction) => {
   const isPrevious = direction === "previous";
   const effectiveCreatedAt = articleChronologyKey(currentEntry).effectiveCreatedAt;
-  const sysComparison = isPrevious ? "lt" : "gt";
+  const isCurrentDated = Boolean(currentEntry.fields?.createAt);
+  const strictComparison = isPrevious ? "lt" : "gt";
   const sysOrder = isPrevious ? "-sys.createdAt" : "sys.createdAt";
-  const entries = await contentfulClient.getEntries({
+  const baseQuery = {
     content_type: "article",
     "fields.createAt[exists]": false,
-    [`sys.createdAt[${sysComparison}]`]: effectiveCreatedAt,
-    order: sysOrder,
-    limit: 1,
-  });
+  };
+  const queries = [
+    {
+      ...baseQuery,
+      [`sys.createdAt[${strictComparison}]`]: effectiveCreatedAt,
+      order: sysOrder,
+      limit: 1,
+    },
+  ];
 
-  return firstEntry(entries);
+  if (isCurrentDated) {
+    queries.push({
+      ...baseQuery,
+      "sys.createdAt": effectiveCreatedAt,
+      order: sysOrder,
+      limit: 1,
+    });
+  }
+
+  const candidates = [];
+
+  for (const query of queries) {
+    candidates.push(firstEntry(await contentfulClient.getEntries(query)));
+  }
+
+  return candidates;
 };
 
 const findChronologicalNeighbor = async (contentfulClient, currentEntry, direction) => {
   const datedCandidate = await findDatedNeighborCandidate(contentfulClient, currentEntry, direction);
-  const undatedCandidate = await findUndatedNeighborCandidate(contentfulClient, currentEntry, direction);
+  const undatedCandidates = await findUndatedNeighborCandidates(contentfulClient, currentEntry, direction);
 
-  return nearestCandidate(currentEntry, [datedCandidate, undatedCandidate], direction);
+  return nearestCandidate(currentEntry, [datedCandidate, ...undatedCandidates], direction);
 };
 
 const isContentfulLink = (value) => value?.sys?.type === "Link" && value.sys.linkType && value.sys.id;
@@ -457,6 +511,14 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
           totalPages,
         };
       }, "Failed to fetch blog index");
+    }
+
+    if (routePath === "/blog-years") {
+      return runWithClient(async (contentfulClient) => {
+        const entries = await contentfulClient.getEntries(blogYearsEntriesQuery());
+
+        return { years: publishedYearsFromEntries(entries) };
+      }, "Failed to fetch blog years");
     }
 
     if (routePath.startsWith("/article-navigation/")) {
