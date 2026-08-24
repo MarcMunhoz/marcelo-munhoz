@@ -14,6 +14,12 @@ describe("public responsive layout", () => {
     assert.match(layout, /aria-label="About"/);
     assert.match(layout, /aria-label="Blog"/);
     assert.match(layout, /aria-label="Admin"/);
+    const adminDropdown = layout.match(/<q-btn-dropdown\b[^>]*>/)?.[0] || "";
+    assert.match(adminDropdown, /id="admin-menu-trigger"/);
+    assert.match(adminDropdown, /toggle-aria-label="Admin"/);
+    assert.match(layout, /<\/q-btn-dropdown>\s*<q-tooltip target="#admin-menu-trigger">Admin<\/q-tooltip>/);
+    const compactShell = layout.match(/@media \(max-width: 700px\) \{([\s\S]*)\n\}/)?.[1] || "";
+    assert.match(compactShell, /\.site-nav-action\s*\{[\s\S]*?:deep\(\.block\)\s*\{\s*display:\s*none\s*!important;/);
     assert.match(layout, /class="site-footer-content"/);
     assert.match(layout, /white-space:\s*normal/);
     assert.match(layout, /min-width:\s*min\(240px,\s*calc\(100vw - 24px\)\)/);

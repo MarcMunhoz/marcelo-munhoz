@@ -1401,6 +1401,13 @@ export default defineComponent({
     min-width: 0;
   }
 
+  .editor-card,
+  .markdown-editor,
+  .markdown-editor-toolbar,
+  .markdown-mode-actions {
+    min-width: 0;
+  }
+
   .markdown-editor-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -1416,7 +1423,7 @@ export default defineComponent({
 
   .markdown-format-actions :focus-visible,
   .markdown-mode-actions :focus-visible {
-    outline: 2px solid #455a64;
+    outline: 2px solid #455a64 !important;
     outline-offset: 2px;
   }
 

@@ -94,21 +94,23 @@
                 no-data-label="No articles match the current filters"
               >
                 <template #item="props">
-                  <admin-article-card
-                    :article="props.row"
-                    :session="session"
-                    :active-tag="filters.tag"
-                    :loading-action="loadingAction"
-                    @edit="openEditorForArticle"
-                    @review="openEditorForArticle"
-                    @request-unpublication="requestUnpublicationFromRow"
-                    @publish="publishSelectedArticle"
-                    @unpublish="unpublishSelectedArticle"
-                    @archive="archiveSelectedArticle"
-                    @unarchive="unarchiveSelectedArticle"
-                    @delete="openDeleteConfirmation"
-                    @toggle-tag="toggleTagFilter"
-                  />
+                  <div class="q-table__grid-item col-xs-12">
+                    <admin-article-card
+                      :article="props.row"
+                      :session="session"
+                      :active-tag="filters.tag"
+                      :loading-action="loadingAction"
+                      @edit="openEditorForArticle"
+                      @review="openEditorForArticle"
+                      @request-unpublication="requestUnpublicationFromRow"
+                      @publish="publishSelectedArticle"
+                      @unpublish="unpublishSelectedArticle"
+                      @archive="archiveSelectedArticle"
+                      @unarchive="unarchiveSelectedArticle"
+                      @delete="openDeleteConfirmation"
+                      @toggle-tag="toggleTagFilter"
+                    />
+                  </div>
                 </template>
 
                 <template #body-cell-status="props">
@@ -151,7 +153,7 @@
                     <q-btn v-if="canPrepareReviewAction(props.row, session)" dense flat round color="blue-grey-7" icon="rate_review" @click="openEditorForArticle(props.row)">
                       <q-tooltip>Submit draft for review</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canRequestUnpublicationAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" @click="requestUnpublicationFromRow(props.row)">
+                    <q-btn v-if="canRequestUnpublicationAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" :loading="loadingAction === `request-unpublication-${props.row.id}`" @click="requestUnpublicationFromRow(props.row)">
                       <q-tooltip>Request unpublication</q-tooltip>
                     </q-btn>
                     <q-btn v-if="canOwnerPublishAction(props.row, session)" dense flat round color="blue-grey-8" icon="publish" @click="publishSelectedArticle(props.row)">
@@ -496,7 +498,7 @@ export default defineComponent({
     canArchiveArticleAction,
     canUnarchiveArticleAction,
     async requestUnpublicationFromRow(article) {
-      this.loadingAction = "unpublish";
+      this.loadingAction = `request-unpublication-${article.id}`;
 
       try {
         await requestArticleUnpublication({

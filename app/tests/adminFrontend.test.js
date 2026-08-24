@@ -1523,7 +1523,7 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(page, /import AdminArticleCard from "\.\.\/components\/AdminArticleCard\.vue"/);
     assert.match(page, /:grid="\$q\.screen\.width <= 720"/);
-    assert.match(page, /<template #item="props">[\s\S]*<admin-article-card/);
+    assert.match(page, /<template #item="props">[\s\S]*<div class="q-table__grid-item col-xs-12">[\s\S]*<admin-article-card/);
     assert.match(page, /:article="props\.row"/);
     assert.match(page, /:session="session"/);
     assert.match(page, /:active-tag="filters\.tag"/);
@@ -1537,6 +1537,8 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /@unarchive="unarchiveSelectedArticle"/);
     assert.match(page, /@delete="openDeleteConfirmation"/);
     assert.match(page, /@toggle-tag="toggleTagFilter"/);
+    assert.match(page, /async requestUnpublicationFromRow\(article\)\s*\{\s*this\.loadingAction = `request-unpublication-\$\{article\.id\}`/);
+    assert.match(page, /canRequestUnpublicationAction\(props\.row, session\)[\s\S]*?:loading="loadingAction === `request-unpublication-\$\{props\.row\.id\}`"/);
 
     assert.match(card, /article\.title/);
     assert.match(card, /statusLabel\(article\.status\)/);
@@ -1544,6 +1546,8 @@ describe("admin frontend writer workflow", () => {
     assert.match(card, /article\.displayDate/);
     assert.match(card, /v-for="tag in article\.displayTags"/);
     assert.match(card, /:aria-pressed="activeTag === tag\.id"/);
+    assert.match(card, /:loading="loadingAction === `request-unpublication-\$\{article\.id\}`"/);
+    assert.doesNotMatch(card, /loadingAction === 'unpublish'/);
     const cardTemplate = card.slice(0, card.indexOf("<script>"));
     assert.doesNotMatch(cardTemplate, /(?<![$\w])emit\(/);
     assert.match(cardTemplate, /@keyup\.enter="\$emit\('toggle-tag', tag\.id\)"/);
@@ -1791,5 +1795,13 @@ describe("admin frontend writer workflow", () => {
     const editor = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.markdown-format-actions\s*\{[\s\S]*?overflow-x:\s*auto;[\s\S]*?padding-inline:\s*4px;[\s\S]*?scroll-padding-inline:\s*4px;/);
+    assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.markdown-format-actions :focus-visible,\s*\.markdown-mode-actions :focus-visible\s*\{[\s\S]*?outline:\s*2px solid #455a64 !important;[\s\S]*?outline-offset:\s*2px;/);
+  });
+
+  it("allows compact editor cards and nested Markdown controls to shrink without widening the document", () => {
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+
+    assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.editor-card,\s*\.markdown-editor,\s*\.markdown-editor-toolbar,\s*\.markdown-mode-actions\s*\{\s*min-width:\s*0;/);
+    assert.doesNotMatch(editor, /@media \(max-width:\s*720px\)[\s\S]*?(?:html|body|\.admin-editor-page)\s*\{[\s\S]*?overflow-x:\s*hidden/);
   });
 });

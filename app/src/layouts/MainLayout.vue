@@ -20,8 +20,18 @@
         <q-btn outline icon="newspaper" label="Blog" aria-label="Blog" to="/blog" size="sm" class="site-nav-action mr-4" color="blue-grey-5">
           <q-tooltip>Blog</q-tooltip>
         </q-btn>
-        <q-btn-dropdown outline no-caps icon="edit_note" :label="adminNavLabel" aria-label="Admin" size="sm" color="blue-grey-5" class="site-nav-action admin-account-menu">
-          <q-tooltip>Admin</q-tooltip>
+        <q-btn-dropdown
+          id="admin-menu-trigger"
+          outline
+          no-caps
+          icon="edit_note"
+          :label="adminNavLabel"
+          aria-label="Admin"
+          toggle-aria-label="Admin"
+          size="sm"
+          color="blue-grey-5"
+          class="site-nav-action admin-account-menu"
+        >
           <q-list class="admin-account-list">
             <q-item class="admin-account-summary">
               <q-item-section avatar>
@@ -64,6 +74,7 @@
             </q-item>
           </q-list>
         </q-btn-dropdown>
+        <q-tooltip target="#admin-menu-trigger">Admin</q-tooltip>
       </q-toolbar>
     </q-header>
 
@@ -250,7 +261,7 @@ export default defineComponent({
     margin-right: 0 !important;
 
     :deep(.block) {
-      display: none;
+      display: none !important;
     }
   }
 
