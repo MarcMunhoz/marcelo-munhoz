@@ -35,10 +35,11 @@ describe("public responsive layout", () => {
     const article = read("../src/components/BlogArticle.vue");
 
     assert.match(home, /clamp\(/);
+    assert.match(home, /class="home-hero flex flex-nowrap justify-center max-h-\[500px\]"/);
     assert.match(home, /knowledge-grid/);
-    assert.match(home, /home-project-chips/);
+    assert.match(home, /home-projects/);
     assert.match(home, /@media \(max-width:\s*700px\)/);
-    const compactProjectChipRule = home.match(/\.home-project-chips :deep\(\.q-chip\) \{([\s\S]*?)\n  \}/)?.[1] || "";
+    const compactProjectChipRule = home.match(/\.home-projects :deep\(\.q-chip\) \{([\s\S]*?)\n  \}/)?.[1] || "";
     assert.match(compactProjectChipRule, /height:\s*auto/);
     assert.match(compactProjectChipRule, /min-height:\s*2em/);
     assert.match(about, /about-introduction/);

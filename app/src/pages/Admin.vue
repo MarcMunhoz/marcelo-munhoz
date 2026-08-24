@@ -1127,6 +1127,10 @@ export default defineComponent({
     flex-direction: column;
   }
 
+  .admin-topbar-actions {
+    flex: 0 1 auto;
+  }
+
   .owner-queue-row {
     display: flex;
     overflow: visible;

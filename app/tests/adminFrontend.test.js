@@ -1574,6 +1574,7 @@ describe("admin frontend writer workflow", () => {
     const page = read("../src/pages/Admin.vue");
 
     assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.status-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.admin-topbar-actions\s*\{[\s\S]*?flex:\s*0\s+1\s+auto/);
     assert.match(page, /@media \(max-width:\s*340px\)[\s\S]*?\.status-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
     assert.match(page, /\.admin-filter-tabs\s*\{[\s\S]*?overflow-x:\s*auto/);
     assert.match(page, /\.admin-filter-tabs\s+\.q-btn-toggle\s*\{[\s\S]*?width:\s*max-content/);
