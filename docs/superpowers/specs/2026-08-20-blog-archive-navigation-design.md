@@ -4,12 +4,13 @@
 
 Improve editorial and reading navigation without coupling the public blog experience to the ongoing Contentful locale and review-workflow changes.
 
-The change has four outcomes:
+The change has five outcomes:
 
 - successful terminal actions in the article editor return to the admin dashboard;
 - the public blog becomes a scalable hybrid of recent highlights and a compact searchable archive;
 - article pages provide a reliable return path plus global chronological previous/next navigation.
 - owners can manage article tags safely in the admin, and article tag chips become direct filters.
+- public and administrative surfaces remain usable without horizontal clipping on phone-sized viewports.
 
 ## Current Problems
 
@@ -18,6 +19,7 @@ The change has four outcomes:
 - The public API fixes article pages at three entries, and the public list renders every entry as a large fixed-width card.
 - Article pages have no visible route back to the archive and no chronological continuation.
 - Tag deletion requires Contentful access, tag usage is not summarized in the admin, and article-table tag chips do not apply the existing filter.
+- The global shell, legacy public pages, dashboard table, and focused editor retain desktop-sized composition on phones, causing clipped navigation, truncated footer text, oversized typography, and unreachable administrative controls.
 
 ## Admin Editor Flow
 
@@ -167,12 +169,38 @@ Either property may be `null` at a collection boundary. `previous` means the imm
 
 ## Accessibility And Responsive Behavior
 
+Public surfaces use their existing 700-pixel compact breakpoint; administrative surfaces use their existing 720-pixel compact breakpoint, with intermediate administrative grids allowed through 1100 pixels. Requirements described as phone behavior apply at or below the corresponding compact breakpoint.
+
 - Search and filters have programmatic labels.
 - Pagination exposes the current page and standard navigation semantics.
 - Highlight and archive links have visible keyboard focus.
 - Images preserve stable aspect ratios to prevent layout shifts.
 - Long titles wrap without changing control dimensions or overlapping metadata.
 - Mobile archive rows stack image and text while keeping primary navigation visible.
+
+### Global Shell And Public Pages
+
+Desktop composition remains unchanged. At phone widths, the header keeps the avatar and a truncatable page title while About, Blog, and Admin use compact icon controls with accessible names and tooltips. The account menu remains bounded by the viewport. The footer uses normal multiline content instead of the single-line truncation behavior of a toolbar title.
+
+Home typography uses fluid `clamp()` sizing. Its hero image is contained responsively, knowledge icons wrap into a stable grid, and project chips cannot exceed the viewport. About stacks the image and biography vertically and wraps social actions. Article tags wrap, long Markdown content breaks safely, images remain within the article width, and wide code blocks or tables scroll inside their own containers rather than widening the document.
+
+### Administrative Dashboard
+
+The desktop article table remains the primary large-screen presentation. At phone widths, the same rows render as cards containing title, status, author, date, tags, and every action allowed by the existing authorization and lifecycle guards. Mobile presentation must not hide columns or operations as a substitute for adapting the layout.
+
+Status metrics use a compact two-column grid on typical phones and one column only when the viewport cannot support two readable cards. Filters and status tabs remain reachable without widening the page. Panel headings, review rows, and action groups stack predictably, with long titles and metadata allowed to wrap.
+
+### Focused Article Editor
+
+The editor heading stacks title, language, state, and dashboard navigation at phone widths. Markdown formatting controls and the Editor/Preview mode switch occupy separate responsive groups so every control stays reachable. Form rows become single-column, media actions use two columns on intermediate widths and one column on phones, and workflow actions use full-width or clearly grouped controls.
+
+Media previews preserve aspect ratio. Media dialogs are bounded by viewport width and height, with their content scrolling internally. Existing handlers, validation, role guards, lifecycle rules, and desktop behavior remain unchanged.
+
+### Responsive Validation
+
+Automated tests assert the structural contracts that prevent regressions: mobile article cards retain guarded actions, toolbars expose responsive groups, footer text can wrap, public content is bounded, and declared breakpoints provide the intended compositions. No new browser or test dependency is introduced without separate authorization.
+
+Manual Brave checks cover 320, 375, 430, and 768 pixel widths plus desktop. Each surface must satisfy `document.documentElement.scrollWidth === document.documentElement.clientWidth`, keep interactive controls inside the viewport, preserve visible keyboard focus, and remain usable with long titles, many tags, filled and empty queues, wide Markdown content, and media dialogs.
 
 ## Testing
 
@@ -190,6 +218,9 @@ Automated coverage must verify:
 - return-to-list fallback and stored archive state;
 - article rendering remains available when navigation loading fails;
 - responsive markup and required accessible labels;
+- global header/footer containment, fluid Home typography, stacked About content, and bounded article Markdown;
+- dashboard mobile cards with the same guarded actions as desktop rows;
+- responsive editor toolbar groups, media controls, dialogs, and workflow actions;
 - owner-only tag-management authorization and article usage counts;
 - both destructive confirmations, zero-usage revalidation, and stale-count conflicts;
 - article-chip filter toggling, preserved unrelated filters, and inverse selected styling;
@@ -209,3 +240,4 @@ This change does not introduce:
 - tag renaming or bulk tag replacement;
 - analytics-driven ranking or recommendations.
 - automatic use of Netlify Identity email data for public Gravatar lookup.
+- a broad visual redesign, new animation system, new responsive framework, or removal of desktop table behavior.

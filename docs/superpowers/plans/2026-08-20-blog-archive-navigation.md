@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Return completed admin editor actions to the dashboard, replace the three-card public blog pagination with a URL-backed hybrid index plus chronological article navigation, add safe owner tag management, and support Gravatar-first author photos.
+**Goal:** Return completed admin editor actions to the dashboard, replace the three-card public blog pagination with a URL-backed hybrid index plus chronological article navigation, add safe owner tag management, support Gravatar-first author photos, and keep public and administrative surfaces usable on phone-sized viewports.
 
-**Architecture:** A dedicated public `blog-index` API owns filtering, highlight exclusion, and 12-item pagination, while a separate failure-tolerant endpoint resolves chronological article neighbors. Pure frontend route helpers make the query string canonical, focused components render highlights and compact archive rows, and successful terminal editor actions replace the editor route with `/admin`. The authenticated admin facade owns bounded tag usage counts, safe deletion, and public Gravatar-profile resolution; browser photo consumers use canonical Gravatar URLs with an allowlisted fallback and initials.
+**Architecture:** A dedicated public `blog-index` API owns filtering, highlight exclusion, and 12-item pagination, while a separate failure-tolerant endpoint resolves chronological article neighbors. Pure frontend route helpers make the query string canonical, focused components render highlights and compact archive rows, and successful terminal editor actions replace the editor route with `/admin`. The authenticated admin facade owns bounded tag usage counts, safe deletion, and public Gravatar-profile resolution; browser photo consumers use canonical Gravatar URLs with an allowlisted fallback and initials. Responsive behavior preserves desktop composition while adding bounded public content, mobile dashboard cards, and explicit compact editor groups at the existing 700/720-pixel breakpoints.
 
 **Tech Stack:** Node.js 22, Vue 3 Options API, Vue Router 4, Quasar 2, Netlify Functions, Contentful Delivery API, `node:test`.
 
@@ -23,6 +23,9 @@
 - Restrict tag deletion and tag-management access to the owner role.
 - Require two sequential confirmations and server-side zero-usage revalidation before deleting a tag.
 - Exclude `article-lang-pt-br` and `article-lang-en-us` from public and administrative tag choices.
+- Preserve desktop table, editor, public navigation, and lifecycle behavior while adapting compact layouts.
+- Use 700 pixels as the public compact breakpoint and 720 pixels as the administrative compact breakpoint.
+- Add no package, browser, responsive framework, or test dependency.
 
 ---
 
@@ -752,3 +755,247 @@ Mark Tasks 7 and 8 complete only where implementation, automated evidence, focus
 - [ ] Resolve public profile slugs only while saving; persist canonical hash metadata without Identity fields or raw emails.
 - [ ] Render Gravatar, fallback, then initials across admin preview, account menu, and public author profile; add square-image guidance.
 - [ ] Run focused and complete verification, request focused review, and keep deployed smoke items unchecked until exercised in staging.
+
+### Task 13: Responsive Global Shell And Public Pages
+
+**Files:**
+- Modify: `app/src/layouts/MainLayout.vue`
+- Modify: `app/src/pages/IndexPage.vue`
+- Modify: `app/src/pages/About.vue`
+- Modify: `app/src/components/BlogArticle.vue`
+- Modify: `app/src/App.vue`
+- Create: `app/tests/publicResponsiveLayout.test.js`
+- Modify: `app/tests/blogFrontend.test.js`
+
+**Interfaces:**
+- Preserves: existing routes, header destinations, account-menu behavior, public content, article sharing, and desktop layout.
+- Produces: compact public composition at `max-width: 700px` with no document-level horizontal overflow.
+
+- [ ] **Step 1: Write failing structural regression tests**
+
+Add source-contract tests that assert:
+
+```js
+assert.match(layout, /class="site-toolbar"/);
+assert.match(layout, /class="site-toolbar-title"/);
+assert.match(layout, /aria-label="About"/);
+assert.match(layout, /white-space:\s*normal/);
+assert.match(home, /clamp\(/);
+assert.match(home, /knowledge-grid/);
+assert.match(about, /about-introduction/);
+assert.match(article, /overflow-wrap:\s*anywhere/);
+assert.match(article, /overflow-x:\s*auto/);
+```
+
+Require an explicit `@media (max-width: 700px)` contract, bounded account-menu width, wrapped article tags, responsive Markdown images, and a scrollable cookie-card body for short viewports.
+
+- [ ] **Step 2: Run focused tests and verify RED**
+
+```bash
+rtk docker compose exec -T app node --test --test-reporter=spec tests/publicResponsiveLayout.test.js tests/blogFrontend.test.js
+```
+
+Expected: FAIL because the shell/public responsive classes and containment rules are absent.
+
+- [ ] **Step 3: Implement the compact global shell**
+
+Add semantic classes to the toolbar, title, navigation actions, footer content, and cookie card. At `max-width: 700px`:
+
+```scss
+.site-toolbar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-footer-content { min-width: 0; overflow: visible; overflow-wrap: anywhere; white-space: normal; }
+.admin-account-list { min-width: min(240px, calc(100vw - 24px)); }
+```
+
+Hide only the visual labels of About, Blog, and Admin at the compact breakpoint; retain icons, `aria-label`, tooltips, routes, and keyboard behavior. Bound and internally scroll the cookie notice without changing pending consent.
+
+- [ ] **Step 4: Implement bounded Home, About, and article content**
+
+Replace fixed Home text sizes with fluid values such as `clamp(2rem, 10vw, 4rem)` and `clamp(1.6rem, 7vw, 3rem)`. Make the hero image responsive, wrap knowledge icons and project chips, stack About image/text at 700 pixels, and explicitly constrain article tags, Markdown images, preformatted blocks, and tables.
+
+- [ ] **Step 5: Run focused tests and verify GREEN**
+
+Run the Task 13 command. Expected: both suites pass with no skipped tests.
+
+- [ ] **Step 6: Request authorization for the public responsive commit**
+
+Stop and present the exact staged scope and message before any commit:
+
+```text
+fix(layout): Improves public mobile composition
+- Compacts accessible header controls and allows footer content to wrap
+- Scales Home and About layouts without viewport overflow
+- Bounds article Markdown, tags, images, code, and tables on phones
+```
+
+### Task 14: Responsive Administrative Dashboard
+
+**Files:**
+- Create: `app/src/components/AdminArticleCard.vue`
+- Modify: `app/src/pages/Admin.vue`
+- Modify: `app/tests/adminFrontend.test.js`
+
+**Interfaces:**
+- `AdminArticleCard` consumes `article`, `session`, `activeTag`, and `loadingAction` props.
+- `AdminArticleCard` emits `edit`, `review`, `request-unpublication`, `publish`, `unpublish`, `archive`, `unarchive`, `delete`, and `toggle-tag` with the current article or tag ID.
+- Preserves: the same authorization helpers and mutation handlers used by desktop table rows.
+
+- [ ] **Step 1: Write failing mobile-card contract tests**
+
+Require `Admin.vue` to enable Quasar grid mode when `$q.screen.width <= 720` and provide an `#item` slot using `AdminArticleCard`. Assert the card exposes title, status, author, date, tags, and every guarded lifecycle action. Assert emitted events are connected to the existing handlers and `toggleTagFilter`.
+
+Add structural checks for a two-column phone metrics grid, horizontally reachable status controls, stacked panel headings, and wrapping review actions.
+
+- [ ] **Step 2: Run focused dashboard tests and verify RED**
+
+```bash
+rtk docker compose exec -T app node --test --test-reporter=spec tests/adminFrontend.test.js
+```
+
+Expected: FAIL because `AdminArticleCard`, grid mode, and compact dashboard contracts do not exist.
+
+- [ ] **Step 3: Implement the mobile article card**
+
+Render labelled metadata and tag chips, importing the existing `can*ArticleAction` helpers rather than duplicating lifecycle logic. Every event must carry the same article object consumed by desktop handlers. Keep tag chips keyboard-operable with `aria-pressed`.
+
+- [ ] **Step 4: Connect QTable grid mode without changing desktop rows**
+
+Use:
+
+```vue
+<q-table :grid="$q.screen.width <= 720" ...>
+  <template #item="props">
+    <admin-article-card :article="props.row" ... />
+  </template>
+</q-table>
+```
+
+Map card events to the existing edit, review, publication, archive, deletion, and filter methods. Desktop body-cell slots remain unchanged.
+
+- [ ] **Step 5: Compact dashboard supporting layout**
+
+At `max-width: 720px`, use two metric columns down to 340 pixels and one below that threshold, stack panel headings, keep filter tabs internally scrollable, and make review metadata/actions wrap without clipping. Do not use document-level `overflow-x: hidden` as the primary containment fix.
+
+- [ ] **Step 6: Run focused tests and verify GREEN**
+
+Run the Task 14 command. Expected: all admin frontend tests pass.
+
+- [ ] **Step 7: Request authorization for the dashboard commit**
+
+Stop and present the exact staged scope and message:
+
+```text
+fix(admin): Adds responsive article cards
+- Preserves the desktop article table while rendering complete mobile cards
+- Keeps role and lifecycle actions available through shared authorization guards
+- Compacts dashboard metrics, filters, and review queues on phones
+```
+
+### Task 15: Responsive Focused Article Editor
+
+**Files:**
+- Modify: `app/src/pages/AdminArticleEditor.vue`
+- Modify: `app/tests/adminFrontend.test.js`
+
+**Interfaces:**
+- Preserves: editor form model, Markdown insertion methods, locale switching, media handlers, validation, and terminal actions.
+- Produces: responsive toolbar groups, media controls, dialog containment, and workflow actions at `max-width: 720px`.
+
+- [ ] **Step 1: Write failing editor-layout tests**
+
+Require named `markdown-format-actions` and `markdown-mode-actions` groups, compact heading/status classes, responsive media-action classes, a bounded media dialog, and mobile workflow-action rules. Assert every existing Markdown command and Editor/Preview option remains present.
+
+- [ ] **Step 2: Run focused editor tests and verify RED**
+
+```bash
+rtk docker compose exec -T app node --test --test-reporter=spec tests/adminFrontend.test.js
+```
+
+Expected: FAIL because the responsive editor groups and containment contracts are absent.
+
+- [ ] **Step 3: Separate formatting and mode controls**
+
+Group the existing formatting buttons without changing click handlers. At 720 pixels, allow formatting controls to wrap or scroll inside their own row and place the Editor/Preview toggle on a separate full-width row. Keep visible focus and do not hide commands.
+
+- [ ] **Step 4: Adapt heading, fields, media, and workflow actions**
+
+Stack the heading composition and form rows. Use two media columns at intermediate widths and one at phone widths; set buttons and file input to `min-width: 0; width: 100%`. Bound the media dialog with `max-width: calc(100vw - 24px)`, `max-height: calc(100dvh - 24px)`, and internal scrolling. Make the primary terminal action full-width with secondary actions wrapping beneath it.
+
+- [ ] **Step 5: Run focused tests and verify GREEN**
+
+Run the Task 15 command. Expected: all admin frontend tests pass.
+
+- [ ] **Step 6: Request authorization for the editor commit**
+
+Stop and present the exact staged scope and message:
+
+```text
+fix(admin): Improves mobile article editing
+- Separates Markdown formatting and mode controls on compact screens
+- Stacks editor fields and bounds media previews and dialogs
+- Keeps workflow actions reachable without changing mutation behavior
+```
+
+### Task 16: Responsive Integration, Review, And Staging Evidence
+
+**Files:**
+- Modify: `openspec/changes/improve-blog-archive-navigation/proposal.md`
+- Modify: `openspec/changes/improve-blog-archive-navigation/design.md`
+- Modify: `openspec/changes/improve-blog-archive-navigation/specs/blog-admin/spec.md`
+- Modify: `openspec/changes/improve-blog-archive-navigation/specs/blog-public/spec.md`
+- Modify: `openspec/changes/improve-blog-archive-navigation/tasks.md`
+- Modify: `openspec/changes/improve-blog-archive-navigation/staging-handoff.md`
+- Modify: `docs/superpowers/specs/2026-08-20-blog-archive-navigation-design.md`
+- Modify: `docs/superpowers/plans/2026-08-20-blog-archive-navigation.md`
+
+**Interfaces:**
+- Consumes: Tasks 13-15.
+- Produces: reviewed responsive implementation and truthful automated/manual evidence.
+
+- [ ] **Step 1: Run all automated validation**
+
+```bash
+rtk docker compose exec -T app npm test
+rtk docker compose exec -T app npm run lint
+rtk docker compose exec -T app npm run build
+rtk docker compose exec -T app npm run scan:build-credentials
+rtk openspec validate improve-blog-archive-navigation --strict
+rtk git diff --check
+```
+
+Expected: every command exits 0, all test counts are recorded, and the credential scan reports no match.
+
+- [ ] **Step 2: Request focused reviews**
+
+Review shell/public containment separately from dashboard/editor behavior. Resolve every Critical and Important finding. The admin review must compare all desktop guards/actions with mobile card actions; the public review must check accessible compact navigation and content containment.
+
+- [ ] **Step 3: Perform Brave responsive smoke checks**
+
+Using the existing Brave installation and no downloaded browser, inspect 320, 375, 430, 768 pixels and desktop. Cover Home, About, blog archive, an article with long content/tags, dashboard with full and empty queues, existing/new editor states, media controls, and dialogs.
+
+For every surface, verify in DevTools:
+
+```js
+document.documentElement.scrollWidth === document.documentElement.clientWidth
+```
+
+Confirm all controls remain reachable, header/footer text is legible, focus is visible, desktop behavior is unchanged, and editor redirects still replace the route after successful terminal actions.
+
+- [ ] **Step 4: Update OpenSpec only from observed evidence**
+
+Add responsive requirements and tasks. Check Task 3.4 only after its automated and manual public checks pass. Check Task 6.4 only after public archive/navigation and redirect smoke evidence is complete. Keep Task 8.4 open unless tag creation/deletion and article-chip smoke checks were actually performed.
+
+- [ ] **Step 5: Request authorization for the verification documentation commit**
+
+Stop and present the exact staged scope and message:
+
+```text
+docs(blog): Verifies responsive archive surfaces
+- Extends public and admin responsive requirements and implementation decisions
+- Records automated validation, focused review, and Brave viewport evidence
+- Preserves unchecked staging tasks that still lack direct observation
+```
+
+- [ ] **Step 6: Stop before sync or archive**
+
+Do not synchronize or archive until every remaining task is complete and the user explicitly authorizes both operations. When archiving, synchronize both delta specs into their main specs first.
