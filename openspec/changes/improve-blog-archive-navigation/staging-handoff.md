@@ -14,14 +14,17 @@ This handoff records verified local behavior and the checks that remain pending.
 - Owners can list, create, and delete editorial tags from a dedicated admin area. The list shows article usage counts without embedding article results, hides reserved language tags, and requires two confirmations before deleting an unused tag.
 - Tag deletion revalidates references across all entry content types and assets with strict bounded responses before issuing a versioned delete; uncertain, stale, or conflicting provider state fails closed.
 - Article-table tag chips toggle the existing tag filter, preserve unrelated filters, and expose selected state visually and accessibly.
+- Author profiles accept a public Gravatar slug or profile URL and an optional allowlisted HTTPS fallback. The server stores a canonical hash without raw email or Identity data, while admin and public consumers fall through from Gravatar to fallback to initials.
+- Unchanged legacy author photos retain their original Contentful value; explicit removal clears the photo. The profile form documents square-image dimensions and efficient formats.
+- Tag-management visibility badges and article counts are centered; destructive-action guidance remains separate from its icon.
 
 ## Local Automated Verification
 
 - `rtk docker compose exec -T app node --test --test-reporter=spec tests/blogNavigationRoundTrip.test.js`: 1 test passed in 1 suite; 0 failed.
 - `rtk docker compose exec -T app node --test --test-reporter=spec tests/contentfulManagementFacade.test.js tests/adminFrontend.test.js`: 98 focused tests passed in 2 suites; 0 failed.
-- `rtk docker compose exec -T app npm test`: 274 tests passed in 15 suites; 0 failed, cancelled, skipped, or pending.
+- `rtk docker compose exec -T app npm test`: 283 tests passed in 16 suites; 0 failed, cancelled, skipped, or pending.
 - `rtk docker compose exec -T app npm run lint`: exited successfully with no lint diagnostics.
-- `rtk docker compose exec -T app npm run build`: production SPA build succeeded; the summary contained 39 JavaScript and 9 CSS assets.
+- `rtk docker compose exec -T app npm run build`: production SPA build succeeded; the summary contained 40 JavaScript and 9 CSS assets.
 - `rtk docker compose exec -T app npm run scan:build-credentials`: exited successfully and reported no credential pattern.
 - `rtk openspec validate improve-blog-archive-navigation --strict`: the active change is valid.
 - Strict per-spec validation succeeded for all three main specs.
@@ -41,6 +44,8 @@ The backend Node process was restarted independently without recreating Compose 
 - As an owner, create an editorial tag, confirm its list metadata and zero count, cancel each deletion confirmation independently, then accept both confirmations and confirm the row refreshes away.
 - Confirm a tag assigned to an article cannot be deleted, displays actionable guidance, and becomes deletable only after its references are removed; repeat with any non-article or asset reference available for safe testing.
 - As a writer, confirm `/admin/tags` returns to `/admin`; as an owner, click and keyboard-toggle article tag chips and confirm only the tag filter changes.
+- Save an author profile with a public Gravatar slug, confirm the preview/account menu/public author page use the current avatar, and confirm no email is requested.
+- Exercise a Gravatar profile without an avatar, an allowlisted fallback URL, a broken fallback, an unchanged legacy photo, and explicit photo removal; confirm the order ends in initials without a broken image.
 - Deploy the intended branch and repeat public index, search, filters, history, clean article URL, chronological navigation, legacy tag redirect, and terminal admin redirect checks in staging.
 
 The responsive checklist item and staging verification item remain open until these checks are performed against the appropriate runtime.

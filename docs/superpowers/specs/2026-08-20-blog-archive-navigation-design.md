@@ -162,6 +162,7 @@ Either property may be `null` at a collection boundary. `previous` means the imm
 - Admin redirect occurs only after a successful mutation response.
 - Tag deletion occurs only after zero usage is revalidated server-side and both client confirmations succeed.
 - Tag deletion conflicts retain the tag and expose a safe actionable message without provider diagnostics.
+- Gravatar profile resolution fails safely before overwriting Contentful; image delivery falls through to an allowlisted fallback and then initials.
 - Public API error payloads remain sanitized and do not expose Contentful diagnostics or configuration.
 
 ## Accessibility And Responsive Behavior
@@ -193,6 +194,7 @@ Automated coverage must verify:
 - both destructive confirmations, zero-usage revalidation, and stale-count conflicts;
 - article-chip filter toggling, preserved unrelated filters, and inverse selected styling;
 - reserved language-tag exclusion across public and admin choices;
+- Gravatar slug/URL normalization, canonical hash storage without raw email data, allowlisted fallback URLs, legacy photo compatibility, and image-error fallback order;
 - full unit suite, lint, production build, credential scan, and strict OpenSpec validation.
 
 ## Scope Boundaries
@@ -206,3 +208,4 @@ This change does not introduce:
 - changes to the editorial review lifecycle;
 - tag renaming or bulk tag replacement;
 - analytics-driven ranking or recommendations.
+- automatic use of Netlify Identity email data for public Gravatar lookup.

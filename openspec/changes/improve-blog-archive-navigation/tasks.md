@@ -54,3 +54,11 @@
 - [x] 8.2 Run focused tests, the full unit suite, lint, production build, credential scan, strict OpenSpec validation, and repository hygiene checks.
 - [x] 8.3 Request focused review of tag deletion safety, permissions, count semantics, and article-filter interaction before considering the work complete.
 - [ ] 8.4 Perform owner tag-management and article-chip filtering smoke checks in staging.
+
+## 9. Gravatar-First Author Photos
+
+- [x] 9.1 Add TDD coverage for profile normalization, canonical Gravatar URLs, allowlisted fallbacks, legacy values, and image-error fallback order.
+- [x] 9.2 Resolve public Gravatar slugs server-side while saving and persist only canonical public photo metadata without raw Identity or email data.
+- [x] 9.3 Replace the raw photo URL control with Gravatar and fallback inputs, actionable image guidance, preview fallback, and public/admin image recovery.
+- [x] 9.4 Center the visibility and article-count columns in tag management and preserve compact responsive action layout.
+- [x] 9.5 Run focused and full verification, request focused review, and leave staging smoke checks pending until deployed behavior is exercised.

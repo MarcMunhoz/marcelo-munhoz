@@ -10,6 +10,7 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Return editors to `/admin` with route replacement after successful save, review submission, unpublication request, or owner unpublication actions.
 - Add owner-only tag management with article usage counts, safe deletion, and tag-chip filtering from the article table.
 - Exclude reserved legacy article-language tags from public and administrative tag choices.
+- Let authors prefer a public Gravatar profile for their photo, with an allowlisted HTTPS fallback and initials when neither image is usable.
 
 ## Capabilities
 
@@ -26,4 +27,5 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Public Contentful read endpoints, query normalization, pagination, and chronological-neighbor lookups.
 - Public blog and article routes, URL synchronization, browser-history restoration, responsive archive rendering, and accessible navigation.
 - Admin editor terminal-action handling, route transitions, article-list tag interaction, and tag-management APIs.
+- Author-profile photo resolution, safe Gravatar lookup, fallback rendering, and photo guidance.
 - Automated tests for public API contracts, route behavior, archive states, article navigation, and admin redirects.

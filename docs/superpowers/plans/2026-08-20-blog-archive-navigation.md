@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Return completed admin editor actions to the dashboard, replace the three-card public blog pagination with a URL-backed hybrid index plus chronological article navigation, and add safe owner tag management.
+**Goal:** Return completed admin editor actions to the dashboard, replace the three-card public blog pagination with a URL-backed hybrid index plus chronological article navigation, add safe owner tag management, and support Gravatar-first author photos.
 
-**Architecture:** A dedicated public `blog-index` API owns filtering, highlight exclusion, and 12-item pagination, while a separate failure-tolerant endpoint resolves chronological article neighbors. Pure frontend route helpers make the query string canonical, focused components render highlights and compact archive rows, and successful terminal editor actions replace the editor route with `/admin`. The authenticated admin facade owns bounded tag usage counts and zero-usage deletion revalidation; the UI keeps tag management separate from the existing article list while reusing its tag filter.
+**Architecture:** A dedicated public `blog-index` API owns filtering, highlight exclusion, and 12-item pagination, while a separate failure-tolerant endpoint resolves chronological article neighbors. Pure frontend route helpers make the query string canonical, focused components render highlights and compact archive rows, and successful terminal editor actions replace the editor route with `/admin`. The authenticated admin facade owns bounded tag usage counts, safe deletion, and public Gravatar-profile resolution; browser photo consumers use canonical Gravatar URLs with an allowlisted fallback and initials.
 
 **Tech Stack:** Node.js 22, Vue 3 Options API, Vue Router 4, Quasar 2, Netlify Functions, Contentful Delivery API, `node:test`.
 
@@ -743,3 +743,12 @@ With disposable tags, verify create, zero/nonzero counts, blocked in-use deletio
 - [ ] **Step 4: Update only verified checklist items**
 
 Mark Tasks 7 and 8 complete only where implementation, automated evidence, focused review, and staging evidence actually exist. Do not archive the change; when later authorized, synchronize delta specs before archival.
+
+### Task 12: Gravatar-First Author Photos And Alignment
+
+**Files:** `app/src/utils/authorPhotos.js`, author-profile frontend/backend surfaces, `app/src/pages/AdminTags.vue`, related tests, CSP, and OpenSpec artifacts.
+
+- [ ] Write failing tests for Gravatar slug/URL/hash normalization, canonical 192-pixel URLs, safe fallback hosts, legacy photos, server-side slug resolution, and centered tag columns.
+- [ ] Resolve public profile slugs only while saving; persist canonical hash metadata without Identity fields or raw emails.
+- [ ] Render Gravatar, fallback, then initials across admin preview, account menu, and public author profile; add square-image guidance.
+- [ ] Run focused and complete verification, request focused review, and keep deployed smoke items unchecked until exercised in staging.

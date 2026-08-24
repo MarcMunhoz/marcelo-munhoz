@@ -110,3 +110,29 @@ The system SHALL let the owner review and manage Contentful article tags from th
 - **WHEN** Contentful returns `article-lang-pt-br` or `article-lang-en-us`
 - **THEN** the system excludes those legacy IDs from public filters, article-editor choices, and tag management
 - **AND** article locale continues to use the explicit editorial locale field
+
+### Requirement: Authors Configure Gravatar-First Profile Photos
+The system SHALL let an authenticated author use a public Gravatar profile as the preferred public photo without deriving or persisting a Netlify Identity email.
+
+#### Scenario: Author saves a Gravatar profile
+- **WHEN** an author supplies a valid public Gravatar profile slug or URL
+- **THEN** the server resolves and stores its canonical public identifier without storing a raw email address
+- **AND** public photo consumers request the current Gravatar avatar at an appropriate display resolution
+
+#### Scenario: Gravatar has no usable avatar
+- **WHEN** the preferred Gravatar image is unavailable
+- **THEN** the interface tries the configured allowlisted HTTPS fallback URL
+- **AND** it displays author initials when the fallback is absent or also fails
+
+#### Scenario: Author supplies an unsafe photo value
+- **WHEN** the Gravatar identifier is invalid or the fallback URL uses credentials, a non-HTTPS scheme, or a host outside the allowlist
+- **THEN** the profile is not overwritten
+- **AND** the author receives a safe validation message
+
+#### Scenario: Author edits photo guidance
+- **WHEN** the author edits public photo settings
+- **THEN** the form recommends a centered square image with suitable minimum and ideal dimensions and efficient formats
+
+#### Scenario: Legacy author photo is loaded
+- **WHEN** an existing author uses a legacy string, Contentful Asset, or Cloudinary-style photo value
+- **THEN** the public and administrative photo surfaces continue to render it

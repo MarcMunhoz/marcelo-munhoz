@@ -57,6 +57,12 @@ In the existing article table, activating a tag chip applies that value to the c
 
 The reserved legacy IDs `article-lang-pt-br` and `article-lang-en-us` are never offered as public archive filters, article-editor choices, or manageable editorial tags. Article language continues to come from the explicit editorial locale field.
 
+### Gravatar-First Author Photos
+
+The author profile accepts a public Gravatar profile slug or URL and an optional HTTPS fallback URL from an explicit image-host allowlist. It never derives the public photo from Netlify Identity or stores a raw email address. The server resolves public profile slugs while saving, stores the canonical hash in the existing photo object, and public clients build a stable 192-pixel, G-rated Gravatar URL that returns 404 when no avatar exists.
+
+Image consumers try Gravatar first, then the configured fallback, then the existing initials treatment. This keeps later Gravatar photo changes live without another Contentful save while preserving legacy string, Contentful Asset, and Cloudinary-style photo values. The form recommends a centered square image, ideally 512 by 512 pixels and at least 256 by 256 pixels, using an efficient photographic format or PNG when transparency is required.
+
 ## Risks / Trade-offs
 
 - Filtering and pagination can produce invalid or stale query values: normalize them at the public boundary and synchronize the returned canonical page.
@@ -65,6 +71,7 @@ The reserved legacy IDs `article-lang-pt-br` and `article-lang-en-us` are never 
 - A stored return URL is browser-local state: direct and shared article URLs must always retain `/blog` as a valid fallback.
 - Tag counts can become stale between display and deletion: revalidate on the server and fail with a safe conflict instead of deleting.
 - Contentful can retain references outside active articles: surface the provider refusal without exposing diagnostics and leave the tag intact.
+- Gravatar lookup or image delivery can fail independently: reject unresolved profile saves safely, keep the previous Contentful version, and fall back without displaying a broken image.
 
 ## Migration Plan
 
