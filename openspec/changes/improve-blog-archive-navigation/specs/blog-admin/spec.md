@@ -136,3 +136,16 @@ The system SHALL let an authenticated author use a public Gravatar profile as th
 #### Scenario: Legacy author photo is loaded
 - **WHEN** an existing author uses a legacy string, Contentful Asset, or Cloudinary-style photo value
 - **THEN** the public and administrative photo surfaces continue to render it
+
+#### Scenario: Author reviews the active photo setup
+- **WHEN** the author opens the profile photo editor or an image candidate fails to load
+- **THEN** the form identifies the source currently displayed as Gravatar, fallback URL, legacy photo, or initials
+- **AND** the photo reset action remains available for configured images that fail and clears only this blog's stored photo settings without changing the Gravatar profile or original image
+
+### Requirement: Administrative Routes Omit The Public Cookie Notice
+The system SHALL keep the public analytics consent notice out of routes marked as administrative without changing the pending consent state.
+
+#### Scenario: User opens an administrative route with consent pending
+- **WHEN** the active route requires admin access and the public cookie notice has not been dismissed
+- **THEN** the cookie notice is not rendered in the administrative area
+- **AND** returning to a public route renders the still-pending notice

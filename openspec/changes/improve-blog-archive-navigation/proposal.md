@@ -11,6 +11,7 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Add owner-only tag management with article usage counts, safe deletion, and tag-chip filtering from the article table.
 - Exclude reserved legacy article-language tags from public and administrative tag choices.
 - Let authors prefer a public Gravatar profile for their photo, with an allowlisted HTTPS fallback and initials when neither image is usable.
+- Keep the public cookie notice out of authenticated administrative routes without accepting consent on the user's behalf.
 
 ## Capabilities
 

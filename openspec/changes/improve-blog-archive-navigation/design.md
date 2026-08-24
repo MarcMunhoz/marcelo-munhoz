@@ -47,6 +47,8 @@ Save draft, submit for review, request unpublication, and owner unpublish call `
 
 Alternative considered: use `router.push('/admin')` or redirect before the response. Push permits reopening stale editor state with Back, while an optimistic redirect discards actionable failure feedback.
 
+The application-level analytics consent dialog is not mounted while the active route carries `requiresAdmin`. Hiding it does not mutate the pending consent state, so public routes continue to request consent until the visitor dismisses the notice.
+
 ### Owner Tag Management And Article Filtering
 
 The admin provides an owner-only tag-management area that lists each non-reserved article tag with its stable Contentful ID, visibility, and article usage count. Counts include editable articles across editorial states but do not expand the management area into an article browser. Existing tag creation remains available; renaming and bulk replacement are out of scope.
@@ -62,6 +64,8 @@ The reserved legacy IDs `article-lang-pt-br` and `article-lang-en-us` are never 
 The author profile accepts a public Gravatar profile slug or URL and an optional HTTPS fallback URL from an explicit image-host allowlist. It never derives the public photo from Netlify Identity or stores a raw email address. The server resolves public profile slugs while saving, stores the canonical hash in the existing photo object, and public clients build a stable 192-pixel, G-rated Gravatar URL that returns 404 when no avatar exists.
 
 Image consumers try Gravatar first, then the configured fallback, then the existing initials treatment. This keeps later Gravatar photo changes live without another Contentful save while preserving legacy string, Contentful Asset, and Cloudinary-style photo values. The form recommends a centered square image, ideally 512 by 512 pixels and at least 256 by 256 pixels, using an efficient photographic format or PNG when transparency is required.
+
+The profile editor labels the source of the candidate currently visible rather than only the first configured source, so image-error fallback remains understandable. Its reset action is described as `Use initials instead`, or `Keep initials and clear photo settings` after configured images fail, and explicitly states that it clears only the blog configuration, never the external Gravatar profile or original image.
 
 ## Risks / Trade-offs
 

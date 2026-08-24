@@ -62,3 +62,8 @@
 - [x] 9.3 Replace the raw photo URL control with Gravatar and fallback inputs, actionable image guidance, preview fallback, and public/admin image recovery.
 - [x] 9.4 Center the visibility and article-count columns in tag management and preserve compact responsive action layout.
 - [x] 9.5 Run focused and full verification, request focused review, and leave staging smoke checks pending until deployed behavior is exercised.
+- [x] 9.6 Identify the photo source currently displayed and clarify that switching to initials does not alter Gravatar or the original image.
+
+## 10. Administrative Cookie Notice
+
+- [x] 10.1 Hide the public cookie notice on routes marked as administrative while preserving pending consent for public routes, with regression coverage.
