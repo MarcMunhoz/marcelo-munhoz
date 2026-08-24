@@ -1,5 +1,22 @@
 ## ADDED Requirements
 
+### Requirement: Public Surfaces Remain Usable On Compact Viewports
+The system SHALL preserve public routes, content, and desktop presentation while adapting the global shell and public pages at or below the 700-pixel compact breakpoint without document-level horizontal overflow.
+
+#### Scenario: Reader uses the compact global shell
+- **WHEN** a public surface renders at or below the compact breakpoint
+- **THEN** About, Blog, and Admin controls retain stable accessible names, keyboard behavior, and bounded tooltips or menus while their visual labels may be hidden
+- **AND** the page title, footer, and pending consent notice remain contained and legible within the viewport
+
+#### Scenario: Reader views compact public content
+- **WHEN** Home, About, or an article renders at or below the compact breakpoint
+- **THEN** typography, images, social actions, project chips, tags, and long text remain within the page width
+- **AND** wide article code blocks and tables scroll inside their own containers instead of widening the document
+
+#### Scenario: Reader uses a wider public viewport
+- **WHEN** a public surface renders above the compact breakpoint
+- **THEN** the existing desktop navigation labels and page composition remain available
+
 ### Requirement: Public Blog Provides A Scalable Hybrid Archive
 The system SHALL present automatic recent highlights and a compact paginated archive whose state is represented by the public URL.
 

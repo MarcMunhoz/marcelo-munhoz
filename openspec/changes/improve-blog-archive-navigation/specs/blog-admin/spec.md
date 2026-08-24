@@ -66,6 +66,27 @@ The system SHALL restrict article publication lifecycle operations to the owner 
 
 ## ADDED Requirements
 
+### Requirement: Administrative Surfaces Preserve Complete Workflows On Compact Viewports
+The system SHALL adapt the dashboard and focused article editor at or below the 720-pixel compact breakpoint without removing metadata, authorized operations, validation, or desktop behavior.
+
+#### Scenario: Admin reviews articles on a compact dashboard
+- **WHEN** the article queue renders at or below the compact breakpoint
+- **THEN** each article uses a full-width card with title, status, author, date, tags, and every action allowed by the same authorization and lifecycle guards as the desktop row
+- **AND** tag toggles, article-specific loading feedback, filters, status navigation, metrics, and review queues remain reachable without widening the document
+
+#### Scenario: Admin edits an article on a compact viewport
+- **WHEN** the focused editor renders at or below the compact breakpoint
+- **THEN** its heading, fields, Markdown formatting and mode controls, media actions, and workflow actions remain reachable without changing their handlers
+- **AND** visible keyboard focus remains inside the viewport while wide control groups scroll or wrap within their own containers
+
+#### Scenario: Admin opens compact media management
+- **WHEN** the media dialog opens on a compact viewport
+- **THEN** the dialog is bounded by viewport width and height, scrolls internally, and retains all selection and editing controls
+
+#### Scenario: Admin uses a wider administrative viewport
+- **WHEN** the dashboard or editor renders above the compact breakpoint
+- **THEN** the desktop article table and established editor composition remain available
+
 ### Requirement: Owner Safely Manages Article Tags
 The system SHALL let the owner review and manage Contentful article tags from the admin area without exposing destructive tag operations to writers.
 

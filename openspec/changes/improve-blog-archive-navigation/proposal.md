@@ -12,6 +12,8 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Exclude reserved legacy article-language tags from public and administrative tag choices.
 - Let authors prefer a public Gravatar profile for their photo, with an allowlisted HTTPS fallback and initials when neither image is usable.
 - Keep the public cookie notice out of authenticated administrative routes without accepting consent on the user's behalf.
+- Keep the global shell, Home, About, articles, and consent notice contained and accessible at the existing 700-pixel public breakpoint.
+- Adapt the dashboard, complete article actions, focused editor, and media dialog at the existing 720-pixel admin breakpoint while preserving desktop presentation.
 
 ## Capabilities
 
@@ -29,4 +31,5 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Public blog and article routes, URL synchronization, browser-history restoration, responsive archive rendering, and accessible navigation.
 - Admin editor terminal-action handling, route transitions, article-list tag interaction, and tag-management APIs.
 - Author-profile photo resolution, safe Gravatar lookup, fallback rendering, and photo guidance.
-- Automated tests for public API contracts, route behavior, archive states, article navigation, and admin redirects.
+- Responsive public and administrative composition without a new framework or hidden mobile workflows.
+- Automated tests for public API contracts, route behavior, archive states, article navigation, admin redirects, and responsive structural contracts.

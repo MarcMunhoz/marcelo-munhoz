@@ -67,6 +67,16 @@ Image consumers try Gravatar first, then the configured fallback, then the exist
 
 The profile editor labels the source of the candidate currently visible rather than only the first configured source, so image-error fallback remains understandable. Its reset action is described as `Use initials instead`, or `Keep initials and clear photo settings` after configured images fail, and explicitly states that it clears only the blog configuration, never the external Gravatar profile or original image.
 
+### Responsive Public And Administrative Composition
+
+Public surfaces retain the existing 700-pixel compact breakpoint. The global shell keeps icon controls with stable accessible names and bounded menus, footer and consent content wrap within the viewport, and Home, About, article media, tags, Markdown, code, and tables remain contained without document-level horizontal overflow. Desktop labels and composition remain available above the breakpoint.
+
+Administrative surfaces retain the existing 720-pixel compact breakpoint. The dashboard switches the article table to full-width cards that expose the same metadata, authorization guards, lifecycle actions, tag-filter behavior, and article-specific loading feedback as desktop rows. Metrics collapse only when their readable width requires it, while filters, status tabs, review queues, and actions remain reachable.
+
+The focused editor removes min-content width constraints from its card and Markdown controls, separates formatting and mode actions, stacks fields and workflows, and bounds the media dialog by the viewport with internal scrolling. Keyboard focus receives an explicit visible outline that stays inside phone-width edges. These adaptations do not change editor mutations, validation, routing, or desktop behavior.
+
+Responsive source-contract tests protect the breakpoints, accessibility labels, action parity, and containment rules. Manual Brave checks cover 320, 375, 430, and 768 pixels plus desktop; data-rich dashboard and media states may be simulated in browser memory for layout checks without writing provider data. Real provider workflows and deployed behavior remain staging responsibilities.
+
 ## Risks / Trade-offs
 
 - Filtering and pagination can produce invalid or stale query values: normalize them at the public boundary and synchronize the returned canonical page.
@@ -76,6 +86,8 @@ The profile editor labels the source of the candidate currently visible rather t
 - Tag counts can become stale between display and deletion: revalidate on the server and fail with a safe conflict instead of deleting.
 - Contentful can retain references outside active articles: surface the provider refusal without exposing diagnostics and leave the tag intact.
 - Gravatar lookup or image delivery can fail independently: reject unresolved profile saves safely, keep the previous Contentful version, and fall back without displaying a broken image.
+- Framework cascade and intrinsic minimum widths can defeat compact rules: use explicit breakpoint overrides and reset min-content constraints at the owning component boundary.
+- A mobile-only presentation can drift from desktop authorization behavior: route both table rows and cards through the same guards and handlers.
 
 ## Migration Plan
 

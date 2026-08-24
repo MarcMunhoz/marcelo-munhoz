@@ -202,6 +202,14 @@ Automated tests assert the structural contracts that prevent regressions: mobile
 
 Manual Brave checks cover 320, 375, 430, and 768 pixel widths plus desktop. Each surface must satisfy `document.documentElement.scrollWidth === document.documentElement.clientWidth`, keep interactive controls inside the viewport, preserve visible keyboard focus, and remain usable with long titles, many tags, filled and empty queues, wide Markdown content, and media dialogs.
 
+### Responsive Verification Evidence
+
+The completed local verification exercised public pages and actual archive/article navigation, empty and data-rich dashboard states, new and existing editor route shells, in-memory media assets, bounded dialogs, and keyboard focus across the required Brave widths. Document scroll width remained equal to client width. Focus inspection confirmed an explicit two-pixel outline on the first Markdown control at 320 pixels.
+
+Focused public and admin reviews reported no remaining Critical, Important, or Minor findings after fixes for framework cascade priority, full-width table grid items, article-specific loading state, stable Admin control naming, intrinsic editor minimum widths, and focus containment. The final automated run passed 297 tests in 17 suites, lint, production build, credential scan, strict OpenSpec validation, and diff hygiene.
+
+Data-rich admin and media states were simulated only in browser memory. Real administrative hydration, provider mutations, and a repeat of the responsive matrix remain staging checks; this local evidence does not satisfy those deployed tasks.
+
 ## Testing
 
 Automated coverage must verify:

@@ -18,6 +18,8 @@ This handoff records verified local behavior and the checks that remain pending.
 - Unchanged legacy author photos retain their original Contentful value. The profile form identifies the photo source currently displayed, including image-error fallbacks; its reset action remains available for broken configured photos and clears only the blog photo settings. The form also documents square-image dimensions and efficient formats.
 - Tag-management visibility badges and article counts are centered; destructive-action guidance remains separate from its icon.
 - Routes marked as administrative do not render the public cookie notice; visiting them does not dismiss a notice that remains pending for public routes.
+- The global shell and public Home, About, archive, article, footer, and consent surfaces remain contained at the 700-pixel compact breakpoint while preserving accessible navigation and the desktop composition.
+- At the 720-pixel admin breakpoint, dashboard rows become full-width cards with the same guarded actions as desktop rows; the focused editor, Markdown controls, media actions, media dialog, workflow actions, and keyboard focus remain reachable without document-level overflow.
 
 ## Local Automated Verification
 
@@ -25,9 +27,9 @@ This handoff records verified local behavior and the checks that remain pending.
 - `rtk docker compose exec -T app node --test --test-reporter=spec tests/contentfulManagementFacade.test.js tests/adminFrontend.test.js`: 98 focused tests passed in 2 suites; 0 failed.
 - `rtk docker compose exec -T app node --test --test-reporter=spec tests/authorPhotos.test.js tests/adminFrontend.test.js`: 77 focused tests passed in 2 suites; 0 failed.
 - `rtk docker compose exec -T app node --test --test-reporter=spec tests/routingConfiguration.test.js`: 17 focused tests passed in 1 suite; 0 failed.
-- `rtk docker compose exec -T app npm test`: 288 tests passed in 16 suites; 0 failed, cancelled, skipped, or pending.
+- `rtk docker compose exec -T app npm test`: 297 tests passed in 17 suites; 0 failed, cancelled, skipped, or pending.
 - `rtk docker compose exec -T app npm run lint`: exited successfully with no lint diagnostics.
-- `rtk docker compose exec -T app npm run build`: production SPA build succeeded; the summary contained 40 JavaScript and 9 CSS assets.
+- `rtk docker compose exec -T app npm run build`: production SPA build succeeded; the summary contained 38 JavaScript and 11 CSS assets.
 - `rtk docker compose exec -T app npm run scan:build-credentials`: exited successfully and reported no credential pattern.
 - `rtk openspec validate improve-blog-archive-navigation --strict`: the active change is valid.
 - Strict per-spec validation succeeded for all three main specs.
@@ -35,11 +37,17 @@ This handoff records verified local behavior and the checks that remain pending.
 
 ## Local Smoke Evidence
 
-The backend Node process was restarted independently without recreating Compose or invoking package installation. The local health endpoint and `/api/contentful/blog-years` returned HTTP 200; the years payload passed shape validation and contained six distinct values. Brave headless captures at desktop and mobile widths showed the expected responsive control, highlight, and archive-row layouts without horizontal overflow or overlap. The persistent consent modal dimmed the captures, and the isolated DevTools port prevented an interactive focus/select check, so responsive interaction remains pending. The deterministic cross-layer test exercised the real exported archive-state helpers and public Contentful handler with a bounded fake client, covering the canonical archive query, selected article slug, clean article route, browser-local return state, article lookup, and older/newer navigation.
+The backend Node process was restarted independently without recreating Compose or invoking package installation. The local health endpoint and `/api/contentful/blog-years` returned HTTP 200; the years payload passed shape validation and contained six distinct values. The deterministic cross-layer test exercised the real exported archive-state helpers and public Contentful handler with a bounded fake client, covering the canonical archive query, selected article slug, clean article route, browser-local return state, article lookup, and older/newer navigation.
+
+Brave checks covered 320, 375, 430, and 768 pixel widths plus desktop. Home, About, Blog, and article pages kept document scroll width equal to client width; compact header labels were hidden while accessible controls remained available, and desktop labels remained visible. The consent notice stayed bounded with an internally scrollable body. Real clicks returned from an article to `/blog` and followed both available chronological neighbors without widening the document.
+
+The administrative dashboard was exercised in empty and data-rich in-memory states from 320 pixels through desktop. Full-width cards retained long titles, tags, guarded actions, publication and unpublication review queues, and article-specific loading state; the compact status strip remained intentionally scrollable inside its own container. New and existing editor route shells, media controls, a dialog with multiple in-memory assets, and keyboard traversal were checked at the same widths. At 320 pixels the editor remained document-contained, the media dialog stayed viewport-bounded with internal scrolling, and the first Markdown control exposed a visible two-pixel focus outline.
+
+The data-rich dashboard and media assets were simulated only in browser memory and caused no persistent provider mutation. The local administrative API was unavailable for real content hydration and provider-backed mutations, so those flows remain staging responsibilities. Terminal redirects were previously confirmed in preview and remain covered by automated route-replacement tests.
 
 ## Pending Manual Checks
 
-- Inspect the archive at desktop and mobile widths, including highlight count, non-duplication, compact rows, long content, labelled controls, focus states, pagination, empty state, error/retry state, and absence of overlap.
+- Repeat the responsive public and administrative matrix on deployed staging with real content, including long archive data, labelled controls, focus states, empty and error states, complete editor hydration, and provider-backed dialogs.
 - Confirm filter changes and browser Back/Forward restore the expected URL, controls, results, and scroll position.
 - Confirm archive return behavior from an article and the direct-article `/blog` fallback.
 - Confirm oldest and newest article boundaries expose only the available chronological direction.
@@ -52,7 +60,7 @@ The backend Node process was restarted independently without recreating Compose 
 - Exercise a Gravatar profile without an avatar, an allowlisted fallback URL, a broken fallback, an unchanged legacy photo, and `Use initials instead`; confirm the displayed source follows each fallback, the order ends in initials without a broken image, and the external Gravatar profile or original image is unchanged.
 - Deploy the intended branch and repeat public index, search, filters, history, clean article URL, chronological navigation, legacy tag redirect, and terminal admin redirect checks in staging.
 
-The responsive checklist item and staging verification item remain open until these checks are performed against the appropriate runtime.
+The local responsive checklist is complete. Public archive/navigation staging smoke, owner tag-management staging smoke, and the deployed responsive repeat remain open until directly exercised against the intended runtime.
 
 ## Rollback And Safety
 

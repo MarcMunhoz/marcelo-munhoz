@@ -18,7 +18,7 @@
 - [x] 3.1 Render automatic recent highlights only for the unfiltered first page, with real article image, title, date, and concise metadata.
 - [x] 3.2 Render the paginated archive as compact rows with thumbnail, description, author, date, and tags.
 - [x] 3.3 Add labelled search, year and tag controls, current-page pagination semantics, empty state, retryable error state, keyboard focus, and stable image ratios.
-- [ ] 3.4 Add responsive markup tests and perform manual desktop and mobile responsive checks before marking them complete.
+- [x] 3.4 Add responsive markup tests and perform manual desktop and mobile responsive checks before marking them complete.
 - [x] 3.5 Load published year options independently and render only years returned by the bounded public years contract.
 
 ## 4. Article Navigation
@@ -67,3 +67,17 @@
 ## 10. Administrative Cookie Notice
 
 - [x] 10.1 Hide the public cookie notice on routes marked as administrative while preserving pending consent for public routes, with regression coverage.
+
+## 11. Responsive Public And Administrative Surfaces
+
+- [x] 11.1 Contain the global shell, Home, About, article content, footer, and consent notice at the 700-pixel public breakpoint while preserving accessible navigation and desktop composition.
+- [x] 11.2 Render complete full-width article cards and compact dashboard metrics, filters, review queues, and actions at the 720-pixel admin breakpoint.
+- [x] 11.3 Keep the focused editor, Markdown controls, media actions, media dialog, workflow actions, and visible keyboard focus usable on compact viewports.
+- [x] 11.4 Add regression coverage for responsive structure, action parity, framework cascade, intrinsic minimum widths, and focus containment.
+
+## 12. Responsive Verification
+
+- [x] 12.1 Run focused and full tests, lint, production build, credential scan, strict OpenSpec validation, and repository hygiene checks.
+- [x] 12.2 Complete focused public and admin reviews and resolve every reported finding.
+- [x] 12.3 Exercise public pages, archive navigation, dashboard states, editor shells, media controls, dialogs, and keyboard focus in Brave from 320 pixels through desktop without document-level overflow.
+- [ ] 12.4 Repeat responsive smoke checks on deployed staging with real administrative data and provider-backed workflows.

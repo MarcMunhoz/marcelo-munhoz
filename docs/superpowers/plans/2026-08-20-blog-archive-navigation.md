@@ -771,7 +771,7 @@ Mark Tasks 7 and 8 complete only where implementation, automated evidence, focus
 - Preserves: existing routes, header destinations, account-menu behavior, public content, article sharing, and desktop layout.
 - Produces: compact public composition at `max-width: 700px` with no document-level horizontal overflow.
 
-- [ ] **Step 1: Write failing structural regression tests**
+- [x] **Step 1: Write failing structural regression tests**
 
 Add source-contract tests that assert:
 
@@ -789,7 +789,7 @@ assert.match(article, /overflow-x:\s*auto/);
 
 Require an explicit `@media (max-width: 700px)` contract, bounded account-menu width, wrapped article tags, responsive Markdown images, and a scrollable cookie-card body for short viewports.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 rtk docker compose exec -T app node --test --test-reporter=spec tests/publicResponsiveLayout.test.js tests/blogFrontend.test.js
@@ -797,7 +797,7 @@ rtk docker compose exec -T app node --test --test-reporter=spec tests/publicResp
 
 Expected: FAIL because the shell/public responsive classes and containment rules are absent.
 
-- [ ] **Step 3: Implement the compact global shell**
+- [x] **Step 3: Implement the compact global shell**
 
 Add semantic classes to the toolbar, title, navigation actions, footer content, and cookie card. At `max-width: 700px`:
 
@@ -809,15 +809,15 @@ Add semantic classes to the toolbar, title, navigation actions, footer content, 
 
 Hide only the visual labels of About, Blog, and Admin at the compact breakpoint; retain icons, `aria-label`, tooltips, routes, and keyboard behavior. Bound and internally scroll the cookie notice without changing pending consent.
 
-- [ ] **Step 4: Implement bounded Home, About, and article content**
+- [x] **Step 4: Implement bounded Home, About, and article content**
 
 Replace fixed Home text sizes with fluid values such as `clamp(2rem, 10vw, 4rem)` and `clamp(1.6rem, 7vw, 3rem)`. Make the hero image responsive, wrap knowledge icons and project chips, stack About image/text at 700 pixels, and explicitly constrain article tags, Markdown images, preformatted blocks, and tables.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run the Task 13 command. Expected: both suites pass with no skipped tests.
 
-- [ ] **Step 6: Request authorization for the public responsive commit**
+- [x] **Step 6: Request authorization for the public responsive commit**
 
 Stop and present the exact staged scope and message before any commit:
 
@@ -840,13 +840,13 @@ fix(layout): Improves public mobile composition
 - `AdminArticleCard` emits `edit`, `review`, `request-unpublication`, `publish`, `unpublish`, `archive`, `unarchive`, `delete`, and `toggle-tag` with the current article or tag ID.
 - Preserves: the same authorization helpers and mutation handlers used by desktop table rows.
 
-- [ ] **Step 1: Write failing mobile-card contract tests**
+- [x] **Step 1: Write failing mobile-card contract tests**
 
 Require `Admin.vue` to enable Quasar grid mode when `$q.screen.width <= 720` and provide an `#item` slot using `AdminArticleCard`. Assert the card exposes title, status, author, date, tags, and every guarded lifecycle action. Assert emitted events are connected to the existing handlers and `toggleTagFilter`.
 
 Add structural checks for a two-column phone metrics grid, horizontally reachable status controls, stacked panel headings, and wrapping review actions.
 
-- [ ] **Step 2: Run focused dashboard tests and verify RED**
+- [x] **Step 2: Run focused dashboard tests and verify RED**
 
 ```bash
 rtk docker compose exec -T app node --test --test-reporter=spec tests/adminFrontend.test.js
@@ -854,11 +854,11 @@ rtk docker compose exec -T app node --test --test-reporter=spec tests/adminFront
 
 Expected: FAIL because `AdminArticleCard`, grid mode, and compact dashboard contracts do not exist.
 
-- [ ] **Step 3: Implement the mobile article card**
+- [x] **Step 3: Implement the mobile article card**
 
 Render labelled metadata and tag chips, importing the existing `can*ArticleAction` helpers rather than duplicating lifecycle logic. Every event must carry the same article object consumed by desktop handlers. Keep tag chips keyboard-operable with `aria-pressed`.
 
-- [ ] **Step 4: Connect QTable grid mode without changing desktop rows**
+- [x] **Step 4: Connect QTable grid mode without changing desktop rows**
 
 Use:
 
@@ -872,15 +872,15 @@ Use:
 
 Map card events to the existing edit, review, publication, archive, deletion, and filter methods. Desktop body-cell slots remain unchanged.
 
-- [ ] **Step 5: Compact dashboard supporting layout**
+- [x] **Step 5: Compact dashboard supporting layout**
 
 At `max-width: 720px`, use two metric columns down to 340 pixels and one below that threshold, stack panel headings, keep filter tabs internally scrollable, and make review metadata/actions wrap without clipping. Do not use document-level `overflow-x: hidden` as the primary containment fix.
 
-- [ ] **Step 6: Run focused tests and verify GREEN**
+- [x] **Step 6: Run focused tests and verify GREEN**
 
 Run the Task 14 command. Expected: all admin frontend tests pass.
 
-- [ ] **Step 7: Request authorization for the dashboard commit**
+- [x] **Step 7: Request authorization for the dashboard commit**
 
 Stop and present the exact staged scope and message:
 
@@ -901,11 +901,11 @@ fix(admin): Adds responsive article cards
 - Preserves: editor form model, Markdown insertion methods, locale switching, media handlers, validation, and terminal actions.
 - Produces: responsive toolbar groups, media controls, dialog containment, and workflow actions at `max-width: 720px`.
 
-- [ ] **Step 1: Write failing editor-layout tests**
+- [x] **Step 1: Write failing editor-layout tests**
 
 Require named `markdown-format-actions` and `markdown-mode-actions` groups, compact heading/status classes, responsive media-action classes, a bounded media dialog, and mobile workflow-action rules. Assert every existing Markdown command and Editor/Preview option remains present.
 
-- [ ] **Step 2: Run focused editor tests and verify RED**
+- [x] **Step 2: Run focused editor tests and verify RED**
 
 ```bash
 rtk docker compose exec -T app node --test --test-reporter=spec tests/adminFrontend.test.js
@@ -913,19 +913,19 @@ rtk docker compose exec -T app node --test --test-reporter=spec tests/adminFront
 
 Expected: FAIL because the responsive editor groups and containment contracts are absent.
 
-- [ ] **Step 3: Separate formatting and mode controls**
+- [x] **Step 3: Separate formatting and mode controls**
 
 Group the existing formatting buttons without changing click handlers. At 720 pixels, allow formatting controls to wrap or scroll inside their own row and place the Editor/Preview toggle on a separate full-width row. Keep visible focus and do not hide commands.
 
-- [ ] **Step 4: Adapt heading, fields, media, and workflow actions**
+- [x] **Step 4: Adapt heading, fields, media, and workflow actions**
 
 Stack the heading composition and form rows. Use two media columns at intermediate widths and one at phone widths; set buttons and file input to `min-width: 0; width: 100%`. Bound the media dialog with `max-width: calc(100vw - 24px)`, `max-height: calc(100dvh - 24px)`, and internal scrolling. Make the primary terminal action full-width with secondary actions wrapping beneath it.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run the Task 15 command. Expected: all admin frontend tests pass.
 
-- [ ] **Step 6: Request authorization for the editor commit**
+- [x] **Step 6: Request authorization for the editor commit**
 
 Stop and present the exact staged scope and message:
 
@@ -952,7 +952,7 @@ fix(admin): Improves mobile article editing
 - Consumes: Tasks 13-15.
 - Produces: reviewed responsive implementation and truthful automated/manual evidence.
 
-- [ ] **Step 1: Run all automated validation**
+- [x] **Step 1: Run all automated validation**
 
 ```bash
 rtk docker compose exec -T app npm test
@@ -965,11 +965,11 @@ rtk git diff --check
 
 Expected: every command exits 0, all test counts are recorded, and the credential scan reports no match.
 
-- [ ] **Step 2: Request focused reviews**
+- [x] **Step 2: Request focused reviews**
 
 Review shell/public containment separately from dashboard/editor behavior. Resolve every Critical and Important finding. The admin review must compare all desktop guards/actions with mobile card actions; the public review must check accessible compact navigation and content containment.
 
-- [ ] **Step 3: Perform Brave responsive smoke checks**
+- [x] **Step 3: Perform Brave responsive smoke checks**
 
 Using the existing Brave installation and no downloaded browser, inspect 320, 375, 430, 768 pixels and desktop. Cover Home, About, blog archive, an article with long content/tags, dashboard with full and empty queues, existing/new editor states, media controls, and dialogs.
 
@@ -981,11 +981,11 @@ document.documentElement.scrollWidth === document.documentElement.clientWidth
 
 Confirm all controls remain reachable, header/footer text is legible, focus is visible, desktop behavior is unchanged, and editor redirects still replace the route after successful terminal actions.
 
-- [ ] **Step 4: Update OpenSpec only from observed evidence**
+- [x] **Step 4: Update OpenSpec only from observed evidence**
 
 Add responsive requirements and tasks. Check Task 3.4 only after its automated and manual public checks pass. Check Task 6.4 only after public archive/navigation and redirect smoke evidence is complete. Keep Task 8.4 open unless tag creation/deletion and article-chip smoke checks were actually performed.
 
-- [ ] **Step 5: Request authorization for the verification documentation commit**
+- [x] **Step 5: Request authorization for the verification documentation commit**
 
 Stop and present the exact staged scope and message:
 
