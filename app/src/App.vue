@@ -1,7 +1,7 @@
 <template>
   <router-view :key="$route.path" />
 
-  <q-dialog v-model="alert" persistent full-width position="bottom" transition-hide="fade" class="text-lg">
+  <q-dialog v-if="showCookieNotice" v-model="alert" persistent full-width position="bottom" transition-hide="fade" class="text-lg">
     <q-card class="">
       <q-card-section class="">Olá! O site utiliza o Google Analytics para coletar informações sobre as visitas e interações dos usuáriosm tais como: endereço IP, localização geográfica, fonte de referência, tipo de navegador, duração da visita e páginas visitadas. Esses dados nos ajudam a entender o desempenho do site, aprimorar sua funcionalidade e fornecer uma melhor experiência para você. Ao continuar navegando, você está consentindo com a associação desses dados coletados pelo Google Analytics às informações que coletamos. </q-card-section>
 
@@ -15,6 +15,7 @@
 <script>
 import { defineComponent, ref } from "vue";
 import { createMetaMixin } from "quasar";
+import { shouldShowCookieNotice } from "./utils/cookieNotice.js";
 
 export default defineComponent({
   name: "App",
@@ -36,6 +37,11 @@ export default defineComponent({
       };
     }),
   ],
+  computed: {
+    showCookieNotice() {
+      return shouldShowCookieNotice(this.$route, this.alert);
+    },
+  },
   watch: {
     $route: {
       immediate: true,

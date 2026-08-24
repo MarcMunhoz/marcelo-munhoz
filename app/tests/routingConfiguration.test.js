@@ -5,10 +5,17 @@ import { describe, it } from "node:test";
 import contentfulRoutes from "../middleware/routes/contentful.js";
 import { scrollBehavior } from "../src/router/index.js";
 import routes from "../src/router/routes.js";
+import { shouldShowCookieNotice } from "../src/utils/cookieNotice.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("routing configuration", () => {
+  it("shows the cookie notice only on public routes while consent is pending", () => {
+    assert.equal(shouldShowCookieNotice({ meta: {} }, true), true);
+    assert.equal(shouldShowCookieNotice({ meta: { requiresAdmin: true } }, true), false);
+    assert.equal(shouldShowCookieNotice({ meta: {} }, false), false);
+  });
+
   it("keeps the routed view mounted when only the query changes", () => {
     const appSource = read("../src/App.vue");
 
