@@ -45,7 +45,7 @@
           </template>
 
           <template #body-cell-articleCount="props">
-            <q-td :props="props">{{ props.row.articleCount }}</q-td>
+            <q-td :props="props" class="tag-article-count-cell">{{ props.row.articleCount }}</q-td>
           </template>
 
           <template #body-cell-actions="props">
@@ -97,7 +97,7 @@ export default defineComponent({
         { name: "label", label: "Tag name", field: "label", align: "left", sortable: true },
         { name: "id", label: "Tag ID", field: "id", align: "left", sortable: true },
         { name: "visibility", label: "Visibility", field: "visibility", align: "center", sortable: true },
-        { name: "articleCount", label: "Articles", field: "articleCount", align: "left", sortable: true },
+        { name: "articleCount", label: "Articles", field: "articleCount", align: "center", sortable: true },
         { name: "actions", label: "Actions", field: "actions", align: "right" },
       ],
     };
@@ -285,6 +285,10 @@ export default defineComponent({
 }
 
 .tag-visibility-cell {
+  text-align: center;
+}
+
+.tag-article-count-cell {
   text-align: center;
 }
 

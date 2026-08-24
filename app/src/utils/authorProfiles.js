@@ -26,12 +26,7 @@ export const authorBiography = (author = {}) => {
   return walk(biography).trim();
 };
 
-export const authorPhotoUrl = (author = {}) => {
-  const photo = author.fields?.photo || author.fields?.avatar || author.fields?.image || author.fields?.picture || author.photo || author.avatar || author.image || author.picture || {};
-  const candidate = String((typeof photo === "string" ? photo : photo.secure_url || photo.secureUrl || photo.url || photo.fields?.file?.url) || author.photoUrl || "").trim();
-
-  return candidate.startsWith("//") ? `https:${candidate}` : candidate;
-};
+export const authorPhotoUrl = (author = {}) => authorPhotoCandidates(author)[0] || "";
 
 export const publicAuthorProfile = (author = {}) => ({
   id: author.sys?.id || author.id || "",
@@ -42,3 +37,4 @@ export const publicAuthorProfile = (author = {}) => ({
 });
 
 export const articleAuthorProfile = (article = {}) => publicAuthorProfile(article.fields?.author || article.author || {});
+import { authorPhotoCandidates } from "./authorPhotos.js";

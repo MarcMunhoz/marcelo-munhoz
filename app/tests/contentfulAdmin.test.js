@@ -257,6 +257,7 @@ describe("contentful admin handler", () => {
               fields: {
                 name: { "pt-BR": "Old Name" },
                 biography: { "pt-BR": { nodeType: "document", data: {}, content: [] } },
+                photo: { "pt-BR": { public_id: "authors/legacy", secure_url: "https://res.cloudinary.com/demo/legacy.jpg" } },
                 internalNote: { "pt-BR": "keep me" },
               },
             };
@@ -295,7 +296,177 @@ describe("contentful admin handler", () => {
     assert.equal(body.fields.biography["pt-BR"].nodeType, "document");
     assert.equal(body.fields.biography["pt-BR"].content[0].content[0].value, "Updated bio");
     assert.equal(body.fields.internalNote["pt-BR"], "keep me");
+    assert.deepEqual(body.fields.photo["pt-BR"], {
+      public_id: "authors/legacy",
+      secure_url: "https://res.cloudinary.com/demo/legacy.jpg",
+    });
     assert.doesNotMatch(calls[1].body, /app_metadata|user_metadata|email|roles/i);
+  });
+
+  it("resolves a public Gravatar slug and stores canonical photo metadata without an email", async () => {
+    const calls = [];
+    const hash = "b".repeat(64);
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method, body: options.body });
+
+      if (String(url) === "https://api.gravatar.com/v3/profiles/marcelo.munhoz") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { hash, profile_url: "https://gravatar.com/marcelo.munhoz", avatar_url: `https://gravatar.com/avatar/${hash}` };
+          },
+        };
+      }
+
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { sys: { id: "author-1", version: 11 }, fields: { name: { "pt-BR": "Marcelo" } } };
+          },
+        };
+      }
+
+      return { ok: true, status: 200, async json() { return { sys: { id: "author-1", version: 12 } }; } };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    await facade.updateAuthorProfile({
+      data: {
+        name: "Marcelo",
+        gravatarProfile: "https://gravatar.com/marcelo.munhoz/",
+        fallbackPhotoUrl: "https://res.cloudinary.com/demo/image/upload/marcelo.webp",
+        version: 11,
+      },
+      session: createSession(["writer"], { authorEntryId: "author-1" }),
+    });
+
+    const put = calls.find((call) => call.method === "PUT");
+    const photo = JSON.parse(put.body).fields.photo["pt-BR"];
+    assert.deepEqual(photo, {
+      source: "gravatar",
+      gravatar_profile: "marcelo.munhoz",
+      gravatar_hash: hash,
+      fallback_url: "https://res.cloudinary.com/demo/image/upload/marcelo.webp",
+      secure_url: `https://gravatar.com/avatar/${hash}?s=192&r=g&d=404`,
+    });
+    assert.doesNotMatch(put.body, /email|identity|user_metadata|app_metadata/i);
+  });
+
+  it("rejects email identifiers and unsafe fallback URLs without overwriting the profile", async () => {
+    let putCount = 0;
+    const fetchImpl = async (_url, options = {}) => {
+      if (options.method === "PUT") putCount += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { sys: { id: "author-1", version: 11 }, fields: {} };
+        },
+      };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+    const session = createSession(["writer"], { authorEntryId: "author-1" });
+
+    await assert.rejects(
+      () => facade.updateAuthorProfile({ data: { gravatarProfile: "writer@example.test", version: 11 }, session }),
+      /Gravatar profile/i
+    );
+    await assert.rejects(
+      () => facade.updateAuthorProfile({ data: { fallbackPhotoUrl: "https://example.test/avatar.jpg", version: 11 }, session }),
+      /fallback photo URL/i
+    );
+    assert.equal(putCount, 0);
+  });
+
+  it("bounds Gravatar profile lookup and maps transport failures to a safe provider error", async () => {
+    let gravatarSignal;
+    const fetchImpl = async (url, options = {}) => {
+      if (String(url).includes("api.gravatar.com")) {
+        gravatarSignal = options.signal;
+        throw new Error("private network diagnostic");
+      }
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { sys: { id: "author-1", version: 11 }, fields: {} };
+        },
+      };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+      gravatarTimeoutMs: 5,
+    });
+
+    await assert.rejects(
+      () =>
+        facade.updateAuthorProfile({
+          data: { gravatarProfile: "marcelo.munhoz", version: 11 },
+          session: createSession(["writer"], { authorEntryId: "author-1" }),
+        }),
+      (error) => error.statusCode === 502 && error.publicError === "Gravatar profile could not be resolved."
+    );
+    assert.equal(gravatarSignal instanceof AbortSignal, true);
+  });
+
+  it("removes the stored photo only when cleared photo settings are explicitly submitted", async () => {
+    let putBody;
+    const fetchImpl = async (_url, options = {}) => {
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              sys: { id: "author-1", version: 11 },
+              fields: {
+                name: { "pt-BR": "Marcelo" },
+                photo: { "pt-BR": "https://secure.gravatar.com/avatar/legacy" },
+              },
+            };
+          },
+        };
+      }
+      putBody = JSON.parse(options.body);
+      return { ok: true, status: 200, async json() { return { sys: { id: "author-1", version: 12 } }; } };
+    };
+    const facade = createContentfulManagementFacade({
+      env: {
+        CONTENTFUL_SPACE_ID: "space-id",
+        CONTENTFUL_MANAGEMENT_KEY: "management-token",
+        CONTENTFUL_DEFAULT_LOCALE: "pt-BR",
+      },
+      fetchImpl,
+    });
+
+    await facade.updateAuthorProfile({
+      data: { gravatarProfile: "", fallbackPhotoUrl: "", version: 11 },
+      session: createSession(["writer"], { authorEntryId: "author-1" }),
+    });
+
+    assert.equal(Object.prototype.hasOwnProperty.call(putBody.fields, "photo"), false);
   });
 
   it("rejects unauthenticated admin API requests without running an operation", async () => {

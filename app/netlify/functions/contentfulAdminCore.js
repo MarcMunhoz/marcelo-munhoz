@@ -11,6 +11,7 @@ const jsonResponse = (statusCode, payload) => ({
 const CONTENTFUL_MANAGEMENT_HOST = "https://api.contentful.com";
 const CONTENTFUL_MANAGEMENT_CONTENT_TYPE = "application/vnd.contentful.management.v1+json";
 const CLOUDINARY_API_HOST = "https://api.cloudinary.com";
+const GRAVATAR_API_HOST = "https://api.gravatar.com/v3";
 const DEFAULT_CONTENTFUL_ENVIRONMENT = "master";
 const DEFAULT_CONTENTFUL_LOCALE = "en-US";
 const DEFAULT_CLOUDINARY_FOLDER = "marcelo-munhoz-website";
@@ -169,6 +170,15 @@ export class ContentfulAuthorProfileResolutionError extends Error {
     this.name = "ContentfulAuthorProfileResolutionError";
     this.statusCode = 404;
     this.publicError = "Author profile not resolved";
+  }
+}
+
+export class GravatarProfileError extends Error {
+  constructor(message = "Gravatar profile could not be resolved.", statusCode = 400) {
+    super(message);
+    this.name = "GravatarProfileError";
+    this.statusCode = statusCode;
+    this.publicError = message;
   }
 }
 
@@ -719,6 +729,112 @@ const urlFromMediaValue = (value = {}) => {
   return candidate;
 };
 
+const GRAVATAR_HASH_PATTERN = /^[a-f0-9]{64}$/i;
+const GRAVATAR_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$/i;
+const GRAVATAR_PROFILE_HOSTS = new Set(["gravatar.com", "www.gravatar.com"]);
+const FALLBACK_PHOTO_HOSTS = new Set([
+  "en.gravatar.com",
+  "gravatar.com",
+  "images.ctfassets.net",
+  "res.cloudinary.com",
+  "secure.gravatar.com",
+  "www.gravatar.com",
+]);
+
+const normalizeGravatarProfile = (value = "") => {
+  const candidate = String(value || "").trim();
+  if (!candidate || candidate.includes("@")) return "";
+  if (GRAVATAR_HASH_PATTERN.test(candidate)) return candidate.toLowerCase();
+
+  if (/^https:\/\//i.test(candidate)) {
+    try {
+      const url = new URL(candidate);
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (url.username || url.password || !GRAVATAR_PROFILE_HOSTS.has(url.hostname.toLowerCase()) || parts.length !== 1) return "";
+      return GRAVATAR_SLUG_PATTERN.test(parts[0]) ? parts[0].toLowerCase() : "";
+    } catch {
+      return "";
+    }
+  }
+
+  return GRAVATAR_SLUG_PATTERN.test(candidate) ? candidate.toLowerCase() : "";
+};
+
+const gravatarAvatarUrl = (hash = "") => `https://gravatar.com/avatar/${hash}?s=192&r=g&d=404`;
+
+const normalizedFallbackPhotoUrl = (value = "") => {
+  const candidate = String(value || "").trim();
+  if (!candidate) return "";
+
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "https:" || url.username || url.password || !FALLBACK_PHOTO_HOSTS.has(url.hostname.toLowerCase())) {
+      throw new Error("unsafe");
+    }
+    return url.toString();
+  } catch {
+    throw new GravatarProfileError("Use an approved HTTPS fallback photo URL.");
+  }
+};
+
+const resolvedAuthorPhoto = async ({ data = {}, fetchImpl, timeoutMs = 5000 }) => {
+  const hasPhotoInput = Object.prototype.hasOwnProperty.call(data, "gravatarProfile") || Object.prototype.hasOwnProperty.call(data, "fallbackPhotoUrl");
+  if (!hasPhotoInput) return { provided: false };
+
+  const rawProfile = String(data.gravatarProfile || "").trim();
+  const profile = normalizeGravatarProfile(rawProfile);
+  const fallback = normalizedFallbackPhotoUrl(data.fallbackPhotoUrl);
+
+  if (rawProfile && !profile) {
+    throw new GravatarProfileError("Use a valid public Gravatar profile slug or URL.");
+  }
+
+  if (!profile) {
+    return {
+      provided: true,
+      photo: fallback ? { source: "fallback", fallback_url: fallback, secure_url: fallback } : null,
+    };
+  }
+
+  let hash = GRAVATAR_HASH_PATTERN.test(profile) ? profile : "";
+  if (!hash) {
+    const controller = new AbortController();
+    const boundedTimeoutMs = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0 ? Number(timeoutMs) : 5000;
+    const timeout = setTimeout(() => controller.abort(), boundedTimeoutMs);
+    let response;
+
+    try {
+      response = await fetchImpl(`${GRAVATAR_API_HOST}/profiles/${encodeURIComponent(profile)}`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+        signal: controller.signal,
+      });
+    } catch {
+      throw new GravatarProfileError("Gravatar profile could not be resolved.", 502);
+    } finally {
+      clearTimeout(timeout);
+    }
+    const payload = await readJson(response);
+
+    if (!response.ok || !GRAVATAR_HASH_PATTERN.test(payload.hash || "")) {
+      throw new GravatarProfileError(response.status === 404 ? "Gravatar profile not found." : "Gravatar profile could not be resolved.", response.status === 404 ? 400 : 502);
+    }
+
+    hash = payload.hash.toLowerCase();
+  }
+
+  return {
+    provided: true,
+    photo: {
+      source: "gravatar",
+      gravatar_profile: profile,
+      gravatar_hash: hash,
+      fallback_url: fallback,
+      secure_url: gravatarAvatarUrl(hash),
+    },
+  };
+};
+
 const normalizedAuthorProfile = (entry = {}, locale) => {
   const fields = entry.fields || {};
   const biography = firstAvailableLocalizedValue(fields, locale, ["biography", "bio", "description"]);
@@ -752,8 +868,10 @@ const publicAuthorProfileFieldsFromData = ({ data = {}, existingFields = {}, loc
     setLocalized("biography", typeof existingBiography === "object" && existingBiography?.nodeType === "document" ? richTextDocumentFromPlainText(data.biography) : data.biography);
   }
 
-  if (data.photo !== undefined) {
-    setLocalized("photo", data.photo || undefined);
+  if (data.photo === null) {
+    delete nextFields.photo;
+  } else if (data.photo !== undefined) {
+    setLocalized("photo", data.photo);
   } else if (data.photoPublicId || data.photoUrl) {
     setLocalized("photo", {
       public_id: String(data.photoPublicId || "").trim(),
@@ -1050,7 +1168,7 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
   };
 };
 
-export const createContentfulManagementFacade = ({ env = process.env, fetchImpl = globalThis.fetch, now = () => new Date().toISOString() } = {}) => {
+export const createContentfulManagementFacade = ({ env = process.env, fetchImpl = globalThis.fetch, now = () => new Date().toISOString(), gravatarTimeoutMs = 5000 } = {}) => {
   const request = async ({ method, path, body, headers = {} }) => {
     const config = managementConfigFromEnv(env, fetchImpl);
     const url = new URL(`${CONTENTFUL_MANAGEMENT_HOST}/spaces/${config.spaceId}/environments/${config.environmentId}${path}`);
@@ -1366,6 +1484,8 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       const authorEntryId = ensureSessionAuthorEntryId(authorResolution.session);
       const version = requiredVersion(data);
       const existingEntry = await request({ method: "GET", path: articlePath(authorEntryId) });
+      const photoResolution = await resolvedAuthorPhoto({ data, fetchImpl, timeoutMs: gravatarTimeoutMs });
+      const profileData = photoResolution.provided ? { ...data, photo: photoResolution.photo } : data;
 
       return request({
         method: "PUT",
@@ -1375,7 +1495,7 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
         },
         body: {
           fields: publicAuthorProfileFieldsFromData({
-            data,
+            data: profileData,
             existingFields: existingEntry.fields || {},
             locale: config.locale,
           }),

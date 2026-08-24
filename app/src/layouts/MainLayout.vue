@@ -21,7 +21,13 @@
             <q-item class="admin-account-summary">
               <q-item-section avatar>
                 <q-avatar color="blue-grey-7" text-color="white" size="34px">
-                  <img v-if="adminProfilePhotoUrl" :src="adminProfilePhotoUrl" :alt="`${adminDisplay.name} profile photo`" />
+                  <img
+                    v-if="adminProfilePhotoUrl"
+                    :src="adminProfilePhotoUrl"
+                    :alt="`${adminDisplay.name} profile photo`"
+                    referrerpolicy="no-referrer"
+                    @error="advanceAdminProfilePhoto"
+                  />
                   <template v-else>{{ adminInitials }}</template>
                 </q-avatar>
               </q-item-section>
@@ -82,6 +88,7 @@ import imageUrl from "../assets/rebellion-rebel-alliance-logo.png";
 import audioFile from "../assets/r2d2.ogg";
 import { getAuthorProfile } from "../utils/adminApi.js";
 import { adminAccountInitials, adminSessionDisplay, getAdminSession, signOutAdmin } from "../utils/adminAuth.js";
+import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
 
 export default defineComponent({
   name: "MainLayout",
@@ -90,6 +97,7 @@ export default defineComponent({
       avatar: "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c",
       adminSession: null,
       adminProfile: null,
+      adminProfilePhotoIndex: 0,
     };
   },
   computed: {
@@ -106,7 +114,7 @@ export default defineComponent({
       return adminAccountInitials(this.adminSession);
     },
     adminProfilePhotoUrl() {
-      return this.adminProfile?.photoUrl || "";
+      return authorPhotoCandidates(this.adminProfile || {})[this.adminProfilePhotoIndex] || "";
     },
   },
   async mounted() {
@@ -133,20 +141,27 @@ export default defineComponent({
       identity.on("logout", () => {
         this.adminSession = null;
         this.adminProfile = null;
+        this.adminProfilePhotoIndex = 0;
       });
     },
     async loadAdminProfile() {
       if (!this.adminSession) {
         this.adminProfile = null;
+        this.adminProfilePhotoIndex = 0;
         return;
       }
 
       try {
         const response = await getAuthorProfile({ session: this.adminSession });
         this.adminProfile = response.profile || null;
+        this.adminProfilePhotoIndex = 0;
       } catch {
         this.adminProfile = null;
+        this.adminProfilePhotoIndex = 0;
       }
+    },
+    advanceAdminProfilePhoto() {
+      this.adminProfilePhotoIndex = nextAuthorPhotoIndex(authorPhotoCandidates(this.adminProfile || {}), this.adminProfilePhotoIndex);
     },
     async signOut() {
       const signedOut = await signOutAdmin();

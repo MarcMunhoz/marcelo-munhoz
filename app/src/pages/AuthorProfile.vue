@@ -5,7 +5,13 @@
     <section v-else class="author-profile">
       <header class="author-header">
         <div class="author-photo">
-          <img v-if="author.photoUrl" :src="author.photoUrl" :alt="`${author.name} profile photo`" />
+          <img
+            v-if="authorPhotoUrl"
+            :src="authorPhotoUrl"
+            :alt="`${author.name} profile photo`"
+            referrerpolicy="no-referrer"
+            @error="advanceAuthorPhoto"
+          />
           <span v-else>{{ authorInitials }}</span>
         </div>
         <div>
@@ -43,6 +49,7 @@ import { defineComponent } from "vue";
 import { createMetaMixin } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { publicAuthorProfile } from "../utils/authorProfiles.js";
+import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
 
 const WORDS_PER_MINUTE = 220;
 const ARTICLE_PAGE_SIZE = 8;
@@ -52,6 +59,8 @@ export default defineComponent({
   data() {
     return {
       author: publicAuthorProfile(),
+      authorPhotoCandidateList: [],
+      authorPhotoIndex: 0,
       articles: [],
       articlePageSize: ARTICLE_PAGE_SIZE,
       visibleArticleCount: ARTICLE_PAGE_SIZE,
@@ -81,6 +90,9 @@ export default defineComponent({
         .join("")
         .toUpperCase();
     },
+    authorPhotoUrl() {
+      return this.authorPhotoCandidateList[this.authorPhotoIndex] || "";
+    },
     displayedArticles() {
       return this.articles.slice(0, this.visibleArticleCount);
     },
@@ -106,6 +118,9 @@ export default defineComponent({
     showLessArticles() {
       this.visibleArticleCount = this.articlePageSize;
     },
+    advanceAuthorPhoto() {
+      this.authorPhotoIndex = nextAuthorPhotoIndex(this.authorPhotoCandidateList, this.authorPhotoIndex);
+    },
     async loadAuthor() {
       this.progress = true;
 
@@ -117,12 +132,16 @@ export default defineComponent({
         }
 
         const payload = await response.json();
+        this.authorPhotoCandidateList = authorPhotoCandidates(payload.author);
+        this.authorPhotoIndex = 0;
         this.author = publicAuthorProfile(payload.author);
         this.articles = payload.articles || [];
         this.visibleArticleCount = this.articlePageSize;
       } catch (error) {
         console.error("Erro ao carregar autor:", error);
         this.author = publicAuthorProfile();
+        this.authorPhotoCandidateList = [];
+        this.authorPhotoIndex = 0;
         this.articles = [];
       } finally {
         this.progress = false;

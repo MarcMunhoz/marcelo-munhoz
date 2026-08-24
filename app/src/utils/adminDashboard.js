@@ -1,4 +1,5 @@
 import { articleLocaleFromArticle, normalizeArticleLocale } from "./articleDates.js";
+import { authorPhotoCandidates } from "./authorPhotos.js";
 
 const normalize = (value) => String(value || "").trim().toLowerCase();
 const sessionRoles = (session = {}) => (Array.isArray(session?.roles) ? session.roles : []).map(normalize);
@@ -281,32 +282,42 @@ export const createEmptyAuthorProfileForm = () => ({
   name: "",
   slug: "",
   biography: "",
+  gravatarProfile: "",
+  gravatarHash: "",
+  fallbackPhotoUrl: "",
+  photoSettingsChanged: false,
   photoUrl: "",
   photoPublicId: "",
   version: null,
 });
 
-export const authorProfileToForm = (profile = {}) => ({
-  ...createEmptyAuthorProfileForm(),
-  id: profile.id || "",
-  name: profile.name || "",
-  slug: profile.slug || "",
-  biography: profile.biography || "",
-  photoUrl: profile.photoUrl || profile.photo?.secure_url || profile.photo?.url || "",
-  photoPublicId: profile.photo?.public_id || profile.photoPublicId || "",
-  version: profile.version || null,
-});
+export const authorProfileToForm = (profile = {}) => {
+  const photo = profile.photo && typeof profile.photo === "object" ? profile.photo : {};
+
+  return {
+    ...createEmptyAuthorProfileForm(),
+    id: profile.id || "",
+    name: profile.name || "",
+    slug: profile.slug || "",
+    biography: profile.biography || "",
+    gravatarProfile: photo.gravatar_profile || photo.gravatarProfile || profile.gravatarProfile || "",
+    gravatarHash: photo.gravatar_hash || photo.gravatarHash || profile.gravatarHash || "",
+    fallbackPhotoUrl: photo.fallback_url || photo.fallbackUrl || profile.fallbackPhotoUrl || "",
+    photoSettingsChanged: false,
+    photoUrl: authorPhotoCandidates(profile)[0] || "",
+    photoPublicId: photo.public_id || profile.photoPublicId || "",
+    version: profile.version || null,
+  };
+};
 
 export const buildAuthorProfilePayload = (form = {}) => ({
   name: String(form.name || "").trim(),
   slug: String(form.slug || "").trim(),
   biography: String(form.biography || "").trim(),
-  ...(form.photoPublicId || form.photoUrl
+  ...(form.photoSettingsChanged
     ? {
-        photo: {
-          public_id: String(form.photoPublicId || "").trim(),
-          secure_url: String(form.photoUrl || "").trim(),
-        },
+        gravatarProfile: String(form.gravatarProfile || "").trim(),
+        fallbackPhotoUrl: String(form.fallbackPhotoUrl || "").trim(),
       }
     : {}),
   version: form.version,

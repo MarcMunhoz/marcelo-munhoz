@@ -203,6 +203,8 @@ describe("admin frontend writer workflow", () => {
     assert.match(netlifyConfig, /connect-src[^"]*https:\/\/identity\.netlify\.com/);
     assert.match(netlifyConfig, /frame-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
     assert.match(netlifyConfig, /img-src[^"]*https:\/\/secure\.gravatar\.com/);
+    assert.match(netlifyConfig, /img-src[^"]*https:\/\/gravatar\.com/);
+    assert.match(netlifyConfig, /img-src[^"]*https:\/\/images\.ctfassets\.net/);
   });
 
   it("provides admin API helpers for draft and workflow requests", () => {
@@ -660,6 +662,8 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /\.tag-delete-action\s+\.q-btn\s*\{[^}]*flex:\s*0 0 auto;/s);
     assert.match(page, /class="tag-visibility-cell"/);
     assert.match(page, /name:\s*"visibility"[^\n]*align:\s*"center"/);
+    assert.match(page, /name:\s*"articleCount"[^\n]*align:\s*"center"/);
+    assert.match(page, /class="tag-article-count-cell"/);
     assert.match(page, /\.tag-visibility-cell\s*\{[^}]*text-align:\s*center;/s);
     assert.doesNotMatch(page, /listAdminArticles/);
     assert.match(dashboard, /toggleTagFilter/);
@@ -874,6 +878,10 @@ describe("admin frontend writer workflow", () => {
       name: "",
       slug: "",
       biography: "",
+      gravatarProfile: "",
+      gravatarHash: "",
+      fallbackPhotoUrl: "",
+      photoSettingsChanged: false,
       photoUrl: "",
       photoPublicId: "",
       version: null,
@@ -884,7 +892,12 @@ describe("admin frontend writer workflow", () => {
         name: "Marcelo Munhoz",
         slug: "marcelo-munhoz",
         biography: "But first...",
-        photo: { public_id: "authors/marcelo", secure_url: "https://example.test/marcelo.jpg" },
+        photo: {
+          gravatar_profile: "marcelo.munhoz",
+          gravatar_hash: "a".repeat(64),
+          fallback_url: "https://res.cloudinary.com/demo/image/upload/marcelo.jpg",
+          secure_url: `https://gravatar.com/avatar/${"a".repeat(64)}?s=192&r=g&d=404`,
+        },
         version: 11,
       }),
       {
@@ -892,8 +905,12 @@ describe("admin frontend writer workflow", () => {
         name: "Marcelo Munhoz",
         slug: "marcelo-munhoz",
         biography: "But first...",
-        photoUrl: "https://example.test/marcelo.jpg",
-        photoPublicId: "authors/marcelo",
+        gravatarProfile: "marcelo.munhoz",
+        gravatarHash: "a".repeat(64),
+        fallbackPhotoUrl: "https://res.cloudinary.com/demo/image/upload/marcelo.jpg",
+        photoSettingsChanged: false,
+        photoUrl: `https://gravatar.com/avatar/${"a".repeat(64)}?s=192&r=g&d=404`,
+        photoPublicId: "",
         version: 11,
       }
     );
@@ -903,6 +920,20 @@ describe("admin frontend writer workflow", () => {
       biography: "Bio",
       version: 11,
     });
+    assert.deepEqual(
+      buildAuthorProfilePayload({
+        name: "Marcelo",
+        biography: "Bio",
+        photoUrl: "https://secure.gravatar.com/avatar/legacy",
+        photoSettingsChanged: false,
+        version: 11,
+      }),
+      { name: "Marcelo", slug: "", biography: "Bio", version: 11 }
+    );
+    assert.deepEqual(
+      buildAuthorProfilePayload({ name: "Marcelo", photoSettingsChanged: true, gravatarProfile: "", fallbackPhotoUrl: "", version: 11 }),
+      { name: "Marcelo", slug: "", biography: "", gravatarProfile: "", fallbackPhotoUrl: "", version: 11 }
+    );
   });
 
   it("derives public author slugs from names instead of exposing entry ids", () => {
@@ -1343,6 +1374,8 @@ describe("admin frontend writer workflow", () => {
   it("renders a separate author profile page backed by Contentful profile APIs", () => {
     const routes = read("../src/router/routes.js");
     const page = read("../src/pages/AdminProfile.vue");
+    const layout = read("../src/layouts/MainLayout.vue");
+    const publicProfile = read("../src/pages/AuthorProfile.vue");
 
     assert.match(routes, /path:\s*"\/admin\/profile"/);
     assert.match(routes, /pages\/AdminProfile\.vue/);
@@ -1350,7 +1383,14 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /updateAuthorProfile/);
     assert.match(page, /Netlify Identity/);
     assert.match(page, /Contentful/);
-    assert.match(page, /Profile photo URL/);
+    assert.match(page, /Gravatar profile/);
+    assert.match(page, /Fallback photo URL/);
+    assert.match(page, /512×512 px/);
+    assert.match(page, /@error="advanceProfilePhoto"/);
+    assert.match(page, /markPhotoSettingsChanged/);
+    assert.match(page, /label="Remove photo"/);
+    assert.match(layout, /@error="advanceAdminProfilePhoto"/);
+    assert.match(publicProfile, /@error="advanceAuthorPhoto"/);
     assert.match(page, /profile-photo-panel/);
     assert.match(page, /profileInitials/);
     assert.doesNotMatch(page, /label="Author slug"/);

@@ -15,6 +15,7 @@ export {
   createContentfulAdminHandler,
   createContentfulManagementFacade,
   devPreviewSessionFromHeaders,
+  GravatarProfileError,
   hasRole,
   isOwner,
   sessionFromNetlifyContext,

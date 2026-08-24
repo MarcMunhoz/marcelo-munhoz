@@ -68,11 +68,40 @@
         <aside class="profile-photo-panel">
           <p class="admin-kicker">Photo</p>
           <div class="profile-photo-preview">
-            <img v-if="profileForm.photoUrl" :src="profileForm.photoUrl" :alt="`${profileForm.name || 'Author'} profile photo`" />
+            <img
+              v-if="profilePhotoUrl"
+              :src="profilePhotoUrl"
+              :alt="`${profileForm.name || 'Author'} profile photo`"
+              referrerpolicy="no-referrer"
+              @error="advanceProfilePhoto"
+            />
             <q-avatar v-else color="blue-grey-7" text-color="white" size="96px">{{ profileInitials }}</q-avatar>
           </div>
-          <q-input v-model="profileForm.photoUrl" label="Profile photo URL" outlined dense />
-          <p>Optional. Leave empty to use the text fallback.</p>
+          <q-input
+            v-model="profileForm.gravatarProfile"
+            label="Gravatar profile"
+            hint="Public profile slug or gravatar.com profile URL. Email addresses are not accepted."
+            outlined
+            dense
+            :error="Boolean(errors.gravatarProfile)"
+            :error-message="errors.gravatarProfile"
+            @update:model-value="markPhotoSettingsChanged"
+          />
+          <q-input
+            v-model="profileForm.fallbackPhotoUrl"
+            label="Fallback photo URL"
+            hint="Optional HTTPS image from Gravatar, Cloudinary, or Contentful."
+            outlined
+            dense
+            :error="Boolean(errors.fallbackPhotoUrl)"
+            :error-message="errors.fallbackPhotoUrl"
+            @update:model-value="markPhotoSettingsChanged"
+          />
+          <q-btn flat no-caps color="negative" icon="hide_image" label="Remove photo" @click="removeProfilePhoto" />
+          <p class="profile-photo-guidance">
+            Use a centered square image. Ideal: 512×512 px; minimum: 256×256 px. Prefer JPG or WebP for photos, or PNG for transparency,
+            ideally below 500 KB.
+          </p>
         </aside>
       </section>
     </section>
@@ -85,6 +114,7 @@ import { defineComponent } from "vue";
 import { getAuthorProfile, updateAuthorProfile, adminUserMessage } from "../utils/adminApi.js";
 import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
 import { authorProfileToForm, buildAuthorProfilePayload, createEmptyAuthorProfileForm, slugFromTitle } from "../utils/adminDashboard.js";
+import { authorPhotoCandidates, isAllowedFallbackPhotoUrl, nextAuthorPhotoIndex, normalizeGravatarProfileInput } from "../utils/authorPhotos.js";
 import { marked } from "marked";
 
 export default defineComponent({
@@ -95,6 +125,7 @@ export default defineComponent({
       sessionResolved: false,
       loginRedirecting: false,
       profileForm: createEmptyAuthorProfileForm(),
+      profilePhotoIndex: 0,
       errors: {},
       profileError: "",
       feedbackMessage: "",
@@ -120,6 +151,18 @@ export default defineComponent({
     profileInitials() {
       return adminAccountInitials({ name: this.profileForm.name || this.sessionDisplay.name, roles: this.session?.roles || [] });
     },
+    profilePhotoCandidates() {
+      return authorPhotoCandidates({
+        photo: {
+          gravatar_hash: this.profileForm.gravatarHash,
+          fallback_url: this.profileForm.fallbackPhotoUrl,
+          secure_url: this.profileForm.photoUrl,
+        },
+      });
+    },
+    profilePhotoUrl() {
+      return this.profilePhotoCandidates[this.profilePhotoIndex] || "";
+    },
     feedbackClass() {
       return {
         "feedback-success": this.feedbackTone === "success",
@@ -129,6 +172,14 @@ export default defineComponent({
     },
     biographyPreview() {
       return marked.parse(this.profileForm.biography || "");
+    },
+  },
+  watch: {
+    "profileForm.gravatarProfile"() {
+      this.profilePhotoIndex = 0;
+    },
+    "profileForm.fallbackPhotoUrl"() {
+      this.profilePhotoIndex = 0;
     },
   },
   async mounted() {
@@ -177,6 +228,7 @@ export default defineComponent({
         const response = await getAuthorProfile({ session: this.session });
         this.applyResolvedSession(response.session);
         this.profileForm = authorProfileToForm(response.profile);
+        this.profilePhotoIndex = 0;
       } catch (error) {
         this.profileForm = createEmptyAuthorProfileForm();
         this.profileError = adminUserMessage(error);
@@ -209,6 +261,14 @@ export default defineComponent({
         this.profileForm.slug = slugFromTitle(this.profileForm.name);
       }
 
+      if (this.profileForm.gravatarProfile && !normalizeGravatarProfileInput(this.profileForm.gravatarProfile)) {
+        errors.gravatarProfile = "Use a public Gravatar profile slug or URL";
+      }
+
+      if (!isAllowedFallbackPhotoUrl(this.profileForm.fallbackPhotoUrl)) {
+        errors.fallbackPhotoUrl = "Use an approved HTTPS image URL";
+      }
+
       this.errors = errors;
       return Object.keys(errors).length === 0;
     },
@@ -226,6 +286,7 @@ export default defineComponent({
           session: this.session,
         });
         this.profileForm.version = response.sys?.version || this.profileForm.version;
+        await this.loadAuthorProfile();
         this.showFeedback("Author profile saved.", "success");
       } catch (error) {
         this.showFeedback(adminUserMessage(error), "error");
@@ -237,6 +298,20 @@ export default defineComponent({
       const value = String(this.profileForm.biography || "");
       const insertion = `${before}${placeholder}${after}`;
       this.profileForm.biography = value ? `${value}${value.endsWith("\n") ? "" : "\n"}${insertion}` : insertion;
+    },
+    advanceProfilePhoto() {
+      this.profilePhotoIndex = nextAuthorPhotoIndex(this.profilePhotoCandidates, this.profilePhotoIndex);
+    },
+    markPhotoSettingsChanged() {
+      this.profileForm.photoSettingsChanged = true;
+      this.profilePhotoIndex = 0;
+    },
+    removeProfilePhoto() {
+      this.profileForm.gravatarProfile = "";
+      this.profileForm.gravatarHash = "";
+      this.profileForm.fallbackPhotoUrl = "";
+      this.profileForm.photoUrl = "";
+      this.markPhotoSettingsChanged();
     },
     showFeedback(message, tone = "info") {
       this.feedbackMessage = message;
