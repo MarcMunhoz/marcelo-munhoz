@@ -77,7 +77,7 @@ The archive tag control excludes the reserved legacy language IDs `article-lang-
 
 An owner-only tag-management area lists non-reserved article tags with name, immutable Contentful ID, visibility, and article usage count. The count covers articles across editorial states and is informational; the page does not embed or duplicate the article list. Owners can create public tags using the existing creation contract. Tag renaming and bulk replacement are outside this change.
 
-Deletion is unavailable while the article count is greater than zero. For an unused tag, deletion requires two sequential confirmations: one names the tag and explains the irreversible action, and the second asks the owner to confirm certainty immediately before the request. The server recalculates usage before deletion and returns a sanitized conflict if usage changed or Contentful still reports another reference.
+Deletion is unavailable while the article count is greater than zero. For an unused tag, deletion requires two sequential confirmations: one names the tag and explains the irreversible action, and the second asks the owner to confirm certainty immediately before the request. The server checks all entry and asset references before deletion and returns a sanitized conflict if usage changed or Contentful still reports another reference.
 
 In the article table, clicking a tag chip applies that tag to the existing tag filter and preserves all other active filters. The selected chip uses inverse foreground/background colors. Clicking the active tag chip again clears only the tag filter.
 

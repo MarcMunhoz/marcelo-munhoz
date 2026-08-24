@@ -51,7 +51,7 @@ Alternative considered: use `router.push('/admin')` or redirect before the respo
 
 The admin provides an owner-only tag-management area that lists each non-reserved article tag with its stable Contentful ID, visibility, and article usage count. Counts include editable articles across editorial states but do not expand the management area into an article browser. Existing tag creation remains available; renaming and bulk replacement are out of scope.
 
-Deletion is available only when the displayed article count is zero. It requires two sequential confirmations: the first identifies the tag and irreversible action, and the second asks the owner to confirm certainty immediately before the request. The server revalidates usage and maps any Contentful refusal to a safe conflict response, preventing stale counts or non-article references from producing an unsafe success state.
+Deletion is available only when the displayed article count is zero. It requires two sequential confirmations: the first identifies the tag and irreversible action, and the second asks the owner to confirm certainty immediately before the request. The server revalidates global entry and asset references and maps any Contentful refusal to a safe conflict response, preventing stale counts or non-article references from producing an unsafe success state.
 
 In the existing article table, activating a tag chip applies that value to the current tag filter without clearing unrelated filters. The active tag uses the inverse chip colors shown by other selected admin actions; activating it again clears the tag filter.
 

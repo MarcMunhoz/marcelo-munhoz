@@ -612,6 +612,7 @@ Report the working-tree state, verification evidence, and remaining staging chec
 ### Task 9: Owner Tag Management API
 
 **Files:**
+- Modify: `app/middleware/contentfulAdmin.js`
 - Modify: `app/netlify/functions/contentfulAdminCore.js`
 - Modify: `app/src/utils/adminApi.js`
 - Test: `app/tests/contentfulManagementFacade.test.js`
@@ -619,8 +620,8 @@ Report the working-tree state, verification evidence, and remaining staging chec
 - Test: `app/tests/adminFrontend.test.js`
 
 **Interfaces:**
-- Produces: `listTags()` returning `{ tags: Array<{ id, label, visibility, articleCount }> }`.
-- Produces: `deleteTag({ tagId })` through `DELETE /api/admin/contentful/tags/:tagId`.
+- Produces: owner-only `listManagedTags()` through `GET /api/admin/contentful/tags/manage`, returning `{ tags: Array<{ id, label, visibility, articleCount }> }`.
+- Produces: owner-only `deleteTag({ tagId })` through `DELETE /api/admin/contentful/tags/:tagId`.
 - Preserves: existing `GET /tags`, `POST /tags`, article mutations, and sanitized admin errors.
 
 - [ ] **Step 1: Write failing usage-count and reserved-tag tests**
@@ -647,7 +648,7 @@ Expected: FAIL because usage counts, owner-only delete routing, and the frontend
 
 - [ ] **Step 4: Implement bounded counting and safe deletion**
 
-Traverse article metadata with explicit Contentful page limits, count tag IDs across editorial states, and fail closed if the bounded collection cannot be proven complete. Before deletion, recompute the selected tag count; delete only at zero and translate upstream reference/version conflicts without returning raw diagnostics.
+Traverse article metadata with explicit Contentful page limits, count tag IDs across editorial states, and fail closed if the bounded collection cannot be proven complete. Before deletion, query all entries and assets for the selected tag with explicit one-item bounds; delete only when both totals are zero and translate upstream reference/version conflicts without returning raw diagnostics.
 
 - [ ] **Step 5: Add the authenticated frontend helper**
 
@@ -664,14 +665,14 @@ Run the Task 9 command. Expected: all pass.
 - Modify: `app/src/pages/AdminArticleEditor.vue`
 - Modify: `app/src/router/routes.js`
 - Create: `app/src/pages/AdminTags.vue`
-- Modify: `app/src/utils/adminDashboard.js`
+- Create: `app/src/utils/adminTags.js`
 - Test: `app/tests/adminFrontend.test.js`
 - Test: `app/tests/routingConfiguration.test.js`
 - Test: `app/tests/blogFrontend.test.js`
 
 **Interfaces:**
 - Consumes: Task 9 tag list, create, and delete contracts.
-- Produces: owner-only `/admin/tags` UI and `toggleArticleTagFilter(current, selected)` behavior.
+- Produces: owner-only `/admin/tags` UI and `toggleArticleTagFilter(filters, selected)` behavior.
 - Preserves: all non-tag article filters and the existing article editor tag workflow.
 
 - [ ] **Step 1: Write failing UI and route tests**
@@ -681,9 +682,8 @@ Assert the owner navigation exposes tag management, writers cannot enter it, eac
 - [ ] **Step 2: Write failing article-chip toggle tests**
 
 ```js
-assert.equal(toggleArticleTagFilter("", "ai"), "ai");
-assert.equal(toggleArticleTagFilter("ai", "ai"), "");
-assert.equal(toggleArticleTagFilter("career", "ai"), "ai");
+assert.deepEqual(toggleArticleTagFilter({ search: "cloud", tag: "" }, "ai"), { search: "cloud", tag: "ai" });
+assert.deepEqual(toggleArticleTagFilter({ search: "cloud", tag: "ai" }, "ai"), { search: "cloud", tag: "" });
 ```
 
 Assert the selected tag chip uses the inverse style and other filter-model values remain unchanged.

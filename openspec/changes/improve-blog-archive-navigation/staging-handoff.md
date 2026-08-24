@@ -11,13 +11,17 @@ This handoff records verified local behavior and the checks that remain pending.
 - Article navigation exposes minimal previous and next links in global editorial chronology, using `fields.createAt` with `sys.createdAt` as fallback and tie-breaker.
 - Legacy `/blog/tags/:tag` routes redirect to `/blog?tag=...`.
 - Successful terminal editor actions replace the editor route with `/admin`; rejected actions remain in the editor.
+- Owners can list, create, and delete editorial tags from a dedicated admin area. The list shows article usage counts without embedding article results, hides reserved language tags, and requires two confirmations before deleting an unused tag.
+- Tag deletion revalidates references across all entry content types and assets with strict bounded responses before issuing a versioned delete; uncertain, stale, or conflicting provider state fails closed.
+- Article-table tag chips toggle the existing tag filter, preserve unrelated filters, and expose selected state visually and accessibly.
 
 ## Local Automated Verification
 
 - `rtk docker compose exec -T app node --test --test-reporter=spec tests/blogNavigationRoundTrip.test.js`: 1 test passed in 1 suite; 0 failed.
-- `rtk docker compose exec -T app node --test --test-reporter=spec`: 259 tests passed in 15 suites; 0 failed, cancelled, skipped, or pending.
+- `rtk docker compose exec -T app node --test --test-reporter=spec tests/contentfulManagementFacade.test.js tests/adminFrontend.test.js`: 98 focused tests passed in 2 suites; 0 failed.
+- `rtk docker compose exec -T app npm test`: 274 tests passed in 15 suites; 0 failed, cancelled, skipped, or pending.
 - `rtk docker compose exec -T app npm run lint`: exited successfully with no lint diagnostics.
-- `rtk docker compose exec -T app npm run build`: production SPA build succeeded; the summary contained 34 JavaScript and 8 CSS assets.
+- `rtk docker compose exec -T app npm run build`: production SPA build succeeded; the summary contained 39 JavaScript and 9 CSS assets.
 - `rtk docker compose exec -T app npm run scan:build-credentials`: exited successfully and reported no credential pattern.
 - `rtk openspec validate improve-blog-archive-navigation --strict`: the active change is valid.
 - Strict per-spec validation succeeded for all three main specs.
@@ -34,6 +38,9 @@ The backend Node process was restarted independently without recreating Compose 
 - Confirm archive return behavior from an article and the direct-article `/blog` fallback.
 - Confirm oldest and newest article boundaries expose only the available chronological direction.
 - Confirm successful terminal admin actions return to `/admin` and failed actions retain editor state.
+- As an owner, create an editorial tag, confirm its list metadata and zero count, cancel each deletion confirmation independently, then accept both confirmations and confirm the row refreshes away.
+- Confirm a tag assigned to an article cannot be deleted, displays actionable guidance, and becomes deletable only after its references are removed; repeat with any non-article or asset reference available for safe testing.
+- As a writer, confirm `/admin/tags` returns to `/admin`; as an owner, click and keyboard-toggle article tag chips and confirm only the tag filter changes.
 - Deploy the intended branch and repeat public index, search, filters, history, clean article URL, chronological navigation, legacy tag redirect, and terminal admin redirect checks in staging.
 
 The responsive checklist item and staging verification item remain open until these checks are performed against the appropriate runtime.

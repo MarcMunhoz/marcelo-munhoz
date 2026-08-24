@@ -86,7 +86,7 @@ The system SHALL let the owner review and manage Contentful article tags from th
 #### Scenario: Owner deletes an unused tag
 - **WHEN** the owner requests deletion of a tag with zero article usage
 - **THEN** the interface presents two sequential confirmations before sending the deletion request
-- **AND** the server revalidates usage before deleting the Contentful tag
+- **AND** the server rejects remaining references from any entry or asset before deleting the Contentful tag
 
 #### Scenario: Tag deletion conflicts with current Contentful state
 - **WHEN** usage changes after the displayed count or Contentful rejects deletion because a reference remains
