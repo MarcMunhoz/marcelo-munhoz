@@ -668,6 +668,197 @@ describe("contentful management facade", () => {
     assert.equal(new URL(calls[0].url).searchParams.get("limit"), "1000");
   });
 
+  it("lists manageable tags with bounded article usage counts and excludes reserved language tags", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (url.toString().includes("/tags?")) {
+          return createResponse(200, {
+            total: 3,
+            skip: 0,
+            limit: 1000,
+            items: [
+              { name: "AI", sys: { id: "ai", visibility: "public" } },
+              { name: "Career", sys: { id: "career", visibility: "public" } },
+              { name: "Article language: Portuguese", sys: { id: "article-lang-pt-br", visibility: "public" } },
+            ],
+          });
+        }
+
+        return createResponse(200, {
+          total: 4,
+          skip: 0,
+          limit: 1000,
+          items: [
+            { sys: { id: "published", contentType: { sys: { id: "article" } } }, metadata: { tags: [{ sys: { id: "ai" } }] } },
+            { sys: { id: "draft", contentType: { sys: { id: "article" } } }, metadata: { tags: [{ sys: { id: "ai" } }] } },
+            { sys: { id: "changed", contentType: { sys: { id: "article" } } }, metadata: { tags: [{ sys: { id: "career" } }] } },
+            { sys: { id: "archived", contentType: { sys: { id: "article" } } }, metadata: { tags: [{ sys: { id: "article-lang-pt-br" } }] } },
+          ],
+        });
+      },
+    });
+
+    const result = await facade.listManagedTags();
+
+    assert.deepEqual(result, {
+      tags: [
+        { id: "ai", label: "AI", visibility: "public", articleCount: 2 },
+        { id: "career", label: "Career", visibility: "public", articleCount: 1 },
+      ],
+    });
+    const entriesUrl = new URL(calls[1].url);
+    assert.equal(entriesUrl.searchParams.get("content_type"), "article");
+    assert.equal(entriesUrl.searchParams.get("limit"), "1000");
+    assert.equal(entriesUrl.searchParams.get("skip"), "0");
+  });
+
+  it("fails closed when the manageable tag collection is incomplete", async () => {
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url) {
+        if (url.toString().includes("/tags?")) {
+          return createResponse(200, {
+            total: 2,
+            skip: 0,
+            limit: 1000,
+            items: [{ name: "AI", sys: { id: "ai", visibility: "public" } }],
+          });
+        }
+
+        return createResponse(200, { total: 0, skip: 0, limit: 1000, items: [] });
+      },
+    });
+
+    await assert.rejects(() => facade.listManagedTags(), /Tag usage could not be verified/);
+  });
+
+  it("refuses to delete a tag when bounded revalidation finds any entry type", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        return createResponse(200, {
+          total: 1,
+          skip: 0,
+          limit: 1,
+          items: [{ sys: { id: "page-1", contentType: { sys: { id: "page" } } } }],
+        });
+      },
+    });
+
+    await assert.rejects(() => facade.deleteTag({ tagId: "ai" }), /Remove this tag from all content before deleting it/);
+    assert.equal(calls.length, 1);
+    assert.equal(new URL(calls[0].url).searchParams.get("metadata.tags.sys.id[all]"), "ai");
+    assert.equal(new URL(calls[0].url).searchParams.has("content_type"), false);
+  });
+
+  it("refuses to delete a zero-article tag that is still assigned to an asset", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+        const pathname = new URL(url).pathname;
+
+        if (pathname.endsWith("/entries")) {
+          return createResponse(200, { total: 0, skip: 0, limit: 1, items: [] });
+        }
+
+        return createResponse(200, { total: 1, skip: 0, limit: 1, items: [{ sys: { id: "asset-1" } }] });
+      },
+    });
+
+    await assert.rejects(() => facade.deleteTag({ tagId: "ai" }), /Remove this tag from all content before deleting it/);
+    assert.equal(calls.length, 2);
+    assert.equal(new URL(calls[1].url).pathname.endsWith("/assets"), true);
+  });
+
+  it("fails closed when a tag reference check returns an incomplete page", async () => {
+    let call = 0;
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        call += 1;
+        if (call === 1) return createResponse(200, { total: 0, skip: 0, limit: 1, items: [] });
+        if (call === 2) return createResponse(200, { total: 0, skip: 1, limit: 1, items: [] });
+        if (call === 3) return createResponse(200, { name: "AI", sys: { id: "ai", version: 7, visibility: "public" } });
+        return createResponse(204);
+      },
+    });
+
+    await assert.rejects(() => facade.deleteTag({ tagId: "ai" }), /Tag usage could not be verified/);
+    assert.equal(call, 2);
+  });
+
+  it("rejects coerced or inconsistent zero-use responses before deleting", async () => {
+    for (const malformed of [
+      { total: null, skip: null, limit: 1, items: [] },
+      { total: "0", skip: "0", limit: 1, items: [] },
+      { total: 0, skip: 0, limit: 1, items: [{ sys: { id: "unexpected" } }] },
+    ]) {
+      let call = 0;
+      const facade = createContentfulManagementFacade({
+        env: createEnv(),
+        async fetchImpl() {
+          call += 1;
+          if (call === 1) return createResponse(200, malformed);
+          if (call === 2) return createResponse(200, { total: 0, skip: 0, limit: 1, items: [] });
+          if (call === 3) return createResponse(200, { name: "AI", sys: { id: "ai", version: 7, visibility: "public" } });
+          return createResponse(204);
+        },
+      });
+
+      await assert.rejects(() => facade.deleteTag({ tagId: "ai" }), /Tag usage could not be verified/);
+      assert.equal(call, 1);
+    }
+  });
+
+  it("deletes a zero-use tag with its current Contentful version", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (url.toString().includes("/entries?") || url.toString().includes("/assets?")) {
+          return createResponse(200, { total: 0, skip: 0, limit: 1, items: [] });
+        }
+
+        if (options.method === "GET") {
+          return createResponse(200, { name: "AI", sys: { id: "ai", version: 7, visibility: "public" } });
+        }
+
+        return createResponse(204);
+      },
+    });
+
+    const result = await facade.deleteTag({ tagId: "ai" });
+
+    assert.deepEqual(result, { deletedTagId: "ai" });
+    assert.equal(calls[3].options.method, "DELETE");
+    assert.equal(calls[3].options.headers["x-contentful-version"], 7);
+  });
+
+  it("sanitizes a provider conflict while deleting a zero-article tag", async () => {
+    let call = 0;
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        call += 1;
+        if (call <= 2) return createResponse(200, { total: 0, skip: 0, limit: 1, items: [] });
+        if (call === 3) return createResponse(200, { name: "AI", sys: { id: "ai", version: 7, visibility: "public" } });
+        return createResponse(400, { message: "Tag has links to private assets", sys: { id: "InvalidEntry" } });
+      },
+    });
+
+    await assert.rejects(() => facade.deleteTag({ tagId: "ai" }), /Remove this tag from all content before deleting it/);
+  });
+
   it("creates public Contentful metadata tags with normalized tag ids", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({

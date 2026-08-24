@@ -143,11 +143,26 @@ export const listContentfulTags = ({ session, fetchImpl } = {}) =>
     fetchImpl,
   });
 
+export const listManagedContentfulTags = ({ session, fetchImpl } = {}) =>
+  adminRequest({
+    path: "/tags/manage",
+    session,
+    fetchImpl,
+  });
+
 export const createContentfulTag = ({ name, session, fetchImpl } = {}) =>
   adminRequest({
     path: "/tags",
     method: "POST",
     body: { name },
+    session,
+    fetchImpl,
+  });
+
+export const deleteContentfulTag = ({ tagId, session, fetchImpl } = {}) =>
+  adminRequest({
+    path: `/tags/${encodeURIComponent(tagId)}`,
+    method: "DELETE",
     session,
     fetchImpl,
   });

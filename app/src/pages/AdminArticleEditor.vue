@@ -341,6 +341,7 @@ import {
   slugFromTitle,
 } from "../utils/adminDashboard.js";
 import { getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
+import { normalizeEditorialTagOptions } from "../utils/adminTags.js";
 import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
 import { marked } from "marked";
 
@@ -551,12 +552,7 @@ export default defineComponent({
       }
     },
     normalizeTagOptions(tags = []) {
-      return (Array.isArray(tags) ? tags : [])
-        .map((tag) => ({
-          id: String(tag.id || "").trim(),
-          label: String(tag.label || tag.id || "").trim(),
-        }))
-        .filter((tag) => tag.id);
+      return normalizeEditorialTagOptions(tags);
     },
     async loadContentfulTags() {
       this.tagsLoading = true;

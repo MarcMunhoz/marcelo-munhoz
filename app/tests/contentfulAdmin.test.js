@@ -423,6 +423,8 @@ describe("contentful admin handler", () => {
       ["POST", "/articles/article-1/archive", "archiveArticle"],
       ["POST", "/articles/article-1/unarchive", "unarchiveArticle"],
       ["DELETE", "/articles/article-1", "deleteArticle"],
+      ["GET", "/tags/manage", "listManagedTags"],
+      ["DELETE", "/tags/ai", "deleteTag"],
     ]) {
       let operationRan = false;
       const handler = createContentfulAdminHandler({
@@ -507,6 +509,30 @@ describe("contentful admin handler", () => {
       assert.equal(response.statusCode, 200);
       assert.deepEqual(parse(response), { articleId: "article-1", approvedBy: "user-123", operationName });
     }
+  });
+
+  it("allows owners to list managed tags and delete a selected tag", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession() {
+        return createSession(["owner"]);
+      },
+      operations: {
+        async listManagedTags({ session }) {
+          return { tags: [{ id: "ai", articleCount: 0 }], requestedBy: session.subject };
+        },
+        async deleteTag({ tagId, session }) {
+          return { deletedTagId: tagId, requestedBy: session.subject };
+        },
+      },
+    });
+
+    const listResponse = await handler({ method: "GET", path: "/tags/manage" });
+    const deleteResponse = await handler({ method: "DELETE", path: "/tags/ai" });
+
+    assert.equal(listResponse.statusCode, 200);
+    assert.deepEqual(parse(listResponse), { tags: [{ id: "ai", articleCount: 0 }], requestedBy: "user-123" });
+    assert.equal(deleteResponse.statusCode, 200);
+    assert.deepEqual(parse(deleteResponse), { deletedTagId: "ai", requestedBy: "user-123" });
   });
 
   it("loads admin article dashboard data through Contentful Management reads", async () => {

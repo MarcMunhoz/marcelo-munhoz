@@ -50,6 +50,15 @@ describe("routing configuration", () => {
     });
   });
 
+  it("registers the owner tag-management route", () => {
+    const mainLayout = routes.find((route) => route.path === "/");
+    const tagManagementRoute = mainLayout.children.find((route) => route.path === "/admin/tags");
+
+    assert.ok(tagManagementRoute);
+    assert.equal(tagManagementRoute.meta.requiresAdmin, true);
+    assert.equal(tagManagementRoute.meta.requiresOwner, true);
+  });
+
   it("routes Contentful API requests before the SPA fallback", () => {
     const netlifyToml = read("../netlify.toml");
     const apiRedirect = netlifyToml.indexOf('from = "/api/contentful/*"');

@@ -9,6 +9,7 @@
           </div>
 
           <div class="admin-topbar-actions">
+            <q-btn v-if="isOwner" outline no-caps color="blue-grey-8" icon="sell" label="Tags" to="/admin/tags" />
             <q-input v-model="filters.search" dense outlined clearable debounce="150" placeholder="Search articles" class="admin-search">
               <template #prepend>
                 <q-icon name="search" />
@@ -102,7 +103,23 @@
                 <template #body-cell-tags="props">
                   <q-td :props="props">
                     <span class="tag-list">
-                      <q-badge v-for="tag in props.row.displayTags" :key="tag.id" outline color="blue-grey-7">{{ tag.label }}</q-badge>
+                      <q-badge
+                        v-for="tag in props.row.displayTags"
+                        :key="tag.id"
+                        class="tag-filter-chip"
+                        :class="{ 'tag-filter-chip--selected': filters.tag === tag.id }"
+                        :outline="filters.tag !== tag.id"
+                        color="blue-grey-7"
+                        role="button"
+                        tabindex="0"
+                        :aria-pressed="filters.tag === tag.id"
+                        @click="toggleTagFilter(tag.id)"
+                        @keyup.enter="toggleTagFilter(tag.id)"
+                        @keydown.space.prevent
+                        @keyup.space.prevent="toggleTagFilter(tag.id)"
+                      >
+                        {{ tag.label }}
+                      </q-badge>
                     </span>
                   </q-td>
                 </template>
@@ -241,6 +258,7 @@ import {
   summarizeArticleStatuses,
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
+import { toggleArticleTagFilter } from "../utils/adminTags.js";
 import { getAdminSession, isOwnerSession, isWriterSession, openAdminLogin, signOutAdmin } from "../utils/adminAuth.js";
 
 export default defineComponent({
@@ -391,6 +409,9 @@ export default defineComponent({
     setStatusFilter(status) {
       this.filters.status = this.filters.status === status ? "" : status || "";
       this.activeSection = "dashboard";
+    },
+    toggleTagFilter(tagId) {
+      this.filters = toggleArticleTagFilter(this.filters, tagId);
     },
     openEditorForNewArticle() {
       this.$router.push("/admin/articles/new");
@@ -785,6 +806,19 @@ export default defineComponent({
   flex-wrap: wrap;
   font-size: 0.86rem;
   gap: 6px;
+}
+
+.tag-filter-chip {
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid #263238;
+    outline-offset: 2px;
+  }
+}
+
+.tag-filter-chip--selected {
+  color: #ffffff;
 }
 
 .status-cell {

@@ -9,8 +9,10 @@ import {
   getAuthorProfile,
   createArticleDraft,
   createContentfulTag,
+  deleteContentfulTag,
   deleteArticle,
   listContentfulTags,
+  listManagedContentfulTags,
   listAdminArticles,
   publishArticle,
   requestArticleUnpublication,
@@ -52,6 +54,12 @@ import {
   updateArticleStatusById,
 } from "../src/utils/adminDashboard.js";
 import { buildMediaEditorOptions, normalizeMediaEditorExport, openCloudinaryMediaEditor } from "../src/utils/cloudinaryMediaEditor.js";
+import {
+  canDeleteManagedTag,
+  normalizeEditorialTagOptions,
+  runDoubleConfirmedTagDeletion,
+  toggleArticleTagFilter,
+} from "../src/utils/adminTags.js";
 import { publicAuthorProfile } from "../src/utils/authorProfiles.js";
 import { articleBylineLabels, publicArticleDates } from "../src/utils/articleDates.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
@@ -265,6 +273,35 @@ describe("admin frontend writer workflow", () => {
     assert.equal(calls[0].url, "/api/admin/contentful/tags");
     assert.equal(calls[0].options.method, "POST");
     assert.deepEqual(JSON.parse(calls[0].options.body), { name: "Teste Kurumin" });
+  });
+
+  it("lists managed tags and deletes an unused tag through owner endpoints", async () => {
+    const calls = [];
+    const responses = [
+      { tags: [{ id: "ai", label: "AI", visibility: "public", articleCount: 0 }] },
+      { deletedTagId: "ai" },
+    ];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return responses.shift();
+        },
+      };
+    };
+    const session = { token: "owner-token" };
+
+    const listed = await listManagedContentfulTags({ session, fetchImpl });
+    const deleted = await deleteContentfulTag({ tagId: "ai", session, fetchImpl });
+
+    assert.equal(listed.tags[0].articleCount, 0);
+    assert.deepEqual(deleted, { deletedTagId: "ai" });
+    assert.equal(calls[0].url, "/api/admin/contentful/tags/manage");
+    assert.equal(calls[0].options.method, "GET");
+    assert.equal(calls[1].url, "/api/admin/contentful/tags/ai");
+    assert.equal(calls[1].options.method, "DELETE");
   });
 
   it("calls owner lifecycle endpoints with version state and server authorization", async () => {
@@ -535,6 +572,90 @@ describe("admin frontend writer workflow", () => {
     });
 
     assert.deepEqual(filtered, [rows[0]]);
+  });
+
+  it("toggles an article tag filter without changing unrelated filters", () => {
+    const filters = { search: "cloud", status: "published", tag: "career", date: "2026-08-11", author: "Marcelo" };
+
+    assert.deepEqual(toggleArticleTagFilter(filters, "ai"), { ...filters, tag: "ai" });
+    assert.deepEqual(toggleArticleTagFilter({ ...filters, tag: "ai" }, "ai"), { ...filters, tag: "" });
+  });
+
+  it("removes reserved language tags from administrative tag choices", () => {
+    assert.deepEqual(
+      normalizeEditorialTagOptions([
+        { id: "ai", label: "AI" },
+        { id: "article-lang-pt-br", label: "Article language: Portuguese" },
+        { id: "article-lang-en-us", label: "Article language: English" },
+      ]),
+      [{ id: "ai", label: "AI" }]
+    );
+  });
+
+  it("requires zero usage and two accepted confirmations before deleting a tag", async () => {
+    const events = [];
+    const tag = { id: "ai", label: "AI", articleCount: 0 };
+
+    assert.equal(canDeleteManagedTag({ ...tag, articleCount: 1 }), false);
+    assert.equal(
+      await runDoubleConfirmedTagDeletion({
+        tag,
+        confirm: async (stage) => {
+          events.push(`confirm:${stage}`);
+          return false;
+        },
+        remove: async () => events.push("remove"),
+      }),
+      false
+    );
+    assert.deepEqual(events, ["confirm:warning"]);
+
+    events.length = 0;
+    assert.equal(
+      await runDoubleConfirmedTagDeletion({
+        tag,
+        confirm: async (stage) => {
+          events.push(`confirm:${stage}`);
+          return stage === "warning";
+        },
+        remove: async () => events.push("remove"),
+      }),
+      false
+    );
+    assert.deepEqual(events, ["confirm:warning", "confirm:certainty"]);
+
+    events.length = 0;
+    assert.equal(
+      await runDoubleConfirmedTagDeletion({
+        tag,
+        confirm: async (stage) => {
+          events.push(`confirm:${stage}`);
+          return true;
+        },
+        remove: async () => events.push("remove"),
+      }),
+      true
+    );
+    assert.deepEqual(events, ["confirm:warning", "confirm:certainty", "remove"]);
+  });
+
+  it("renders owner tag management without embedding article results", () => {
+    const page = read("../src/pages/AdminTags.vue");
+    const dashboard = read("../src/pages/Admin.vue");
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+
+    assert.match(page, /Tag management/);
+    assert.match(page, /articleCount/);
+    assert.match(page, /runDoubleConfirmedTagDeletion/);
+    assert.match(page, /isOwnerSession/);
+    assert.match(page, /v-if="props\.row\.articleCount > 0" class="tag-delete-guidance"/);
+    assert.match(page, /Remove this tag from matching articles first/);
+    assert.doesNotMatch(page, /listAdminArticles/);
+    assert.match(dashboard, /toggleTagFilter/);
+    assert.match(dashboard, /filters\.tag === tag\.id/);
+    assert.match(dashboard, /:aria-pressed="filters\.tag === tag\.id"/);
+    assert.match(dashboard, /@keydown\.space\.prevent/);
+    assert.match(editor, /normalizeEditorialTagOptions/);
   });
 
   it("builds owner review queues for publication and unpublication requests", () => {

@@ -44,6 +44,7 @@ const blogComponent = ({ fetchImpl = async () => ({ ok: true, json: async () => 
     clearTimeout: clearTimeoutImpl,
     console: { error() {} },
     fetch: fetchImpl,
+    isArticleLanguageTag,
     setTimeout,
   };
 
@@ -693,7 +694,12 @@ describe("public blog frontend", () => {
     const component = blogComponent({
       fetchImpl: async () => ({
         ok: true,
-        json: async () => ({ items: [{ name: "Architecture", sys: { id: "architecture" } }] }),
+        json: async () => ({
+          items: [
+            { name: "Architecture", sys: { id: "architecture" } },
+            { name: "Article language: Portuguese", sys: { id: "article-lang-pt-br" } },
+          ],
+        }),
       }),
     });
     const context = { tagsLoading: false, tagOptions: [] };

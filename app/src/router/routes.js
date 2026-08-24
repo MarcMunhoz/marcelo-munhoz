@@ -66,6 +66,16 @@ const routes = [
           requiresAdmin: true,
         },
       },
+      {
+        path: "/admin/tags",
+        name: "Admin Tags",
+        component: () => import("pages/AdminTags.vue"),
+        meta: {
+          title: "Tag management",
+          requiresAdmin: true,
+          requiresOwner: true,
+        },
+      },
     ],
   },
   {

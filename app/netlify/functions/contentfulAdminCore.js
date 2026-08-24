@@ -145,6 +145,24 @@ export class ContentfulAdminLifecycleError extends Error {
   }
 }
 
+export class ContentfulTagConflictError extends Error {
+  constructor() {
+    super("Remove this tag from all content before deleting it.");
+    this.name = "ContentfulTagConflictError";
+    this.statusCode = 409;
+    this.publicError = "Remove this tag from all content before deleting it.";
+  }
+}
+
+export class ContentfulTagUsageUnavailableError extends Error {
+  constructor() {
+    super("Tag usage could not be verified.");
+    this.name = "ContentfulTagUsageUnavailableError";
+    this.statusCode = 502;
+    this.publicError = "Tag usage could not be verified.";
+  }
+}
+
 export class ContentfulAuthorProfileResolutionError extends Error {
   constructor() {
     super("Author profile could not be resolved for the authenticated user");
@@ -228,6 +246,63 @@ const normalizedTagIds = (tags = []) =>
 const tagsFromIds = (tags = []) => normalizedTagIds(tags).map((id) => contentfulLink("Tag", id));
 
 const isArticleLanguageTag = (tagId = "") => ["article-lang-en-us", "article-lang-pt-br"].includes(tagId);
+
+const TAG_USAGE_LIMIT = 1000;
+
+const completeBoundedItems = (payload = {}, { limit = TAG_USAGE_LIMIT } = {}) => {
+  const total = payload.total;
+  const skip = payload.skip;
+  const items = payload.items;
+
+  if (
+    typeof total !== "number" ||
+    !Number.isInteger(total) ||
+    total < 0 ||
+    total > limit ||
+    typeof skip !== "number" ||
+    !Number.isInteger(skip) ||
+    skip !== 0 ||
+    !Array.isArray(items) ||
+    items.length !== total
+  ) {
+    throw new ContentfulTagUsageUnavailableError();
+  }
+
+  return items;
+};
+
+const boundedUsageTotal = (payload = {}, { limit = 1 } = {}) => {
+  const total = payload.total;
+  const skip = payload.skip;
+  const items = payload.items;
+
+  if (
+    typeof total !== "number" ||
+    !Number.isInteger(total) ||
+    total < 0 ||
+    typeof skip !== "number" ||
+    !Number.isInteger(skip) ||
+    skip !== 0 ||
+    !Array.isArray(items) ||
+    items.length !== Math.min(total, limit)
+  ) {
+    throw new ContentfulTagUsageUnavailableError();
+  }
+
+  return total;
+};
+
+const articleTagCounts = (entries = []) => {
+  const counts = new Map();
+
+  for (const entry of entries) {
+    for (const tagId of allNormalizedTags(entry.metadata)) {
+      counts.set(tagId, (counts.get(tagId) || 0) + 1);
+    }
+  }
+
+  return counts;
+};
 
 const existingTagIds = async ({ request }) => {
   const payload = await request({ method: "GET", path: "/tags?limit=1000" });
@@ -1104,7 +1179,25 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       const payload = await request({ method: "GET", path: "/tags?limit=1000" });
 
       return {
-        tags: (payload.items || []).map(normalizedContentfulTag).filter((tag) => tag.id),
+        tags: (payload.items || []).map(normalizedContentfulTag).filter((tag) => tag.id && !isArticleLanguageTag(tag.id)),
+      };
+    },
+    async listManagedTags() {
+      const tagsPayload = await request({ method: "GET", path: "/tags?limit=1000" });
+      const tags = completeBoundedItems(tagsPayload);
+      const params = new URLSearchParams({
+        content_type: "article",
+        limit: String(TAG_USAGE_LIMIT),
+        skip: "0",
+      });
+      const entriesPayload = await request({ method: "GET", path: `/entries?${params}` });
+      const counts = articleTagCounts(completeBoundedItems(entriesPayload));
+
+      return {
+        tags: tags
+          .map(normalizedContentfulTag)
+          .filter((tag) => tag.id && !isArticleLanguageTag(tag.id))
+          .map((tag) => ({ ...tag, articleCount: counts.get(tag.id) || 0 })),
       };
     },
     async createTag({ data = {} } = {}) {
@@ -1134,6 +1227,49 @@ export const createContentfulManagementFacade = ({ env = process.env, fetchImpl 
       return {
         tag: normalizedContentfulTag(payload),
       };
+    },
+    async deleteTag({ tagId } = {}) {
+      const normalizedTagId = String(tagId || "").trim();
+
+      if (!normalizedTagId || isArticleLanguageTag(normalizedTagId)) {
+        throw new ContentfulAdminLifecycleError("A valid tag is required.");
+      }
+
+      for (const resource of ["entries", "assets"]) {
+        const usageParams = new URLSearchParams({
+          "metadata.tags.sys.id[all]": normalizedTagId,
+          limit: "1",
+          skip: "0",
+        });
+        const usagePayload = await request({ method: "GET", path: `/${resource}?${usageParams}` });
+
+        if (boundedUsageTotal(usagePayload) > 0) {
+          throw new ContentfulTagConflictError();
+        }
+      }
+
+      const tagPath = `/tags/${encodeURIComponent(normalizedTagId)}`;
+      const tag = await request({ method: "GET", path: tagPath });
+      const version = Number(tag?.sys?.version);
+
+      if (!Number.isInteger(version) || version < 1) {
+        throw new ContentfulTagUsageUnavailableError();
+      }
+
+      try {
+        await request({ method: "DELETE", path: tagPath, headers: { "x-contentful-version": version } });
+      } catch (error) {
+        if (
+          error instanceof ContentfulVersionConflictError ||
+          (error instanceof ContentfulManagementRequestError && [400, 409, 422].includes(error.upstreamStatusCode))
+        ) {
+          throw new ContentfulTagConflictError();
+        }
+
+        throw error;
+      }
+
+      return { deletedTagId: normalizedTagId };
     },
     async createArticleDraft({ data, session }) {
       const config = managementConfigFromEnv(env, fetchImpl);
@@ -1532,12 +1668,30 @@ export const createContentfulAdminHandler = ({
       });
     }
 
+    if (requestMethod === "GET" && routePath === "/tags/manage") {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.listManagedTags,
+        payload: {},
+      });
+    }
+
     if (requestMethod === "POST" && routePath === "/tags") {
       return runAdminOperation({
         session,
         role: "writer",
         operation: adminOperations.createTag,
         payload: { data },
+      });
+    }
+
+    if (requestMethod === "DELETE" && /^\/tags\/[^/]+$/.test(routePath)) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.deleteTag,
+        payload: { tagId: decodeURIComponent(routePath.replace(/^\/tags\//, "")) },
       });
     }
 

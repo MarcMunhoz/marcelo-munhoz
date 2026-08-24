@@ -8,6 +8,8 @@ export {
   ContentfulAdminNotImplementedError,
   contentfulAdminHandler,
   ContentfulManagementRequestError,
+  ContentfulTagConflictError,
+  ContentfulTagUsageUnavailableError,
   ContentfulVersionConflictError,
   createCloudinaryMediaFacade,
   createContentfulAdminHandler,

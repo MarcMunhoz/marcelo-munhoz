@@ -122,6 +122,7 @@ import BlogArchiveList from "../components/BlogArchiveList.vue";
 import BlogHighlights from "../components/BlogHighlights.vue";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { blogRouteQuery, normalizeBlogRouteQuery } from "../utils/blogArchive.js";
+import { isArticleLanguageTag } from "../utils/articleDates.js";
 
 const sameArchiveState = (left, right) => ["page", "q", "year", "tag"].every((key) => left[key] === right[key]);
 
@@ -350,7 +351,7 @@ export default defineComponent({
             label: String(tag.name || tag.sys?.id || ""),
             value: String(tag.sys?.id || ""),
           }))
-          .filter((tag) => tag.value);
+          .filter((tag) => tag.value && !isArticleLanguageTag(tag.value));
       } catch (error) {
         console.error("Erro ao carregar tags:", error);
         this.tagOptions = [];
