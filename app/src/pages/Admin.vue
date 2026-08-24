@@ -88,10 +88,29 @@
                 row-key="id"
                 :rows="filteredArticles"
                 :columns="articleColumns"
+                :grid="$q.screen.width <= 720"
                 :loading="loadingAction === 'articles'"
                 :pagination="{ rowsPerPage: 6 }"
                 no-data-label="No articles match the current filters"
               >
+                <template #item="props">
+                  <admin-article-card
+                    :article="props.row"
+                    :session="session"
+                    :active-tag="filters.tag"
+                    :loading-action="loadingAction"
+                    @edit="openEditorForArticle"
+                    @review="openEditorForArticle"
+                    @request-unpublication="requestUnpublicationFromRow"
+                    @publish="publishSelectedArticle"
+                    @unpublish="unpublishSelectedArticle"
+                    @archive="archiveSelectedArticle"
+                    @unarchive="unarchiveSelectedArticle"
+                    @delete="openDeleteConfirmation"
+                    @toggle-tag="toggleTagFilter"
+                  />
+                </template>
+
                 <template #body-cell-status="props">
                   <q-td :props="props">
                     <span class="status-cell">
@@ -231,6 +250,7 @@
 
 <script>
 import { defineComponent } from "vue";
+import AdminArticleCard from "../components/AdminArticleCard.vue";
 import {
   archiveArticle,
   deleteArticle,
@@ -263,6 +283,7 @@ import { getAdminSession, isOwnerSession, isWriterSession, openAdminLogin, signO
 
 export default defineComponent({
   name: "AdminPage",
+  components: { AdminArticleCard },
   data() {
     return {
       session: null,
@@ -591,7 +612,6 @@ export default defineComponent({
   background: #f2f4f3;
   color: #263238;
   min-height: inherit;
-  overflow-x: hidden;
 }
 
 .admin-shell {
@@ -607,7 +627,6 @@ export default defineComponent({
 
 .admin-workspace {
   min-width: 0;
-  overflow-x: hidden;
   padding: 22px;
 }
 
@@ -659,6 +678,12 @@ export default defineComponent({
 
 .admin-filter-tabs {
   margin: 0 0 14px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.admin-filter-tabs .q-btn-toggle {
+  width: max-content;
 }
 
 .admin-blocked {
@@ -1102,6 +1127,11 @@ export default defineComponent({
 
   .owner-queue-row {
     display: flex;
+    overflow: visible;
+  }
+
+  .panel-heading {
+    flex-direction: column;
   }
 
   .owner-actions {
@@ -1112,7 +1142,10 @@ export default defineComponent({
     min-width: 0;
   }
 
-  .status-grid,
+  .status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .article-filters,
   .media-actions {
     grid-template-columns: 1fr;
@@ -1124,6 +1157,12 @@ export default defineComponent({
 
   .table-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 340px) {
+  .status-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

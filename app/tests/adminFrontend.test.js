@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   adminUserMessage,
@@ -1512,6 +1512,70 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /label="Request unpublication"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /label="Unpublish"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /\.editor-actions[\s\S]*gap:\s*8px/);
+  });
+
+  it("renders complete, guarded article cards from QTable grid mode on phones", () => {
+    const page = read("../src/pages/Admin.vue");
+    const cardPath = new URL("../src/components/AdminArticleCard.vue", import.meta.url);
+
+    assert.ok(existsSync(cardPath), "AdminArticleCard should render mobile article metadata and lifecycle actions");
+    const card = read("../src/components/AdminArticleCard.vue");
+
+    assert.match(page, /import AdminArticleCard from "\.\.\/components\/AdminArticleCard\.vue"/);
+    assert.match(page, /:grid="\$q\.screen\.width <= 720"/);
+    assert.match(page, /<template #item="props">[\s\S]*<admin-article-card/);
+    assert.match(page, /:article="props\.row"/);
+    assert.match(page, /:session="session"/);
+    assert.match(page, /:active-tag="filters\.tag"/);
+    assert.match(page, /:loading-action="loadingAction"/);
+    assert.match(page, /@edit="openEditorForArticle"/);
+    assert.match(page, /@review="openEditorForArticle"/);
+    assert.match(page, /@request-unpublication="requestUnpublicationFromRow"/);
+    assert.match(page, /@publish="publishSelectedArticle"/);
+    assert.match(page, /@unpublish="unpublishSelectedArticle"/);
+    assert.match(page, /@archive="archiveSelectedArticle"/);
+    assert.match(page, /@unarchive="unarchiveSelectedArticle"/);
+    assert.match(page, /@delete="openDeleteConfirmation"/);
+    assert.match(page, /@toggle-tag="toggleTagFilter"/);
+
+    assert.match(card, /article\.title/);
+    assert.match(card, /statusLabel\(article\.status\)/);
+    assert.match(card, /article\.displayAuthor/);
+    assert.match(card, /article\.displayDate/);
+    assert.match(card, /v-for="tag in article\.displayTags"/);
+    assert.match(card, /:aria-pressed="activeTag === tag\.id"/);
+    const cardTemplate = card.slice(0, card.indexOf("<script>"));
+    assert.doesNotMatch(cardTemplate, /(?<![$\w])emit\(/);
+    assert.match(cardTemplate, /@keyup\.enter="\$emit\('toggle-tag', tag\.id\)"/);
+    assert.match(cardTemplate, /@keyup\.space\.prevent="\$emit\('toggle-tag', tag\.id\)"/);
+
+    for (const action of ["edit", "review", "request-unpublication", "publish", "unpublish", "archive", "unarchive", "delete"]) {
+      assert.match(cardTemplate, new RegExp(`\\$emit\\('${action}', article\\)`));
+    }
+
+    for (const guard of [
+      "canEditArticleAction",
+      "canPrepareReviewAction",
+      "canRequestUnpublicationAction",
+      "canOwnerPublishAction",
+      "canOwnerUnpublishAction",
+      "canArchiveArticleAction",
+      "canUnarchiveArticleAction",
+    ]) {
+      assert.match(card, new RegExp(`\\b${guard}\\(`));
+    }
+  });
+
+  it("keeps compact dashboard controls reachable without clipping phone layouts", () => {
+    const page = read("../src/pages/Admin.vue");
+
+    assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.status-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    assert.match(page, /@media \(max-width:\s*340px\)[\s\S]*?\.status-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+    assert.match(page, /\.admin-filter-tabs\s*\{[\s\S]*?overflow-x:\s*auto/);
+    assert.match(page, /\.admin-filter-tabs\s+\.q-btn-toggle\s*\{[\s\S]*?width:\s*max-content/);
+    assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.panel-heading\s*\{[\s\S]*?flex-direction:\s*column/);
+    assert.match(page, /\.owner-actions\s*\{[\s\S]*?flex-wrap:\s*wrap/);
+    assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.owner-queue-row\s*\{[\s\S]*?overflow:\s*visible/);
   });
 
   it("keeps admin layout responsive without relying on a horizontally oversized table shell", () => {
