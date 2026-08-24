@@ -645,11 +645,22 @@ describe("admin frontend writer workflow", () => {
     const editor = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(page, /Tag management/);
+    assert.match(page, /class="tag-admin-heading"/);
+    assert.match(page, /class="tag-admin-title"/);
+    assert.match(page, /class="tag-admin-description"/);
+    assert.match(page, /\.tag-admin-header\s*\{[^}]*background:\s*#fff;[^}]*border-left:\s*4px solid #455a64;/s);
+    assert.match(page, /\.tag-admin-title\s*\{[^}]*font-size:\s*1\.75rem;[^}]*font-weight:\s*700;/s);
     assert.match(page, /articleCount/);
     assert.match(page, /runDoubleConfirmedTagDeletion/);
     assert.match(page, /isOwnerSession/);
     assert.match(page, /v-if="props\.row\.articleCount > 0" class="tag-delete-guidance"/);
     assert.match(page, /Remove this tag from matching articles first/);
+    assert.match(page, /class="tag-delete-action"/);
+    assert.match(page, /\.tag-delete-action\s*\{[^}]*display:\s*flex;[^}]*gap:\s*8px;[^}]*justify-content:\s*flex-end;/s);
+    assert.match(page, /\.tag-delete-action\s+\.q-btn\s*\{[^}]*flex:\s*0 0 auto;/s);
+    assert.match(page, /class="tag-visibility-cell"/);
+    assert.match(page, /name:\s*"visibility"[^\n]*align:\s*"center"/);
+    assert.match(page, /\.tag-visibility-cell\s*\{[^}]*text-align:\s*center;/s);
     assert.doesNotMatch(page, /listAdminArticles/);
     assert.match(dashboard, /toggleTagFilter/);
     assert.match(dashboard, /filters\.tag === tag\.id/);

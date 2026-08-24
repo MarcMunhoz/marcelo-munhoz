@@ -2,10 +2,10 @@
   <q-page class="tag-admin-page">
     <main v-if="sessionResolved && isOwner" class="tag-admin-shell">
       <header class="tag-admin-header">
-        <div>
+        <div class="tag-admin-heading">
           <p class="tag-admin-kicker">Blog admin</p>
-          <h1>Tag management</h1>
-          <p>Review usage before removing editorial tags.</p>
+          <h1 class="tag-admin-title">Tag management</h1>
+          <p class="tag-admin-description">Review usage before removing editorial tags.</p>
         </div>
         <q-btn flat no-caps color="blue-grey-8" icon="arrow_back" label="Articles" to="/admin" />
       </header>
@@ -39,7 +39,7 @@
           no-data-label="No editorial tags available"
         >
           <template #body-cell-visibility="props">
-            <q-td :props="props">
+            <q-td :props="props" class="tag-visibility-cell">
               <q-badge outline color="blue-grey-7">{{ props.row.visibility || "private" }}</q-badge>
             </q-td>
           </template>
@@ -50,22 +50,24 @@
 
           <template #body-cell-actions="props">
             <q-td :props="props">
-              <span v-if="props.row.articleCount > 0" class="tag-delete-guidance">
-                Remove this tag from matching articles first
-              </span>
-              <q-btn
-                dense
-                flat
-                round
-                color="negative"
-                icon="delete_forever"
-                :disable="!canDeleteManagedTag(props.row)"
-                :loading="loadingAction === `delete-${props.row.id}`"
-                :aria-label="`Delete ${props.row.label}`"
-                @click="deleteTag(props.row)"
-              >
-                <q-tooltip v-if="props.row.articleCount === 0">Delete unused tag</q-tooltip>
-              </q-btn>
+              <div class="tag-delete-action">
+                <span v-if="props.row.articleCount > 0" class="tag-delete-guidance">
+                  Remove this tag from matching articles first
+                </span>
+                <q-btn
+                  dense
+                  flat
+                  round
+                  color="negative"
+                  icon="delete_forever"
+                  :disable="!canDeleteManagedTag(props.row)"
+                  :loading="loadingAction === `delete-${props.row.id}`"
+                  :aria-label="`Delete ${props.row.label}`"
+                  @click="deleteTag(props.row)"
+                >
+                  <q-tooltip v-if="props.row.articleCount === 0">Delete unused tag</q-tooltip>
+                </q-btn>
+              </div>
             </q-td>
           </template>
         </q-table>
@@ -94,7 +96,7 @@ export default defineComponent({
       columns: [
         { name: "label", label: "Tag name", field: "label", align: "left", sortable: true },
         { name: "id", label: "Tag ID", field: "id", align: "left", sortable: true },
-        { name: "visibility", label: "Visibility", field: "visibility", align: "left", sortable: true },
+        { name: "visibility", label: "Visibility", field: "visibility", align: "center", sortable: true },
         { name: "articleCount", label: "Articles", field: "articleCount", align: "left", sortable: true },
         { name: "actions", label: "Actions", field: "actions", align: "right" },
       ],
@@ -214,12 +216,34 @@ export default defineComponent({
 }
 
 .tag-admin-header {
+  background: #fff;
+  border: 1px solid #cfd8dc;
+  border-left: 4px solid #455a64;
   margin-bottom: 18px;
+  padding: 18px 20px;
 
   h1,
   p {
     margin: 0;
   }
+}
+
+.tag-admin-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tag-admin-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.tag-admin-description {
+  color: #546e7a;
+  line-height: 1.4;
 }
 
 .tag-admin-kicker {
@@ -260,13 +284,28 @@ export default defineComponent({
   color: #1b5e20;
 }
 
+.tag-visibility-cell {
+  text-align: center;
+}
+
+.tag-delete-action {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.tag-delete-action .q-btn {
+  flex: 0 0 auto;
+}
+
 .tag-delete-guidance {
   color: #546e7a;
-  display: inline-block;
   font-size: 0.75rem;
-  margin-right: 8px;
+  line-height: 1.25;
   max-width: 180px;
-  vertical-align: middle;
+  white-space: normal;
 }
 
 @media (max-width: 600px) {
@@ -274,6 +313,10 @@ export default defineComponent({
   .tag-create-form {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .tag-admin-header .q-btn {
+    align-self: flex-start;
   }
 }
 </style>
