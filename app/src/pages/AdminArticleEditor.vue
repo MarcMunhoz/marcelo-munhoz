@@ -2,7 +2,7 @@
   <q-page class="admin-editor-page">
     <section v-if="showEditorSurface" class="editor-shell">
       <header class="editor-heading">
-        <div>
+        <div class="editor-heading-content">
           <p class="admin-kicker">Article editor</p>
           <h1>{{ articleForm.id ? "Edit article" : "Create article" }}</h1>
           <p>{{ articleForm.id ? articleForm.title : "Create a new draft for review." }}</p>
@@ -22,8 +22,8 @@
             </button>
             <span class="article-language-switch__track" :class="{ english: articleForm.locale === 'en-US' }"></span>
           </div>
-          <q-badge outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
-          <q-btn outline color="blue-grey-7" icon="arrow_back" label="Dashboard" no-caps @click="leaveEditor" />
+          <q-badge class="editor-status" outline color="blue-grey-7">{{ statusMessage || "Unsaved" }}</q-badge>
+          <q-btn class="editor-dashboard-action" outline color="blue-grey-7" icon="arrow_back" label="Dashboard" no-caps @click="leaveEditor" />
         </div>
       </header>
 
@@ -62,42 +62,45 @@
           <div class="markdown-editor" :class="{ 'has-error': errors.body }">
             <div class="markdown-editor-label">Body <span>(required)</span></div>
             <div class="markdown-editor-toolbar">
-              <q-btn-dropdown flat dense icon="title" dropdown-icon="arrow_drop_down" :disable="bodyEditorMode === 'preview'">
-                <q-list dense>
-                  <q-item v-close-popup clickable @click="insertMarkdown('body', '# ', '', 'Heading 1')">
-                    <q-item-section>Heading 1</q-item-section>
-                  </q-item>
-                  <q-item v-close-popup clickable @click="insertMarkdown('body', '## ', '', 'Heading 2')">
-                    <q-item-section>Heading 2</q-item-section>
-                  </q-item>
-                  <q-item v-close-popup clickable @click="insertMarkdown('body', '### ', '', 'Heading 3')">
-                    <q-item-section>Heading 3</q-item-section>
-                  </q-item>
-                </q-list>
-                <q-tooltip>Headings</q-tooltip>
-              </q-btn-dropdown>
-              <q-btn flat dense icon="format_bold" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '**', '**', 'bold text')" />
-              <q-btn flat dense icon="format_italic" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '_', '_', 'italic text')" />
-              <q-btn flat dense icon="format_quote" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '> ', '', 'Quote')" />
-              <q-btn flat dense icon="format_list_bulleted" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '- ', '', 'List item')" />
-              <q-btn flat dense icon="format_list_numbered" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '1. ', '', 'List item')" />
-              <q-btn flat dense icon="link" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '[', '](https://)', 'link text')" />
-              <q-btn-dropdown flat dense icon="more_horiz" dropdown-icon="arrow_drop_down" :disable="bodyEditorMode === 'preview'">
-                <q-list dense>
-                  <q-item v-close-popup clickable @click="insertMarkdown('body', '`', '`', 'code')">
-                    <q-item-section>Inline code</q-item-section>
-                  </q-item>
-                  <q-item v-close-popup clickable @click="insertMarkdown('body', '```\n', '\n```', 'code block')">
-                    <q-item-section>Code block</q-item-section>
-                  </q-item>
-                  <q-item v-close-popup clickable @click="insertMarkdown('body', '\n---\n', '', '')">
-                    <q-item-section>Divider</q-item-section>
-                  </q-item>
-                </q-list>
-                <q-tooltip>More actions</q-tooltip>
-              </q-btn-dropdown>
-              <q-space />
-              <q-btn-toggle v-model="bodyEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bodyEditorModeOptions" />
+              <div class="markdown-format-actions">
+                <q-btn-dropdown flat dense icon="title" dropdown-icon="arrow_drop_down" :disable="bodyEditorMode === 'preview'">
+                  <q-list dense>
+                    <q-item v-close-popup clickable @click="insertMarkdown('body', '# ', '', 'Heading 1')">
+                      <q-item-section>Heading 1</q-item-section>
+                    </q-item>
+                    <q-item v-close-popup clickable @click="insertMarkdown('body', '## ', '', 'Heading 2')">
+                      <q-item-section>Heading 2</q-item-section>
+                    </q-item>
+                    <q-item v-close-popup clickable @click="insertMarkdown('body', '### ', '', 'Heading 3')">
+                      <q-item-section>Heading 3</q-item-section>
+                    </q-item>
+                  </q-list>
+                  <q-tooltip>Headings</q-tooltip>
+                </q-btn-dropdown>
+                <q-btn flat dense icon="format_bold" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '**', '**', 'bold text')" />
+                <q-btn flat dense icon="format_italic" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '_', '_', 'italic text')" />
+                <q-btn flat dense icon="format_quote" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '> ', '', 'Quote')" />
+                <q-btn flat dense icon="format_list_bulleted" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '- ', '', 'List item')" />
+                <q-btn flat dense icon="format_list_numbered" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '1. ', '', 'List item')" />
+                <q-btn flat dense icon="link" :disable="bodyEditorMode === 'preview'" @click="insertMarkdown('body', '[', '](https://)', 'link text')" />
+                <q-btn-dropdown flat dense icon="more_horiz" dropdown-icon="arrow_drop_down" :disable="bodyEditorMode === 'preview'">
+                  <q-list dense>
+                    <q-item v-close-popup clickable @click="insertMarkdown('body', '`', '`', 'code')">
+                      <q-item-section>Inline code</q-item-section>
+                    </q-item>
+                    <q-item v-close-popup clickable @click="insertMarkdown('body', '```\n', '\n```', 'code block')">
+                      <q-item-section>Code block</q-item-section>
+                    </q-item>
+                    <q-item v-close-popup clickable @click="insertMarkdown('body', '\n---\n', '', '')">
+                      <q-item-section>Divider</q-item-section>
+                    </q-item>
+                  </q-list>
+                  <q-tooltip>More actions</q-tooltip>
+                </q-btn-dropdown>
+              </div>
+              <div class="markdown-mode-actions">
+                <q-btn-toggle v-model="bodyEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bodyEditorModeOptions" />
+              </div>
             </div>
             <textarea
               v-show="bodyEditorMode === 'editor'"
@@ -139,8 +142,9 @@
             <small>Select an image from the media library</small>
           </div>
           <div class="media-actions">
-            <q-btn outline color="blue-grey-7" icon="perm_media" label="Select image" no-caps :loading="loadingAction === 'media-list'" @click="openMediaLibrary" />
+            <q-btn class="media-action" outline color="blue-grey-7" icon="perm_media" label="Select image" no-caps :loading="loadingAction === 'media-list'" @click="openMediaLibrary" />
             <q-btn
+              class="media-action"
               outline
               color="blue-grey-7"
               icon="crop"
@@ -150,14 +154,14 @@
               :loading="loadingAction === 'media-editor'"
               @click="editThumbnailImage"
             />
-            <q-btn outline color="blue-grey-7" icon="backspace" label="Clear image" no-caps :disable="!articleForm.thumbnailUrl" @click="clearThumbnail" />
+            <q-btn class="media-action" outline color="blue-grey-7" icon="backspace" label="Clear image" no-caps :disable="!articleForm.thumbnailUrl" @click="clearThumbnail" />
             <q-file
               v-model="mediaUploadFile"
               dense
               outlined
               accept="image/*"
               label="Upload image"
-              class="media-upload"
+              class="media-upload media-action"
               :loading="loadingAction === 'media-upload'"
               @update:model-value="handleMediaFile"
             >
@@ -214,9 +218,10 @@
         <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
 
         <div class="editor-actions">
-          <q-btn v-if="canSaveArticle" unelevated color="blue-grey-8" icon="save" :label="saveButtonLabel" dense no-caps type="submit" :loading="loadingAction === 'save'" />
+          <q-btn v-if="canSaveArticle" class="editor-action editor-action-primary" unelevated color="blue-grey-8" icon="save" :label="saveButtonLabel" dense no-caps type="submit" :loading="loadingAction === 'save'" />
           <q-btn
             v-if="canSubmitArticleForReview"
+            class="editor-action editor-action-secondary"
             outline
             color="blue-grey-7"
             icon="rate_review"
@@ -229,6 +234,7 @@
           />
           <q-btn
             v-if="canRequestArticleUnpublication"
+            class="editor-action editor-action-secondary"
             outline
             color="amber-9"
             icon="visibility_off"
@@ -241,6 +247,7 @@
           />
           <q-btn
             v-if="canOwnerUnpublishArticle"
+            class="editor-action editor-action-secondary"
             outline
             color="amber-9"
             icon="visibility_off"
@@ -266,7 +273,7 @@
           <q-btn flat round dense icon="close" v-close-popup />
         </q-card-section>
 
-        <q-card-section>
+        <q-card-section class="media-dialog-content">
           <div class="media-dialog-toolbar">
             <q-file
               v-model="mediaUploadFile"
@@ -274,7 +281,7 @@
               outlined
               accept="image/*"
               label="Upload image"
-              class="media-upload"
+              class="media-upload media-action"
               :loading="loadingAction === 'media-upload'"
               @update:model-value="handleMediaFile"
             >
@@ -1003,6 +1010,10 @@ export default defineComponent({
   }
 }
 
+.editor-heading-content {
+  min-width: 0;
+}
+
 .editor-heading-actions {
   align-items: center;
   flex-wrap: wrap;
@@ -1128,6 +1139,22 @@ export default defineComponent({
   padding: 8px 12px;
 }
 
+.markdown-format-actions,
+.markdown-mode-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+}
+
+.markdown-format-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.markdown-mode-actions {
+  flex: 0 0 auto;
+}
+
 .markdown-editor-textarea,
 .markdown-editor-preview {
   border: 0;
@@ -1174,6 +1201,11 @@ export default defineComponent({
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(140px, 170px) minmax(120px, 150px) minmax(120px, 150px) minmax(0, 1fr);
+}
+
+.media-action {
+  min-width: 0;
+  width: 100%;
 }
 
 .media-upload {
@@ -1261,7 +1293,10 @@ export default defineComponent({
 }
 
 .media-dialog {
+  display: flex;
+  flex-direction: column;
   max-width: min(1160px, 96vw);
+  max-height: calc(100dvh - 24px);
   min-width: min(900px, 96vw);
 }
 
@@ -1276,6 +1311,11 @@ export default defineComponent({
   display: flex;
   justify-content: flex-end;
   margin-bottom: 16px;
+}
+
+.media-dialog-content {
+  min-height: 0;
+  overflow: auto;
 }
 
 .media-grid {
@@ -1335,11 +1375,85 @@ export default defineComponent({
   min-height: calc(100vh - 98px);
 }
 
+@media (max-width: 1080px) {
+  .media-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
+  .editor-shell {
+    padding: 14px;
+  }
+
+  .editor-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editor-heading-actions {
+    justify-content: space-between;
+  }
+
+  .editor-heading-content,
+  .editor-status,
+  .editor-dashboard-action {
+    min-width: 0;
+  }
+
+  .markdown-editor-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .markdown-format-actions {
+    overflow-x: auto;
+    padding-bottom: 2px;
+    padding-inline: 4px;
+    scroll-padding-inline: 4px;
+    width: 100%;
+  }
+
+  .markdown-format-actions :focus-visible,
+  .markdown-mode-actions :focus-visible {
+    outline: 2px solid #455a64;
+    outline-offset: 2px;
+  }
+
+  .markdown-mode-actions {
+    width: 100%;
+  }
+
+  .markdown-mode-actions .q-btn-toggle {
+    width: 100%;
+  }
+
   .form-row,
   .media-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .media-dialog {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    min-width: 0;
+    width: calc(100vw - 24px);
+  }
+
+  .editor-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .editor-action {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .editor-action-primary {
+    grid-column: 1 / -1;
   }
 }
 </style>

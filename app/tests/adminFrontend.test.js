@@ -1760,4 +1760,36 @@ describe("admin frontend writer workflow", () => {
     assert.match(profile, /insertBiographyMarkdown/);
     assert.match(profile, /marked\.parse/);
   });
+
+  it("keeps every editor command reachable in responsive Markdown, media, dialog, and workflow controls", () => {
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+
+    assert.match(editor, /class="markdown-format-actions"[\s\S]*?insertMarkdown\('body', '# ', '', 'Heading 1'\)[\s\S]*?insertMarkdown\('body', '## ', '', 'Heading 2'\)[\s\S]*?insertMarkdown\('body', '### ', '', 'Heading 3'\)[\s\S]*?insertMarkdown\('body', '\*\*', '\*\*', 'bold text'\)[\s\S]*?insertMarkdown\('body', '_', '_', 'italic text'\)[\s\S]*?insertMarkdown\('body', '> ', '', 'Quote'\)[\s\S]*?insertMarkdown\('body', '- ', '', 'List item'\)[\s\S]*?insertMarkdown\('body', '1\. ', '', 'List item'\)[\s\S]*?insertMarkdown\('body', '\[', '\]\(https:\/\/\)', 'link text'\)[\s\S]*?insertMarkdown\('body', '`', '`', 'code'\)[\s\S]*?insertMarkdown\('body', '```\\n', '\\n```', 'code block'\)[\s\S]*?insertMarkdown\('body', '\\n---\\n', '', ''\)/);
+    assert.match(editor, /class="markdown-mode-actions"[\s\S]*?<q-btn-toggle[\s\S]*?v-model="bodyEditorMode"[\s\S]*?:options="bodyEditorModeOptions"/);
+    assert.match(editor, /class="editor-heading-content"/);
+    assert.match(editor, /class="editor-status"/);
+    assert.match(editor, /class="media-action"/);
+    assert.match(editor, /class="media-upload media-action"/);
+    assert.match(editor, /class="media-dialog-content"/);
+    assert.match(editor, /\.media-dialog-content\s*\{[\s\S]*?overflow:\s*auto/);
+    assert.match(editor, /class="editor-action editor-action-primary"[\s\S]*?type="submit"/);
+    assert.match(editor, /class="editor-action editor-action-secondary"[\s\S]*?label="Submit for review"/);
+    assert.match(editor, /@media \(max-width:\s*1080px\)[\s\S]*?\.media-actions\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.markdown-format-actions\s*\{[\s\S]*?overflow-x:\s*auto/);
+    assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.markdown-mode-actions\s*\{[\s\S]*?width:\s*100%/);
+    assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.editor-action-primary\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1/);
+  });
+
+  it("preserves desktop media-dialog sizing and scopes viewport width containment to compact screens", () => {
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+
+    assert.match(editor, /\.media-dialog\s*\{[\s\S]*?max-width:\s*min\(1160px,\s*96vw\);[\s\S]*?min-width:\s*min\(900px,\s*96vw\);/);
+    assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.media-dialog\s*\{[\s\S]*?max-width:\s*calc\(100vw - 24px\);[\s\S]*?max-height:\s*calc\(100dvh - 24px\);[\s\S]*?width:\s*calc\(100vw - 24px\);/);
+  });
+
+  it("pads the scrollable Markdown format row so focus outlines stay reachable at both edges", () => {
+    const editor = read("../src/pages/AdminArticleEditor.vue");
+
+    assert.match(editor, /@media \(max-width:\s*720px\)[\s\S]*?\.markdown-format-actions\s*\{[\s\S]*?overflow-x:\s*auto;[\s\S]*?padding-inline:\s*4px;[\s\S]*?scroll-padding-inline:\s*4px;/);
+  });
 });
