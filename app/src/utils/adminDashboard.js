@@ -310,6 +310,14 @@ export const authorProfileToForm = (profile = {}) => {
   };
 };
 
+export const updateAuthorGravatarDraft = (form = {}, gravatarProfile = "") => ({
+  ...form,
+  gravatarProfile: String(gravatarProfile || ""),
+  gravatarHash: "",
+  photoSettingsChanged: true,
+  photoUrl: "",
+});
+
 export const buildAuthorProfilePayload = (form = {}) => ({
   name: String(form.name || "").trim(),
   slug: String(form.slug || "").trim(),

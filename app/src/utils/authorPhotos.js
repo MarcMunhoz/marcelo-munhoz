@@ -56,12 +56,31 @@ const legacyPhotoUrl = (author = {}) => {
   return candidate.startsWith("//") ? `https:${candidate}` : candidate;
 };
 
-export const authorPhotoCandidates = (author = {}) => {
+const authorPhotoOptions = (author = {}) => {
   const photo = author.fields?.photo || author.photo || {};
   const gravatarHash = typeof photo === "object" ? photo.gravatar_hash || photo.gravatarHash || author.gravatarHash : author.gravatarHash;
+  const gravatarProfile =
+    typeof photo === "object" ? photo.gravatar_profile || photo.gravatarProfile || author.gravatarProfile : author.gravatarProfile;
   const fallback = typeof photo === "object" ? photo.fallback_url || photo.fallbackUrl || author.fallbackPhotoUrl : author.fallbackPhotoUrl;
+  const options = [
+    { url: gravatarAvatarUrl(gravatarHash), kind: "gravatar", label: "Gravatar", detail: String(gravatarProfile || "").trim() },
+    { url: String(fallback || "").trim(), kind: "fallback", label: "Fallback URL", detail: "" },
+    { url: legacyPhotoUrl(author), kind: "legacy", label: "Legacy photo", detail: "" },
+  ].filter(({ url }) => Boolean(url));
 
-  return [...new Set([gravatarAvatarUrl(gravatarHash), String(fallback || "").trim(), legacyPhotoUrl(author)].filter(Boolean))];
+  return options.filter(({ url }, index) => options.findIndex((option) => option.url === url) === index);
+};
+
+export const authorPhotoCandidates = (author = {}) => authorPhotoOptions(author).map(({ url }) => url);
+
+export const authorPhotoSource = (author = {}, currentIndex = 0) => {
+  const option = authorPhotoOptions(author)[Math.max(0, Number(currentIndex) || 0)];
+  return option ? { kind: option.kind, label: option.label, detail: option.detail } : { kind: "initials", label: "Initials", detail: "" };
+};
+
+export const authorPhotoResetActionLabel = (sourceKind = "initials", candidateCount = 0) => {
+  if (Math.max(0, Number(candidateCount) || 0) === 0) return "";
+  return sourceKind === "initials" ? "Keep initials and clear photo settings" : "Use initials instead";
 };
 
 export const nextAuthorPhotoIndex = (candidates = [], currentIndex = 0) =>

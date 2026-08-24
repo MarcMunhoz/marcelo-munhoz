@@ -52,6 +52,7 @@ import {
   statusLabel,
   summarizeArticleStatuses,
   updateArticleStatusById,
+  updateAuthorGravatarDraft,
 } from "../src/utils/adminDashboard.js";
 import { buildMediaEditorOptions, normalizeMediaEditorExport, openCloudinaryMediaEditor } from "../src/utils/cloudinaryMediaEditor.js";
 import {
@@ -936,6 +937,30 @@ describe("admin frontend writer workflow", () => {
     );
   });
 
+  it("invalidates the resolved photo when the Gravatar profile draft changes", () => {
+    assert.deepEqual(
+      updateAuthorGravatarDraft(
+        {
+          name: "Marcelo",
+          gravatarProfile: "old-profile",
+          gravatarHash: "a".repeat(64),
+          fallbackPhotoUrl: "https://res.cloudinary.com/demo/image/upload/fallback.jpg",
+          photoSettingsChanged: false,
+          photoUrl: `https://gravatar.com/avatar/${"a".repeat(64)}?s=192&r=g&d=404`,
+        },
+        "new-profile"
+      ),
+      {
+        name: "Marcelo",
+        gravatarProfile: "new-profile",
+        gravatarHash: "",
+        fallbackPhotoUrl: "https://res.cloudinary.com/demo/image/upload/fallback.jpg",
+        photoSettingsChanged: true,
+        photoUrl: "",
+      }
+    );
+  });
+
   it("derives public author slugs from names instead of exposing entry ids", () => {
     assert.deepEqual(
       publicAuthorProfile({
@@ -1388,7 +1413,12 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /512×512 px/);
     assert.match(page, /@error="advanceProfilePhoto"/);
     assert.match(page, /markPhotoSettingsChanged/);
-    assert.match(page, /label="Remove photo"/);
+    assert.match(page, /Current source/);
+    assert.match(page, /profilePhotoSource/);
+    assert.match(page, /:label="profilePhotoActionLabel"/);
+    assert.match(page, /New Gravatar photos are checked when you save/);
+    assert.match(page, /Clears the photo settings in this blog only/);
+    assert.match(page, /Gravatar profile and original image remain unchanged/);
     assert.match(layout, /@error="advanceAdminProfilePhoto"/);
     assert.match(publicProfile, /@error="advanceAuthorPhoto"/);
     assert.match(page, /profile-photo-panel/);

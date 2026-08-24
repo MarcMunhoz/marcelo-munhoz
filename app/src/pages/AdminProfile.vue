@@ -77,6 +77,11 @@
             />
             <q-avatar v-else color="blue-grey-7" text-color="white" size="96px">{{ profileInitials }}</q-avatar>
           </div>
+          <div class="profile-photo-source" aria-live="polite">
+            <span>Current source</span>
+            <strong>{{ profilePhotoSource.label }}</strong>
+            <small v-if="profilePhotoSource.detail">{{ profilePhotoSource.detail }}</small>
+          </div>
           <q-input
             v-model="profileForm.gravatarProfile"
             label="Gravatar profile"
@@ -85,8 +90,11 @@
             dense
             :error="Boolean(errors.gravatarProfile)"
             :error-message="errors.gravatarProfile"
-            @update:model-value="markPhotoSettingsChanged"
+            @update:model-value="updateGravatarProfile"
           />
+          <p v-if="profileForm.gravatarProfile && !profileForm.gravatarHash" class="profile-photo-resolution-note">
+            New Gravatar photos are checked when you save.
+          </p>
           <q-input
             v-model="profileForm.fallbackPhotoUrl"
             label="Fallback photo URL"
@@ -97,7 +105,18 @@
             :error-message="errors.fallbackPhotoUrl"
             @update:model-value="markPhotoSettingsChanged"
           />
-          <q-btn flat no-caps color="negative" icon="hide_image" label="Remove photo" @click="removeProfilePhoto" />
+          <q-btn
+            v-if="profilePhotoActionLabel"
+            flat
+            no-caps
+            color="negative"
+            icon="hide_image"
+            :label="profilePhotoActionLabel"
+            @click="useProfileInitials"
+          />
+          <p v-if="profilePhotoActionLabel" class="profile-photo-removal-note">
+            Clears the photo settings in this blog only. Your Gravatar profile and original image remain unchanged.
+          </p>
           <p class="profile-photo-guidance">
             Use a centered square image. Ideal: 512×512 px; minimum: 256×256 px. Prefer JPG or WebP for photos, or PNG for transparency,
             ideally below 500 KB.
@@ -113,8 +132,21 @@
 import { defineComponent } from "vue";
 import { getAuthorProfile, updateAuthorProfile, adminUserMessage } from "../utils/adminApi.js";
 import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
-import { authorProfileToForm, buildAuthorProfilePayload, createEmptyAuthorProfileForm, slugFromTitle } from "../utils/adminDashboard.js";
-import { authorPhotoCandidates, isAllowedFallbackPhotoUrl, nextAuthorPhotoIndex, normalizeGravatarProfileInput } from "../utils/authorPhotos.js";
+import {
+  authorProfileToForm,
+  buildAuthorProfilePayload,
+  createEmptyAuthorProfileForm,
+  slugFromTitle,
+  updateAuthorGravatarDraft,
+} from "../utils/adminDashboard.js";
+import {
+  authorPhotoCandidates,
+  authorPhotoResetActionLabel,
+  authorPhotoSource,
+  isAllowedFallbackPhotoUrl,
+  nextAuthorPhotoIndex,
+  normalizeGravatarProfileInput,
+} from "../utils/authorPhotos.js";
 import { marked } from "marked";
 
 export default defineComponent({
@@ -152,16 +184,26 @@ export default defineComponent({
       return adminAccountInitials({ name: this.profileForm.name || this.sessionDisplay.name, roles: this.session?.roles || [] });
     },
     profilePhotoCandidates() {
-      return authorPhotoCandidates({
+      return authorPhotoCandidates(this.profilePhotoSettings);
+    },
+    profilePhotoSettings() {
+      return {
         photo: {
+          gravatar_profile: this.profileForm.gravatarProfile,
           gravatar_hash: this.profileForm.gravatarHash,
           fallback_url: this.profileForm.fallbackPhotoUrl,
           secure_url: this.profileForm.photoUrl,
         },
-      });
+      };
     },
     profilePhotoUrl() {
       return this.profilePhotoCandidates[this.profilePhotoIndex] || "";
+    },
+    profilePhotoSource() {
+      return authorPhotoSource(this.profilePhotoSettings, this.profilePhotoIndex);
+    },
+    profilePhotoActionLabel() {
+      return authorPhotoResetActionLabel(this.profilePhotoSource.kind, this.profilePhotoCandidates.length);
     },
     feedbackClass() {
       return {
@@ -306,7 +348,11 @@ export default defineComponent({
       this.profileForm.photoSettingsChanged = true;
       this.profilePhotoIndex = 0;
     },
-    removeProfilePhoto() {
+    updateGravatarProfile(value) {
+      this.profileForm = updateAuthorGravatarDraft(this.profileForm, value);
+      this.profilePhotoIndex = 0;
+    },
+    useProfileInitials() {
       this.profileForm.gravatarProfile = "";
       this.profileForm.gravatarHash = "";
       this.profileForm.fallbackPhotoUrl = "";
@@ -453,6 +499,35 @@ export default defineComponent({
     object-fit: cover;
     width: 100%;
   }
+}
+
+.profile-photo-source {
+  background: #f5f7f7;
+  border-left: 3px solid #607d8b;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+
+  span {
+    color: #607d8b;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+
+  small {
+    color: #607d8b;
+    overflow-wrap: anywhere;
+  }
+}
+
+.profile-photo-removal-note {
+  font-size: 0.8rem;
+  margin: -8px 0 0;
+}
+
+.profile-photo-resolution-note {
+  font-size: 0.8rem;
+  margin: -8px 0 0;
 }
 
 .profile-photo-panel {

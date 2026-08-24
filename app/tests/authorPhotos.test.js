@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   authorPhotoCandidates,
+  authorPhotoResetActionLabel,
+  authorPhotoSource,
   gravatarAvatarUrl,
   isAllowedFallbackPhotoUrl,
   nextAuthorPhotoIndex,
@@ -58,5 +60,35 @@ describe("author photo resolution", () => {
     assert.equal(nextAuthorPhotoIndex(candidates, 0), 1);
     assert.equal(nextAuthorPhotoIndex(candidates, 1), 2);
     assert.equal(nextAuthorPhotoIndex(candidates, 2), 2);
+  });
+
+  it("identifies the source of the photo candidate currently displayed", () => {
+    const author = {
+      photo: {
+        gravatar_profile: "marcelo.munhoz",
+        gravatar_hash: HASH,
+        fallback_url: "https://res.cloudinary.com/demo/image/upload/avatar.webp",
+        secure_url: "https://images.ctfassets.net/space/legacy.jpg",
+      },
+    };
+
+    assert.deepEqual(authorPhotoSource(author, 0), { kind: "gravatar", label: "Gravatar", detail: "marcelo.munhoz" });
+    assert.deepEqual(authorPhotoSource(author, 1), { kind: "fallback", label: "Fallback URL", detail: "" });
+    assert.deepEqual(authorPhotoSource(author, 2), { kind: "legacy", label: "Legacy photo", detail: "" });
+    assert.deepEqual(authorPhotoSource(author, 3), { kind: "initials", label: "Initials", detail: "" });
+  });
+
+  it("identifies an existing unconfigured image as a legacy photo", () => {
+    assert.deepEqual(authorPhotoSource({ photo: "https://secure.gravatar.com/avatar/legacy" }), {
+      kind: "legacy",
+      label: "Legacy photo",
+      detail: "",
+    });
+  });
+
+  it("keeps a clear-settings action after a broken configured photo falls back to initials", () => {
+    assert.equal(authorPhotoResetActionLabel("legacy", 1), "Use initials instead");
+    assert.equal(authorPhotoResetActionLabel("initials", 1), "Keep initials and clear photo settings");
+    assert.equal(authorPhotoResetActionLabel("initials", 0), "");
   });
 });
