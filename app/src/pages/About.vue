@@ -1,10 +1,10 @@
 <template>
   <q-page class="pt-4">
     <q-card class="my-card" flat>
-      <q-card-section horizontal>
-        <q-img class="col-3 rounded-br-lg" :src="cloudinaryImg('me', 500)" />
+      <q-card-section horizontal class="about-introduction">
+        <q-img class="about-image col-3 rounded-br-lg" :src="cloudinaryImg('me', 500)" />
 
-        <q-card-section class="text-justify">
+        <q-card-section class="about-biography text-justify">
           <p>Eu sou uma pessoa simples, porém complexa.</p>
           <p>Sou um apixonado por futebol, mas detesto uma discussão de fã, esse papo de "se foi penalti a favor está certo, caso contrário não foi" é muito entediante pra mim. 🙄</p>
           <p>¡Hala MADRID y nada más! <img src="../assets/real_madrid.svg" class="inline-block w-[20px]" /></p>
@@ -47,3 +47,29 @@ export default defineComponent({
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.social-links {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 700px) {
+  .about-introduction {
+    flex-direction: column;
+  }
+
+  .about-image {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .about-biography {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .social-links :deep(.q-btn) {
+    flex: 0 0 auto;
+  }
+}
+</style>

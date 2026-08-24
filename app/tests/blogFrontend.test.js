@@ -219,6 +219,15 @@ describe("public blog frontend", () => {
     assert.match(article, /flex-direction:\s*column/);
   });
 
+  it("contains rendered Markdown and article tags inside compact viewports", () => {
+    const article = read("../src/components/BlogArticle.vue");
+
+    assert.match(article, /class="article-tags"/);
+    assert.match(article, /overflow-wrap:\s*anywhere/);
+    assert.match(article, /overflow-x:\s*auto/);
+    assert.match(article, /max-width:\s*100%/);
+  });
+
   it("uses validated browser history state for the archive return action", () => {
     const stored = blogArticleComponent({ historyState: { blogReturnTo: "/blog?page=4&tag=architecture" } });
     const unsafe = blogArticleComponent({ historyState: { blogReturnTo: "https://untrusted.example.test" } });

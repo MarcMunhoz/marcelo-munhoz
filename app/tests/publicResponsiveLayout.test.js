@@ -1,0 +1,45 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { describe, it } from "node:test";
+
+const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
+
+describe("public responsive layout", () => {
+  it("keeps the compact global shell accessible and contained", () => {
+    const layout = read("../src/layouts/MainLayout.vue");
+    const app = read("../src/App.vue");
+
+    assert.match(layout, /class="site-toolbar"/);
+    assert.match(layout, /class="site-toolbar-title"/);
+    assert.match(layout, /aria-label="About"/);
+    assert.match(layout, /aria-label="Blog"/);
+    assert.match(layout, /aria-label="Admin"/);
+    assert.match(layout, /class="site-footer-content"/);
+    assert.match(layout, /white-space:\s*normal/);
+    assert.match(layout, /min-width:\s*min\(240px,\s*calc\(100vw - 24px\)\)/);
+    assert.match(layout, /@media \(max-width:\s*700px\)/);
+    assert.match(app, /class="cookie-card"/);
+    assert.match(app, /class="cookie-card-body"/);
+    assert.match(app, /overflow-y:\s*auto/);
+  });
+
+  it("bounds public page content at the compact breakpoint", () => {
+    const home = read("../src/pages/IndexPage.vue");
+    const about = read("../src/pages/About.vue");
+    const article = read("../src/components/BlogArticle.vue");
+
+    assert.match(home, /clamp\(/);
+    assert.match(home, /knowledge-grid/);
+    assert.match(home, /home-project-chips/);
+    assert.match(home, /@media \(max-width:\s*700px\)/);
+    const compactProjectChipRule = home.match(/\.home-project-chips :deep\(\.q-chip\) \{([\s\S]*?)\n  \}/)?.[1] || "";
+    assert.match(compactProjectChipRule, /height:\s*auto/);
+    assert.match(compactProjectChipRule, /min-height:\s*2em/);
+    assert.match(about, /about-introduction/);
+    assert.match(about, /@media \(max-width:\s*700px\)/);
+    assert.match(article, /article-tags/);
+    assert.match(article, /overflow-wrap:\s*anywhere/);
+    assert.match(article, /overflow-x:\s*auto/);
+    assert.match(article, /max-width:\s*100%/);
+  });
+});

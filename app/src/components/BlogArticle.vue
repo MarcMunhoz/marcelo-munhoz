@@ -2,7 +2,7 @@
   <q-page class="q-pa-md row items-start">
     <q-circular-progress v-if="progress" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
 
-    <article class="w-full" :class="progress && 'hidden'">
+    <article class="article-content w-full" :class="progress && 'hidden'">
       <router-link :to="archiveLocation" class="article-return">
         <q-icon name="fa-solid fa-arrow-left" aria-hidden="true" />
         <span>{{ navigationLabels.all }}</span>
@@ -90,7 +90,7 @@
       <div class="rendered-text"></div>
 
       <section class="my-4">
-        <ul class="flex flex-row gap-4 justify-center">
+        <ul class="article-tags">
           <li v-for="tag in articleTags" :key="tag" class="cursor-pointer bg-blue-grey-1 text-blue-grey-3 font-bold p-1">
             <router-link :to="{ name: 'Meus Artigos', query: { tag } }">#{{ tag }}</router-link>
           </li>
@@ -471,6 +471,8 @@ export default defineComponent({
 :deep(.rendered-text) {
   font-size: 1.3em;
   font-weight: 300;
+  min-width: 0;
+  overflow-wrap: anywhere;
 
   h1 {
     font-size: 2em;
@@ -517,6 +519,8 @@ export default defineComponent({
 
   pre {
     background-color: $grey-3;
+    max-width: 100%;
+    overflow-x: auto;
     padding: 1em;
 
     code {
@@ -528,9 +532,35 @@ export default defineComponent({
   }
 
   img {
+    height: auto;
     margin: 1em auto;
+    max-width: 100%;
     object-fit: cover;
   }
+
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+.article-content,
+.article-tags {
+  min-width: 0;
+}
+
+.article-tags {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.article-tags li {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 700px) {

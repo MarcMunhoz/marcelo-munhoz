@@ -1,12 +1,12 @@
 <template>
   <q-layout view="hHh lpR fff">
     <q-header elevated reveal class="bg-grey-5">
-      <q-toolbar>
+      <q-toolbar class="site-toolbar">
         <q-avatar>
           <img :src="avatar" class="" />
         </q-avatar>
 
-        <q-toolbar-title>
+        <q-toolbar-title class="site-toolbar-title">
           <span v-if="$route.path !== '/'">
             <span @click="$router.push('/')" @mouseover="avatarOver" @mouseleave="avatarLeave" class="cursor-pointer uppercase">Marcelo Munhoz</span>
             | <i class="not-italic text-blue-grey-5 header-title">{{ $route.name }}</i>
@@ -14,9 +14,14 @@
           <span v-else @mouseover="avatarOver" @mouseleave="avatarLeave" class="uppercase"> Marcelo Munhoz </span>
         </q-toolbar-title>
 
-        <q-btn outline icon="badge" label="About" to="/about" size="sm" class="mr-4" color="blue-grey-5" />
-        <q-btn outline icon="newspaper" label="Blog" to="/blog" size="sm" class="mr-4" color="blue-grey-5" />
-        <q-btn-dropdown outline no-caps icon="edit_note" :label="adminNavLabel" size="sm" color="blue-grey-5" class="admin-account-menu">
+        <q-btn outline icon="badge" label="About" aria-label="About" to="/about" size="sm" class="site-nav-action mr-4" color="blue-grey-5">
+          <q-tooltip>About</q-tooltip>
+        </q-btn>
+        <q-btn outline icon="newspaper" label="Blog" aria-label="Blog" to="/blog" size="sm" class="site-nav-action mr-4" color="blue-grey-5">
+          <q-tooltip>Blog</q-tooltip>
+        </q-btn>
+        <q-btn-dropdown outline no-caps icon="edit_note" :label="adminNavLabel" aria-label="Admin" size="sm" color="blue-grey-5" class="site-nav-action admin-account-menu">
+          <q-tooltip>Admin</q-tooltip>
           <q-list class="admin-account-list">
             <q-item class="admin-account-summary">
               <q-item-section avatar>
@@ -67,8 +72,8 @@
     </q-page-container>
 
     <q-footer elevated class="bg-grey-5 text-center py-2">
-      <q-toolbar>
-        <q-toolbar-title class="text-base">
+      <q-toolbar class="site-footer-toolbar">
+        <q-toolbar-title class="site-footer-content" :class="['text-base']">
           © 2018-Today / Copyright Marcelo Munhoz. All rights reserved.
           <p class="text-sm">
             This site is built with
@@ -217,5 +222,45 @@ export default defineComponent({
   cursor: default;
   padding-bottom: 12px;
   padding-top: 12px;
+}
+
+.site-footer-content {
+  min-width: 0;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+@media (max-width: 700px) {
+  .site-toolbar {
+    gap: 0.25rem;
+    min-width: 0;
+    padding-inline: 0.5rem;
+  }
+
+  .site-toolbar-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .site-nav-action {
+    flex: 0 0 auto;
+    margin-right: 0 !important;
+
+    :deep(.block) {
+      display: none;
+    }
+  }
+
+  .admin-account-list {
+    min-width: min(240px, calc(100vw - 24px));
+  }
+
+  .site-footer-toolbar {
+    min-width: 0;
+    padding-inline: 0.75rem;
+  }
 }
 </style>
