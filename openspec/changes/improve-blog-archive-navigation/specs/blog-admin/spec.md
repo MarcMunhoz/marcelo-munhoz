@@ -119,6 +119,11 @@ The system SHALL let the owner review and manage Contentful article tags from th
 - **THEN** the server retries once after the provider reset
 - **AND** a repeated or long rate limit returns a safe actionable error without weakening usage revalidation
 
+#### Scenario: Owner deletion crosses the administrative transport boundary
+- **WHEN** the owner confirms deletion of an unused tag
+- **THEN** the browser sends an owner-only POST deletion command to the administrative Function
+- **AND** the server preserves reference checks and performs the versioned DELETE only against Contentful
+
 #### Scenario: Writer accesses tag management
 - **WHEN** an authenticated non-owner requests the tag-management page or destructive API
 - **THEN** the system denies the owner-only operation

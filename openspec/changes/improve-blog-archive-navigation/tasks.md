@@ -94,3 +94,10 @@
 - [x] 14.2 Center the visibility value structurally and add focused regression coverage for access, navigation, deletion, and indexing.
 - [x] 14.3 Run focused and full verification, lint, production build, credential scan, strict OpenSpec validation, and repository hygiene checks.
 - [ ] 14.4 Repeat the affected login, compact navigation, and unused-tag deletion smoke checks on deployed staging.
+
+## 15. Staging Feedback Follow-up
+
+- [x] 15.1 Route browser tag deletion through an owner-only POST command while preserving provider-side versioned DELETE and reference validation.
+- [x] 15.2 Remove compact dashboard vertical whitespace caused by horizontal flex bases after the layout stacks.
+- [x] 15.3 Close rejected access challenges with the uppercase `AMIGO` hint and return rejected or signed-out administrative visitors Home.
+- [ ] 15.4 Repeat tag deletion, compact dashboard spacing, logout, and rejected-challenge smoke checks on deployed staging.

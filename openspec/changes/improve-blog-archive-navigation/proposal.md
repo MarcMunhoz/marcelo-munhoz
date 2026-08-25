@@ -16,6 +16,7 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Adapt the dashboard, complete article actions, focused editor, and media dialog at the existing 720-pixel admin breakpoint while preserving desktop presentation.
 - Hide administrative discovery from signed-out navigation and search crawlers, and reveal Netlify Identity only through the three-click `AMIGO` challenge.
 - Replace ambiguous compact header icons with one labelled navigation menu and make tag deletion resilient to bounded Contentful rate limits.
+- Keep tag deletion reachable through provider-hostile transports, remove compact dashboard flex gaps, and return rejected or signed-out administrative visitors Home.
 
 ## Capabilities
 

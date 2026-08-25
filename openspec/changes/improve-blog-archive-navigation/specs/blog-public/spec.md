@@ -25,6 +25,11 @@ The system SHALL omit administrative navigation for signed-out visitors and SHAL
 - **THEN** the Netlify Identity login opens
 - **AND** cancelling it leaves the public route usable for another attempt
 
+#### Scenario: Visitor submits the wrong administrative phrase
+- **WHEN** the visitor submits a phrase other than exact `AMIGO`
+- **THEN** the challenge closes and displays `Você não é um AMIGO, até a próxima!`
+- **AND** the application replaces the current route with Home without opening Netlify Identity
+
 #### Scenario: Signed-out visitor opens an administrative URL directly
 - **WHEN** no authenticated session is available
 - **THEN** the application returns to Home without opening the login widget
@@ -34,6 +39,11 @@ The system SHALL omit administrative navigation for signed-out visitors and SHAL
 - **WHEN** an administrative session is available
 - **THEN** desktop navigation shows the account menu
 - **AND** compact navigation includes Dashboard, profile, and sign-out items with icon and text
+
+#### Scenario: Authenticated visitor signs out from an administrative route
+- **WHEN** Netlify Identity confirms logout
+- **THEN** the application clears the administrative session and profile
+- **AND** it replaces the current route with Home so stale administrative content is not retained
 
 ### Requirement: Public Blog Provides A Scalable Hybrid Archive
 The system SHALL present automatic recent highlights and a compact paginated archive whose state is represented by the public URL.

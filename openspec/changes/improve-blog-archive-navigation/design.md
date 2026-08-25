@@ -85,6 +85,8 @@ At the public compact breakpoint, About and Blog move into one labelled dropdown
 
 Contentful Management requests retry one short `429` response using the provider reset header. Longer or repeated rate limits fail with a safe actionable message. Tag usage revalidation and version locking remain unchanged.
 
+The browser submits tag deletion as an owner-only POST command so method-specific transport restrictions cannot block the Netlify Function; the Function still performs a versioned DELETE against Contentful after reference validation. Compact dashboard search controls reset their horizontal flex basis when stacked so it cannot become vertical whitespace. Logout events and rejected access challenges replace the current route with Home; this forced signed-out navigation bypasses the editor's unsaved-change guard because the session has already ended. An incorrect phrase closes the challenge and emits the second hint `Você não é um AMIGO, até a próxima!`.
+
 ## Risks / Trade-offs
 
 - Filtering and pagination can produce invalid or stale query values: normalize them at the public boundary and synchronize the returned canonical page.
