@@ -131,7 +131,7 @@
 <script>
 import { defineComponent } from "vue";
 import { getAuthorProfile, updateAuthorProfile, adminUserMessage } from "../utils/adminApi.js";
-import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
+import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession } from "../utils/adminAuth.js";
 import {
   authorProfileToForm,
   buildAuthorProfilePayload,
@@ -155,7 +155,6 @@ export default defineComponent({
     return {
       session: null,
       sessionResolved: false,
-      loginRedirecting: false,
       profileForm: createEmptyAuthorProfileForm(),
       profilePhotoIndex: 0,
       errors: {},
@@ -175,7 +174,7 @@ export default defineComponent({
       return isWriterSession(this.session);
     },
     showProfileSurface() {
-      return this.sessionResolved && !this.loginRedirecting;
+      return this.sessionResolved;
     },
     sessionDisplay() {
       return adminSessionDisplay(this.session);
@@ -228,7 +227,7 @@ export default defineComponent({
     this.bindIdentityCallbacks();
     this.session = await getAdminSession();
     this.sessionResolved = true;
-    this.redirectToLoginIfSignedOut();
+    this.redirectSignedOutVisitor();
     this.loadAuthorProfile();
   },
   methods: {
@@ -244,18 +243,13 @@ export default defineComponent({
           identity.close();
         }
 
-        this.loginRedirecting = false;
         this.session = await getAdminSession();
         this.loadAuthorProfile();
       });
     },
-    openLogin() {
-      openAdminLogin();
-    },
-    redirectToLoginIfSignedOut() {
+    redirectSignedOutVisitor() {
       if (!this.session) {
-        this.loginRedirecting = true;
-        this.openLogin();
+        this.$router.replace("/");
       }
     },
     async loadAuthorProfile() {

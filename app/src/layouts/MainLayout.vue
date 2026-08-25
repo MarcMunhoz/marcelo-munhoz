@@ -8,19 +8,20 @@
 
         <q-toolbar-title class="site-toolbar-title">
           <span v-if="$route.path !== '/'">
-            <span @click="$router.push('/')" @mouseover="avatarOver" @mouseleave="avatarLeave" class="cursor-pointer uppercase">Marcelo Munhoz</span>
+            <span role="button" tabindex="0" class="site-name cursor-pointer uppercase" @click="handleNameClick" @keyup.enter="handleNameClick" @keyup.space.prevent="handleNameClick">Marcelo Munhoz</span>
             | <i class="not-italic text-blue-grey-5 header-title">{{ $route.name }}</i>
           </span>
-          <span v-else @mouseover="avatarOver" @mouseleave="avatarLeave" class="uppercase"> Marcelo Munhoz </span>
+          <span v-else role="button" tabindex="0" class="site-name cursor-pointer uppercase" @click="handleNameClick" @keyup.enter="handleNameClick" @keyup.space.prevent="handleNameClick"> Marcelo Munhoz </span>
         </q-toolbar-title>
 
-        <q-btn outline icon="badge" label="About" aria-label="About" to="/about" size="sm" class="site-nav-action mr-4" color="blue-grey-5">
+        <q-btn outline icon="badge" label="About" aria-label="About" to="/about" size="sm" class="site-nav-action desktop-navigation-action mr-4" color="blue-grey-5">
           <q-tooltip>About</q-tooltip>
         </q-btn>
-        <q-btn outline icon="newspaper" label="Blog" aria-label="Blog" to="/blog" size="sm" class="site-nav-action mr-4" color="blue-grey-5">
+        <q-btn outline icon="newspaper" label="Blog" aria-label="Blog" to="/blog" size="sm" class="site-nav-action desktop-navigation-action mr-4" color="blue-grey-5">
           <q-tooltip>Blog</q-tooltip>
         </q-btn>
         <q-btn-dropdown
+          v-if="adminSession"
           id="admin-menu-trigger"
           outline
           no-caps
@@ -30,7 +31,7 @@
           toggle-aria-label="Admin"
           size="sm"
           color="blue-grey-5"
-          class="site-nav-action admin-account-menu"
+          class="site-nav-action desktop-navigation-action admin-account-menu"
         >
           <q-list class="admin-account-list">
             <q-item class="admin-account-summary">
@@ -74,7 +75,42 @@
             </q-item>
           </q-list>
         </q-btn-dropdown>
-        <q-tooltip target="#admin-menu-trigger">Admin</q-tooltip>
+        <q-tooltip v-if="adminSession" target="#admin-menu-trigger">Admin</q-tooltip>
+
+        <q-btn-dropdown
+          outline
+          no-caps
+          icon="menu"
+          aria-label="Navigation menu"
+          toggle-aria-label="Navigation menu"
+          size="sm"
+          color="blue-grey-5"
+          class="mobile-navigation-menu"
+        >
+          <q-list class="mobile-navigation-list">
+            <q-item clickable v-close-popup to="/about">
+              <q-item-section avatar><q-icon name="badge" /></q-item-section>
+              <q-item-section>About</q-item-section>
+            </q-item>
+            <q-item clickable v-close-popup to="/blog">
+              <q-item-section avatar><q-icon name="newspaper" /></q-item-section>
+              <q-item-section>Blog</q-item-section>
+            </q-item>
+            <q-separator v-if="adminSession" />
+            <q-item v-if="adminSession" clickable v-close-popup to="/admin">
+              <q-item-section avatar><q-icon name="dashboard" /></q-item-section>
+              <q-item-section>Dashboard</q-item-section>
+            </q-item>
+            <q-item v-if="adminSession" clickable v-close-popup to="/admin/profile">
+              <q-item-section avatar><q-icon name="person" /></q-item-section>
+              <q-item-section>Author profile</q-item-section>
+            </q-item>
+            <q-item v-if="adminDisplay.canSignOut" clickable v-close-popup @click="signOut">
+              <q-item-section avatar><q-icon name="logout" /></q-item-section>
+              <q-item-section>Sign out</q-item-section>
+            </q-item>
+          </q-list>
+        </q-btn-dropdown>
       </q-toolbar>
     </q-header>
 
@@ -94,16 +130,38 @@
       </q-toolbar>
     </q-footer>
 
-    <audio class="insivible-btn hidden" preload="auto"></audio>
+    <q-dialog v-model="adminAccessDialog">
+      <q-card class="admin-access-card">
+        <q-card-section>
+          <h2 class="admin-access-title">Diga “AMIGO” e entre</h2>
+          <p class="admin-access-copy">Digite a palavra para abrir o acesso administrativo.</p>
+        </q-card-section>
+        <q-form @submit.prevent="submitAdminAccess">
+          <q-card-section>
+            <q-input v-model="adminAccessPhrase" autofocus outlined label="Palavra" :error="adminAccessError" error-message="A palavra não confere." />
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn flat no-caps label="Cancelar" v-close-popup />
+            <q-btn unelevated no-caps color="blue-grey-8" label="Entrar" type="submit" />
+          </q-card-actions>
+        </q-form>
+      </q-card>
+    </q-dialog>
   </q-layout>
 </template>
 
 <script>
 import { defineComponent } from "vue";
-import imageUrl from "../assets/rebellion-rebel-alliance-logo.png";
-import audioFile from "../assets/r2d2.ogg";
 import { getAuthorProfile } from "../utils/adminApi.js";
-import { adminAccountInitials, adminSessionDisplay, getAdminSession, signOutAdmin } from "../utils/adminAuth.js";
+import {
+  adminAccessPhraseMatches,
+  adminAccountInitials,
+  adminSessionDisplay,
+  getAdminSession,
+  nextAdminAccessClick,
+  openAdminLogin,
+  signOutAdmin,
+} from "../utils/adminAuth.js";
 import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
 
 export default defineComponent({
@@ -114,6 +172,12 @@ export default defineComponent({
       adminSession: null,
       adminProfile: null,
       adminProfilePhotoIndex: 0,
+      adminAccessDialog: false,
+      adminAccessPhrase: "",
+      adminAccessError: false,
+      adminAccessClickState: null,
+      nameNavigationTimer: null,
+      adminLoginRequested: false,
     };
   },
   computed: {
@@ -138,6 +202,9 @@ export default defineComponent({
     await this.loadAdminProfile();
     this.bindIdentityCallbacks();
   },
+  beforeUnmount() {
+    clearTimeout(this.nameNavigationTimer);
+  },
   methods: {
     bindIdentityCallbacks() {
       const identity = globalThis.netlifyIdentity;
@@ -153,6 +220,10 @@ export default defineComponent({
 
         this.adminSession = await getAdminSession();
         await this.loadAdminProfile();
+        if (this.adminLoginRequested && this.adminSession) {
+          this.adminLoginRequested = false;
+          await this.$router.push("/admin");
+        }
       });
       identity.on("logout", () => {
         this.adminSession = null;
@@ -186,25 +257,35 @@ export default defineComponent({
         this.adminSession = null;
       }
     },
-    avatarOver() {
-      // Simulating the first document interaction and triggering the Easter egg
-      const phantomAudio = document.querySelector(".insivible-btn");
-      phantomAudio.setAttribute("src", audioFile);
-
-      var phantomPromise = document.querySelector(".insivible-btn").play();
-
-      if (phantomPromise !== undefined) {
-        phantomPromise
-          .then((_) => {
-            return (this.avatar = imageUrl), phantomAudio.play();
-          })
-          .catch(() => {
-            return console.warn("Interact with the page, mouse over my name and welcome to the Rebel Alliance!");
-          });
-      }
+    navigateHome() {
+      if (this.$route.path !== "/") this.$router.push("/");
     },
-    avatarLeave() {
-      return (this.avatar = "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c");
+    handleNameClick() {
+      const result = nextAdminAccessClick(this.adminAccessClickState);
+      this.adminAccessClickState = result.state;
+      clearTimeout(this.nameNavigationTimer);
+
+      if (result.unlock) {
+        this.adminAccessPhrase = "";
+        this.adminAccessError = false;
+        this.adminAccessDialog = true;
+        return;
+      }
+
+      this.nameNavigationTimer = setTimeout(() => {
+        this.adminAccessClickState = null;
+        this.navigateHome();
+      }, 600);
+    },
+    submitAdminAccess() {
+      if (!adminAccessPhraseMatches(this.adminAccessPhrase)) {
+        this.adminAccessError = true;
+        return;
+      }
+
+      this.adminAccessError = false;
+      this.adminAccessDialog = false;
+      this.adminLoginRequested = openAdminLogin();
     },
   },
 });
@@ -227,6 +308,29 @@ export default defineComponent({
 
 .admin-account-list {
   min-width: 240px;
+}
+
+.mobile-navigation-menu {
+  display: none;
+}
+
+.mobile-navigation-list {
+  min-width: min(240px, calc(100vw - 24px));
+}
+
+.admin-access-card {
+  max-width: calc(100vw - 24px);
+  width: 380px;
+}
+
+.admin-access-title {
+  font-size: 1.25rem;
+  margin: 0 0 0.35rem;
+}
+
+.admin-access-copy {
+  color: #546e7a;
+  margin: 0;
 }
 
 .admin-account-summary {
@@ -256,13 +360,13 @@ export default defineComponent({
     white-space: nowrap;
   }
 
-  .site-nav-action {
-    flex: 0 0 auto;
-    margin-right: 0 !important;
+  .desktop-navigation-action {
+    display: none;
+  }
 
-    :deep(.block) {
-      display: none !important;
-    }
+  .mobile-navigation-menu {
+    display: inline-flex;
+    flex: 0 0 auto;
   }
 
   .admin-account-list {

@@ -40,7 +40,9 @@
         >
           <template #body-cell-visibility="props">
             <q-td :props="props" class="tag-visibility-cell">
-              <q-badge outline color="blue-grey-7">{{ props.row.visibility || "private" }}</q-badge>
+              <span class="tag-visibility-content">
+                <q-badge outline color="blue-grey-7">{{ props.row.visibility || "private" }}</q-badge>
+              </span>
             </q-td>
           </template>
 
@@ -112,7 +114,7 @@ export default defineComponent({
     this.sessionResolved = true;
 
     if (!this.isOwner) {
-      await this.$router.replace("/admin");
+      await this.$router.replace(this.session ? "/admin" : "/");
       return;
     }
 
@@ -286,6 +288,12 @@ export default defineComponent({
 
 .tag-visibility-cell {
   text-align: center;
+}
+
+.tag-visibility-content {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .tag-article-count-cell {

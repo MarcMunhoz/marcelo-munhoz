@@ -33,6 +33,10 @@ export default defineComponent({
             name: "description",
             content: "Some brief histories of my past-present development experience. The life, the universe and everything about a tech life",
           },
+          robots: {
+            name: "robots",
+            content: this.$route.meta?.requiresAdmin ? "noindex,nofollow" : "index,follow",
+          },
         },
       };
     }),

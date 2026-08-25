@@ -159,6 +159,20 @@ describe("admin frontend writer workflow", () => {
     assert.match(layout, /adminInitials/);
     assert.match(layout, /admin-account-menu/);
     assert.match(layout, /q-btn-dropdown/);
+    assert.match(layout, /v-if="adminSession"/);
+    assert.match(layout, /Diga “AMIGO” e entre/);
+    assert.match(layout, /submitAdminAccess/);
+    assert.match(layout, /@keyup\.enter="handleNameClick"/);
+    assert.match(layout, /@keyup\.space\.prevent="handleNameClick"/);
+    assert.doesNotMatch(layout, /r2d2|rebel-alliance|avatarOver/);
+  });
+
+  it("keeps administrative routes out of search indexes", () => {
+    const app = read("../src/App.vue");
+    const robots = read("../public/robots.txt");
+
+    assert.match(app, /requiresAdmin\s*\?\s*"noindex,nofollow"\s*:\s*"index,follow"/);
+    assert.match(robots, /Disallow:\s*\/admin/);
   });
 
   it("provides writer session helpers without adding an auth package", () => {
@@ -170,17 +184,16 @@ describe("admin frontend writer workflow", () => {
     assert.match(auth, /isOwnerSession/);
   });
 
-  it("redirects signed-out production visitors to Netlify Identity login", () => {
+  it("returns signed-out production visitors home without opening Identity", () => {
     const page = read("../src/pages/Admin.vue");
 
     assert.match(page, /v-if="showAdminSurface"/);
-    assert.match(page, /loginRedirecting:\s*false/);
     assert.match(page, /sessionResolved:\s*false/);
     assert.match(page, /showAdminSurface\(\)/);
-    assert.match(page, /redirectToLoginIfSignedOut/);
+    assert.match(page, /redirectSignedOutVisitor/);
     assert.match(page, /if\s*\(!this\.session\)\s*{/);
-    assert.match(page, /this\.loginRedirecting\s*=\s*true/);
-    assert.match(page, /this\.openLogin\(\)/);
+    assert.match(page, /this\.\$router\.replace\("\/"\)/);
+    assert.doesNotMatch(page, /openAdminLogin/);
   });
 
   it("closes the Netlify Identity modal and reloads admin data after login", () => {
@@ -189,7 +202,6 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /bindIdentityCallbacks/);
     assert.match(page, /identity\.on\("login"/);
     assert.match(page, /identity\.close\(\)/);
-    assert.match(page, /this\.loginRedirecting\s*=\s*false/);
     assert.match(page, /this\.session\s*=\s*await getAdminSession\(\)/);
     assert.match(page, /this\.loadArticleDashboard\(\)/);
   });
@@ -662,10 +674,12 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /\.tag-delete-action\s*\{[^}]*display:\s*flex;[^}]*gap:\s*8px;[^}]*justify-content:\s*flex-end;/s);
     assert.match(page, /\.tag-delete-action\s+\.q-btn\s*\{[^}]*flex:\s*0 0 auto;/s);
     assert.match(page, /class="tag-visibility-cell"/);
+    assert.match(page, /class="tag-visibility-content"/);
     assert.match(page, /name:\s*"visibility"[^\n]*align:\s*"center"/);
     assert.match(page, /name:\s*"articleCount"[^\n]*align:\s*"center"/);
     assert.match(page, /class="tag-article-count-cell"/);
     assert.match(page, /\.tag-visibility-cell\s*\{[^}]*text-align:\s*center;/s);
+    assert.match(page, /\.tag-visibility-content\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*center;/s);
     assert.doesNotMatch(page, /listAdminArticles/);
     assert.match(dashboard, /toggleTagFilter/);
     assert.match(dashboard, /filters\.tag === tag\.id/);

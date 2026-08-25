@@ -23,7 +23,6 @@
           <div>
             <h2>Writer access required</h2>
             <p>Sign in with an invited writer account to manage blog drafts.</p>
-            <q-btn outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
           </div>
         </section>
 
@@ -281,7 +280,7 @@ import {
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
 import { toggleArticleTagFilter } from "../utils/adminTags.js";
-import { getAdminSession, isOwnerSession, isWriterSession, openAdminLogin, signOutAdmin } from "../utils/adminAuth.js";
+import { getAdminSession, isOwnerSession, isWriterSession, signOutAdmin } from "../utils/adminAuth.js";
 
 export default defineComponent({
   name: "AdminPage",
@@ -290,7 +289,6 @@ export default defineComponent({
     return {
       session: null,
       sessionResolved: false,
-      loginRedirecting: false,
       activeSection: "dashboard",
       articles: [],
       adminSummary: summarizeArticleStatuses([]),
@@ -341,7 +339,7 @@ export default defineComponent({
       return isWriterSession(this.session);
     },
     showAdminSurface() {
-      return this.sessionResolved && !this.loginRedirecting;
+      return this.sessionResolved;
     },
     isOwner() {
       return isOwnerSession(this.session);
@@ -370,7 +368,7 @@ export default defineComponent({
     this.bindIdentityCallbacks();
     this.session = await getAdminSession();
     this.sessionResolved = true;
-    this.redirectToLoginIfSignedOut();
+    this.redirectSignedOutVisitor();
     this.loadArticleDashboard();
   },
   beforeUnmount() {
@@ -391,18 +389,13 @@ export default defineComponent({
           identity.close();
         }
 
-        this.loginRedirecting = false;
         this.session = await getAdminSession();
         this.loadArticleDashboard();
       });
     },
-    openLogin() {
-      openAdminLogin();
-    },
-    redirectToLoginIfSignedOut() {
+    redirectSignedOutVisitor() {
       if (!this.session) {
-        this.loginRedirecting = true;
-        this.openLogin();
+        this.$router.replace("/");
       }
     },
     async loadArticleDashboard() {

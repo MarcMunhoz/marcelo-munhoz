@@ -1,5 +1,19 @@
 const PREVIEW_ROLE_STORAGE_KEY = "admin.previewRole";
 const PREVIEW_ROLES = new Set(["writer", "owner"]);
+const ADMIN_ACCESS_CLICK_WINDOW_MS = 600;
+
+export const nextAdminAccessClick = (state, now = Date.now()) => {
+  const insideWindow = state && now - state.lastClickAt <= ADMIN_ACCESS_CLICK_WINDOW_MS;
+  const count = insideWindow ? state.count + 1 : 1;
+
+  if (count === 3) {
+    return { state: null, unlock: true };
+  }
+
+  return { state: { count, lastClickAt: now }, unlock: false };
+};
+
+export const adminAccessPhraseMatches = (value) => String(value || "").trim() === "AMIGO";
 
 export const selectedPreviewRole = ({ storage = globalThis.localStorage } = {}) => {
   const role = storage?.getItem?.(PREVIEW_ROLE_STORAGE_KEY);

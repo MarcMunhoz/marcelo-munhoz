@@ -34,7 +34,6 @@
         <div>
           <h2>Writer access required</h2>
           <p>Sign in with an invited writer account to edit articles.</p>
-          <q-btn outline color="blue-grey-7" icon="login" label="Sign in" size="sm" @click="openLogin" />
         </div>
       </section>
 
@@ -347,7 +346,7 @@ import {
   runTerminalAdminAction,
   slugFromTitle,
 } from "../utils/adminDashboard.js";
-import { getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
+import { getAdminSession, isWriterSession } from "../utils/adminAuth.js";
 import { normalizeEditorialTagOptions } from "../utils/adminTags.js";
 import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
 import { marked } from "marked";
@@ -358,7 +357,6 @@ export default defineComponent({
     return {
       session: null,
       sessionResolved: false,
-      loginRedirecting: false,
       articleForm: createEmptyArticleForm(),
       originalFormSnapshot: "",
       slugTouched: false,
@@ -395,7 +393,7 @@ export default defineComponent({
       return isWriterSession(this.session);
     },
     showEditorSurface() {
-      return this.sessionResolved && !this.loginRedirecting;
+      return this.sessionResolved;
     },
     isNewArticle() {
       return this.$route.name === "Admin Article New";
@@ -440,7 +438,7 @@ export default defineComponent({
     this.bindIdentityCallbacks();
     this.session = await getAdminSession();
     this.sessionResolved = true;
-    this.redirectToLoginIfSignedOut();
+    this.redirectSignedOutVisitor();
     await this.loadEditor();
   },
   beforeRouteLeave(_to, _from, next) {
@@ -464,18 +462,13 @@ export default defineComponent({
           identity.close();
         }
 
-        this.loginRedirecting = false;
         this.session = await getAdminSession();
         await this.loadEditor();
       });
     },
-    openLogin() {
-      openAdminLogin();
-    },
-    redirectToLoginIfSignedOut() {
+    redirectSignedOutVisitor() {
       if (!this.session) {
-        this.loginRedirecting = true;
-        this.openLogin();
+        this.$router.replace("/");
       }
     },
     snapshotForm() {
