@@ -1138,7 +1138,9 @@ export default defineComponent({
   }
 
   .admin-search {
+    flex: 0 1 auto;
     min-width: 0;
+    width: 100%;
   }
 
   .status-grid {

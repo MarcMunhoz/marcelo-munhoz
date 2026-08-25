@@ -1,6 +1,7 @@
 const PREVIEW_ROLE_STORAGE_KEY = "admin.previewRole";
 const PREVIEW_ROLES = new Set(["writer", "owner"]);
 const ADMIN_ACCESS_CLICK_WINDOW_MS = 600;
+let adminSignOutNavigation = false;
 
 export const nextAdminAccessClick = (state, now = Date.now()) => {
   const insideWindow = state && now - state.lastClickAt <= ADMIN_ACCESS_CLICK_WINDOW_MS;
@@ -14,6 +15,27 @@ export const nextAdminAccessClick = (state, now = Date.now()) => {
 };
 
 export const adminAccessPhraseMatches = (value) => String(value || "").trim() === "AMIGO";
+
+export const isAdminSignOutNavigation = () => adminSignOutNavigation;
+
+export const redirectSignedOutAdmin = async ({ router, currentPath = "/" } = {}) => {
+  if (currentPath === "/" || typeof router?.replace !== "function") {
+    return false;
+  }
+
+  adminSignOutNavigation = true;
+  try {
+    await router.replace("/");
+    return true;
+  } finally {
+    adminSignOutNavigation = false;
+  }
+};
+
+export const rejectAdminAccess = async ({ notifyImpl, router, currentPath = "/" } = {}) => {
+  notifyImpl?.({ type: "negative", message: "Você não é um AMIGO, até a próxima!" });
+  await redirectSignedOutAdmin({ router, currentPath });
+};
 
 export const selectedPreviewRole = ({ storage = globalThis.localStorage } = {}) => {
   const role = storage?.getItem?.(PREVIEW_ROLE_STORAGE_KEY);

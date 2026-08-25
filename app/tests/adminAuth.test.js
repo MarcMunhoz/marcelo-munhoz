@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { adminAccountInitials, adminSessionDisplay, createPreviewSession, getAdminSession, openAdminLogin, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
+import { adminAccountInitials, adminSessionDisplay, createPreviewSession, getAdminSession, isAdminSignOutNavigation, openAdminLogin, redirectSignedOutAdmin, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
 
 describe("admin auth preview sessions", () => {
   it("uses owner as the default local preview role for full admin testing", () => {
@@ -162,5 +162,27 @@ describe("admin auth preview sessions", () => {
 
     assert.equal(await signOutAdmin({ identity, confirmImpl: () => true }), true);
     assert.deepEqual(calls, ["logout"]);
+  });
+
+  it("returns a signed-out admin route home without adding browser history", async () => {
+    const routes = [];
+
+    assert.equal(isAdminSignOutNavigation(), false);
+    assert.equal(
+      await redirectSignedOutAdmin({
+        currentPath: "/admin",
+        router: {
+          replace: async (path) => {
+            assert.equal(isAdminSignOutNavigation(), true);
+            routes.push(path);
+          },
+        },
+      }),
+      true
+    );
+    assert.equal(isAdminSignOutNavigation(), false);
+    assert.deepEqual(routes, ["/"]);
+    assert.equal(await redirectSignedOutAdmin({ currentPath: "/", router: { replace: async (path) => routes.push(path) } }), false);
+    assert.deepEqual(routes, ["/"]);
   });
 });

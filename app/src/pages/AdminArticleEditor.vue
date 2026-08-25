@@ -346,7 +346,7 @@ import {
   runTerminalAdminAction,
   slugFromTitle,
 } from "../utils/adminDashboard.js";
-import { getAdminSession, isWriterSession } from "../utils/adminAuth.js";
+import { getAdminSession, isAdminSignOutNavigation, isWriterSession } from "../utils/adminAuth.js";
 import { normalizeEditorialTagOptions } from "../utils/adminTags.js";
 import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
 import { marked } from "marked";
@@ -442,6 +442,11 @@ export default defineComponent({
     await this.loadEditor();
   },
   beforeRouteLeave(_to, _from, next) {
+    if (isAdminSignOutNavigation()) {
+      next();
+      return;
+    }
+
     if (this.hasUnsavedChanges && !globalThis.confirm?.("Leave the article editor and discard unsaved changes?")) {
       next(false);
       return;

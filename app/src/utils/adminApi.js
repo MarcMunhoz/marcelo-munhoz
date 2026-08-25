@@ -161,8 +161,8 @@ export const createContentfulTag = ({ name, session, fetchImpl } = {}) =>
 
 export const deleteContentfulTag = ({ tagId, session, fetchImpl } = {}) =>
   adminRequest({
-    path: `/tags/${encodeURIComponent(tagId)}`,
-    method: "DELETE",
+    path: `/tags/${encodeURIComponent(tagId)}/delete`,
+    method: "POST",
     session,
     fetchImpl,
   });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { adminAccessPhraseMatches, nextAdminAccessClick } from "../src/utils/adminAuth.js";
+import { adminAccessPhraseMatches, nextAdminAccessClick, rejectAdminAccess } from "../src/utils/adminAuth.js";
 
 describe("hidden admin access", () => {
   it("unlocks only on three sequential name clicks inside the time window", () => {
@@ -30,5 +30,19 @@ describe("hidden admin access", () => {
     assert.equal(adminAccessPhraseMatches("amigo"), false);
     assert.equal(adminAccessPhraseMatches("AMIGA"), false);
     assert.equal(adminAccessPhraseMatches(null), false);
+  });
+
+  it("rejects a non-AMIGO visitor with a second hint and returns home", async () => {
+    const notifications = [];
+    const routes = [];
+
+    await rejectAdminAccess({
+      currentPath: "/blog",
+      notifyImpl: (options) => notifications.push(options),
+      router: { replace: async (path) => routes.push(path) },
+    });
+
+    assert.deepEqual(notifications, [{ type: "negative", message: "Você não é um AMIGO, até a próxima!" }]);
+    assert.deepEqual(routes, ["/"]);
   });
 });

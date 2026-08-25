@@ -138,7 +138,7 @@
         </q-card-section>
         <q-form @submit.prevent="submitAdminAccess">
           <q-card-section>
-            <q-input v-model="adminAccessPhrase" autofocus outlined label="Palavra" :error="adminAccessError" error-message="A palavra não confere." />
+            <q-input v-model="adminAccessPhrase" autofocus outlined label="Palavra" />
           </q-card-section>
           <q-card-actions align="right">
             <q-btn flat no-caps label="Cancelar" v-close-popup />
@@ -160,6 +160,8 @@ import {
   getAdminSession,
   nextAdminAccessClick,
   openAdminLogin,
+  redirectSignedOutAdmin,
+  rejectAdminAccess,
   signOutAdmin,
 } from "../utils/adminAuth.js";
 import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
@@ -174,7 +176,6 @@ export default defineComponent({
       adminProfilePhotoIndex: 0,
       adminAccessDialog: false,
       adminAccessPhrase: "",
-      adminAccessError: false,
       adminAccessClickState: null,
       nameNavigationTimer: null,
       adminLoginRequested: false,
@@ -225,11 +226,7 @@ export default defineComponent({
           await this.$router.push("/admin");
         }
       });
-      identity.on("logout", () => {
-        this.adminSession = null;
-        this.adminProfile = null;
-        this.adminProfilePhotoIndex = 0;
-      });
+      identity.on("logout", () => this.finishAdminSignOut());
     },
     async loadAdminProfile() {
       if (!this.adminSession) {
@@ -253,9 +250,13 @@ export default defineComponent({
     async signOut() {
       const signedOut = await signOutAdmin();
 
-      if (signedOut) {
-        this.adminSession = null;
-      }
+      if (signedOut && this.adminSession) await this.finishAdminSignOut();
+    },
+    async finishAdminSignOut() {
+      this.adminSession = null;
+      this.adminProfile = null;
+      this.adminProfilePhotoIndex = 0;
+      await redirectSignedOutAdmin({ router: this.$router, currentPath: this.$route.path });
     },
     navigateHome() {
       if (this.$route.path !== "/") this.$router.push("/");
@@ -267,7 +268,6 @@ export default defineComponent({
 
       if (result.unlock) {
         this.adminAccessPhrase = "";
-        this.adminAccessError = false;
         this.adminAccessDialog = true;
         return;
       }
@@ -277,13 +277,18 @@ export default defineComponent({
         this.navigateHome();
       }, 600);
     },
-    submitAdminAccess() {
+    async submitAdminAccess() {
       if (!adminAccessPhraseMatches(this.adminAccessPhrase)) {
-        this.adminAccessError = true;
+        this.adminAccessDialog = false;
+        this.adminAccessPhrase = "";
+        await rejectAdminAccess({
+          notifyImpl: (options) => this.$q.notify(options),
+          router: this.$router,
+          currentPath: this.$route.path,
+        });
         return;
       }
 
-      this.adminAccessError = false;
       this.adminAccessDialog = false;
       this.adminLoginRequested = openAdminLogin();
     },

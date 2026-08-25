@@ -315,8 +315,8 @@ describe("admin frontend writer workflow", () => {
     assert.deepEqual(deleted, { deletedTagId: "ai" });
     assert.equal(calls[0].url, "/api/admin/contentful/tags/manage");
     assert.equal(calls[0].options.method, "GET");
-    assert.equal(calls[1].url, "/api/admin/contentful/tags/ai");
-    assert.equal(calls[1].options.method, "DELETE");
+    assert.equal(calls[1].url, "/api/admin/contentful/tags/ai/delete");
+    assert.equal(calls[1].options.method, "POST");
   });
 
   it("calls owner lifecycle endpoints with version state and server authorization", async () => {
@@ -1330,6 +1330,7 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(editor, /beforeRouteLeave/);
     assert.match(editor, /Leave the article editor and discard unsaved changes/);
+    assert.match(editor, /if \(isAdminSignOutNavigation\(\)\)\s*\{\s*next\(\);\s*return;/);
     assert.doesNotMatch(editor, /v-model="articleForm\.version"/);
     assert.doesNotMatch(editor, /v-model="articleForm\.notes"/);
     assert.doesNotMatch(editor, /label="Author entry ID"/);
@@ -1589,6 +1590,7 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.status-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
     assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.admin-topbar-actions\s*\{[\s\S]*?flex:\s*0\s+1\s+auto/);
+    assert.match(page, /@media \(max-width:\s*720px\)[\s\S]*?\.admin-search\s*\{[\s\S]*?flex:\s*0\s+1\s+auto[\s\S]*?width:\s*100%/);
     assert.match(page, /@media \(max-width:\s*340px\)[\s\S]*?\.status-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
     assert.match(page, /\.admin-filter-tabs\s*\{[\s\S]*?overflow-x:\s*auto/);
     assert.match(page, /\.admin-filter-tabs\s+\.q-btn-toggle\s*\{[\s\S]*?width:\s*max-content/);
