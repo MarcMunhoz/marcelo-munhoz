@@ -87,6 +87,8 @@ Contentful Management requests retry one short `429` response using the provider
 
 The browser submits tag deletion as an owner-only POST command so method-specific transport restrictions cannot block the Netlify Function; the Function still performs a versioned DELETE against Contentful after reference validation. Compact dashboard search controls reset their horizontal flex basis when stacked so it cannot become vertical whitespace. Logout events and rejected access challenges replace the current route with Home; this forced signed-out navigation bypasses the editor's unsaved-change guard because the session has already ended. An incorrect phrase closes the challenge and emits the second hint `Você não é um AMIGO, até a próxima!`.
 
+Quasar UI feedback and confirmations use declarative components owned by their pages or persistent layout. Tag deletion advances one `<q-dialog>` through warning and certainty states before issuing the POST command, and the rejected-access hint uses a state-controlled `<q-banner>`. Responsive component state uses lifecycle-safe native `matchMedia` observers at the established breakpoints. The injected `$q` interface is prohibited by lint so optional plugin registration cannot silently break these flows again.
+
 ## Risks / Trade-offs
 
 - Filtering and pagination can produce invalid or stale query values: normalize them at the public boundary and synchronize the returned canonical page.

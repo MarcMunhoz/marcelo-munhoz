@@ -101,3 +101,9 @@
 - [x] 15.2 Remove compact dashboard vertical whitespace caused by horizontal flex bases after the layout stacks.
 - [x] 15.3 Close rejected access challenges with the uppercase `AMIGO` hint and return rejected or signed-out administrative visitors Home.
 - [ ] 15.4 Repeat tag deletion, compact dashboard spacing, logout, and rejected-challenge smoke checks on deployed staging.
+
+## 16. Declarative Quasar Follow-up
+
+- [x] 16.1 Replace every injected `$q` use with declarative Quasar components or lifecycle-safe native media queries, and add regression coverage plus a lint prohibition.
+- [ ] 16.2 Run focused and full tests, lint, production build, credential scan, strict OpenSpec validation, and repository hygiene checks without using the occupied development container.
+- [ ] 16.3 Repeat unused-tag deletion, rejected-access feedback, dashboard grid, and blog pagination smoke checks on deployed staging.

@@ -17,6 +17,7 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Hide administrative discovery from signed-out navigation and search crawlers, and reveal Netlify Identity only through the three-click `AMIGO` challenge.
 - Replace ambiguous compact header icons with one labelled navigation menu and make tag deletion resilient to bounded Contentful rate limits.
 - Keep tag deletion reachable through provider-hostile transports, remove compact dashboard flex gaps, and return rejected or signed-out administrative visitors Home.
+- Use declarative Quasar components and native browser media queries so administrative dialogs, feedback, and responsive state do not depend on optional injected plugins.
 
 ## Capabilities
 
