@@ -8,6 +8,7 @@ export {
   ContentfulAdminNotImplementedError,
   contentfulAdminHandler,
   ContentfulManagementRequestError,
+  ContentfulRateLimitError,
   ContentfulTagConflictError,
   ContentfulTagUsageUnavailableError,
   ContentfulVersionConflictError,

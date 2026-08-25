@@ -164,6 +164,15 @@ export class ContentfulTagUsageUnavailableError extends Error {
   }
 }
 
+export class ContentfulRateLimitError extends Error {
+  constructor() {
+    super("Content service is busy. Try again.");
+    this.name = "ContentfulRateLimitError";
+    this.statusCode = 503;
+    this.publicError = "Content service is busy. Try again.";
+  }
+}
+
 export class ContentfulAuthorProfileResolutionError extends Error {
   constructor() {
     super("Author profile could not be resolved for the authenticated user");
@@ -1168,25 +1177,46 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
   };
 };
 
-export const createContentfulManagementFacade = ({ env = process.env, fetchImpl = globalThis.fetch, now = () => new Date().toISOString(), gravatarTimeoutMs = 5000 } = {}) => {
+export const createContentfulManagementFacade = ({
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  now = () => new Date().toISOString(),
+  gravatarTimeoutMs = 5000,
+  sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+} = {}) => {
   const request = async ({ method, path, body, headers = {} }) => {
     const config = managementConfigFromEnv(env, fetchImpl);
     const url = new URL(`${CONTENTFUL_MANAGEMENT_HOST}/spaces/${config.spaceId}/environments/${config.environmentId}${path}`);
 
-    const response = await fetchImpl(url, {
-      method,
-      headers: {
-        authorization: `Bearer ${config.token}`,
-        "content-type": CONTENTFUL_MANAGEMENT_CONTENT_TYPE,
-        ...headers,
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
+    let response;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      response = await fetchImpl(url, {
+        method,
+        headers: {
+          authorization: `Bearer ${config.token}`,
+          "content-type": CONTENTFUL_MANAGEMENT_CONTENT_TYPE,
+          ...headers,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+      if (response.status !== 429 || attempt === 1) break;
+
+      const resetHeader = response.headers?.get?.("x-contentful-ratelimit-reset");
+      if (resetHeader === null || resetHeader === undefined || resetHeader === "") break;
+      const resetSeconds = Number(resetHeader);
+      if (!Number.isFinite(resetSeconds) || resetSeconds < 0 || resetSeconds > 2) break;
+      await sleep(Math.max(1, resetSeconds) * 1000);
+    }
 
     const payload = await readJson(response);
 
     if (response.status === 409) {
       throw new ContentfulVersionConflictError();
+    }
+
+    if (response.status === 429) {
+      throw new ContentfulRateLimitError();
     }
 
     if (!response.ok) {

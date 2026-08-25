@@ -14,9 +14,14 @@ const createEnv = () => ({
   CONTENTFUL_ENVIRONMENT_ID: "staging",
 });
 
-const createResponse = (status, payload = {}) => ({
+const createResponse = (status, payload = {}, headers = {}) => ({
   ok: status >= 200 && status < 300,
   status,
+  headers: {
+    get(name) {
+      return headers[String(name).toLowerCase()] ?? null;
+    },
+  },
   async json() {
     return payload;
   },
@@ -842,6 +847,62 @@ describe("contentful management facade", () => {
     assert.deepEqual(result, { deletedTagId: "ai" });
     assert.equal(calls[3].options.method, "DELETE");
     assert.equal(calls[3].options.headers["x-contentful-version"], 7);
+  });
+
+  it("retries a rate-limited tag deletion check after the provider reset", async () => {
+    const waits = [];
+    let call = 0;
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      sleep: async (milliseconds) => waits.push(milliseconds),
+      async fetchImpl(url, options) {
+        call += 1;
+        if (call === 1) return createResponse(429, {}, { "x-contentful-ratelimit-reset": "1" });
+        if (url.toString().includes("/entries?") || url.toString().includes("/assets?")) {
+          return createResponse(200, { total: 0, skip: 0, limit: 1, items: [] });
+        }
+        if (options.method === "GET") {
+          return createResponse(200, { name: "AI", sys: { id: "ai", version: 7, visibility: "public" } });
+        }
+        return createResponse(204);
+      },
+    });
+
+    assert.deepEqual(await facade.deleteTag({ tagId: "ai" }), { deletedTagId: "ai" });
+    assert.deepEqual(waits, [1000]);
+    assert.equal(call, 5);
+  });
+
+  it("returns an actionable safe error when the rate limit remains exhausted", async () => {
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      sleep: async () => {},
+      async fetchImpl() {
+        return createResponse(429, {}, { "x-contentful-ratelimit-reset": "1" });
+      },
+    });
+
+    await assert.rejects(
+      () => facade.deleteTag({ tagId: "ai" }),
+      (error) => error.statusCode === 503 && error.publicError === "Content service is busy. Try again."
+    );
+  });
+
+  it("does not retry a rate limit response without a valid provider reset", async () => {
+    let calls = 0;
+    const waits = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      sleep: async (milliseconds) => waits.push(milliseconds),
+      async fetchImpl() {
+        calls += 1;
+        return createResponse(429);
+      },
+    });
+
+    await assert.rejects(() => facade.deleteTag({ tagId: "ai" }), (error) => error.statusCode === 503);
+    assert.equal(calls, 1);
+    assert.deepEqual(waits, []);
   });
 
   it("sanitizes a provider conflict while deleting a zero-article tag", async () => {
