@@ -595,7 +595,7 @@ describe("contentful admin handler", () => {
       ["POST", "/articles/article-1/unarchive", "unarchiveArticle"],
       ["DELETE", "/articles/article-1", "deleteArticle"],
       ["GET", "/tags/manage", "listManagedTags"],
-      ["DELETE", "/tags/ai", "deleteTag"],
+      ["POST", "/tags/ai/delete", "deleteTag"],
     ]) {
       let operationRan = false;
       const handler = createContentfulAdminHandler({
@@ -698,12 +698,15 @@ describe("contentful admin handler", () => {
     });
 
     const listResponse = await handler({ method: "GET", path: "/tags/manage" });
-    const deleteResponse = await handler({ method: "DELETE", path: "/tags/ai" });
+    const deleteResponse = await handler({ method: "POST", path: "/tags/ai/delete" });
+    const legacyDeleteResponse = await handler({ method: "DELETE", path: "/tags/ai" });
 
     assert.equal(listResponse.statusCode, 200);
     assert.deepEqual(parse(listResponse), { tags: [{ id: "ai", articleCount: 0 }], requestedBy: "user-123" });
     assert.equal(deleteResponse.statusCode, 200);
     assert.deepEqual(parse(deleteResponse), { deletedTagId: "ai", requestedBy: "user-123" });
+    assert.equal(legacyDeleteResponse.statusCode, 200);
+    assert.deepEqual(parse(legacyDeleteResponse), { deletedTagId: "ai", requestedBy: "user-123" });
   });
 
   it("loads admin article dashboard data through Contentful Management reads", async () => {

@@ -1836,12 +1836,14 @@ export const createContentfulAdminHandler = ({
       });
     }
 
-    if (requestMethod === "DELETE" && /^\/tags\/[^/]+$/.test(routePath)) {
+    const isTagDeleteCommand = requestMethod === "POST" && /^\/tags\/[^/]+\/delete$/.test(routePath);
+    const isLegacyTagDelete = requestMethod === "DELETE" && /^\/tags\/[^/]+$/.test(routePath);
+    if (isTagDeleteCommand || isLegacyTagDelete) {
       return runAdminOperation({
         session,
         role: "owner",
         operation: adminOperations.deleteTag,
-        payload: { tagId: decodeURIComponent(routePath.replace(/^\/tags\//, "")) },
+        payload: { tagId: decodeURIComponent(routePath.replace(/^\/tags\//, "").replace(/\/delete$/, "")) },
       });
     }
 
