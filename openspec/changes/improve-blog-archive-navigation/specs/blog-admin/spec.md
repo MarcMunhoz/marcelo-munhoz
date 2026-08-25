@@ -106,13 +106,13 @@ The system SHALL let the owner review and manage Contentful article tags from th
 
 #### Scenario: Owner deletes an unused tag
 - **WHEN** the owner requests deletion of a tag with zero article usage
-- **THEN** the interface presents two sequential confirmations before sending the deletion request
+- **THEN** the interface presents one confirmation before sending the deletion request
 - **AND** the server rejects remaining references from any entry or asset before deleting the Contentful tag
 
 #### Scenario: Owner opens tag deletion confirmation
 - **WHEN** the owner activates deletion for an unused tag
-- **THEN** the first confirmation opens using the administrative interface's bundled declarative components
-- **AND** no deletion request is sent until the owner advances to and accepts the second confirmation
+- **THEN** one confirmation opens using the administrative interface's bundled declarative components
+- **AND** no deletion request is sent until the owner accepts that confirmation
 
 #### Scenario: Tag deletion conflicts with current Contentful state
 - **WHEN** usage changes after the displayed count or Contentful rejects deletion because a reference remains

@@ -79,26 +79,11 @@
     <q-dialog v-model="tagDeleteDialogOpen" persistent @hide="resetTagDeleteConfirmation">
       <q-card class="tag-delete-dialog">
         <q-card-section>
-          <h2>{{ tagDeleteConfirmationStage === "warning" ? "Delete tag" : "Are you sure?" }}</h2>
-          <p v-if="tagDeleteConfirmationStage === 'warning'">
-            Delete <strong>{{ tagPendingDeletion?.label }}</strong>? This action cannot be undone.
-          </p>
-          <p v-else>
-            Are you sure you want to permanently delete <strong>{{ tagPendingDeletion?.label }}</strong>?
-          </p>
+          <p>Are you sure you want to permanently delete <strong>{{ tagPendingDeletion?.label }}</strong>?</p>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps color="blue-grey-7" label="Cancel" :disable="tagDeletionPending" v-close-popup />
           <q-btn
-            v-if="tagDeleteConfirmationStage === 'warning'"
-            unelevated
-            no-caps
-            color="negative"
-            label="Continue"
-            @click="advanceTagDeleteConfirmation"
-          />
-          <q-btn
-            v-else
             unelevated
             no-caps
             color="negative"
@@ -132,7 +117,6 @@ export default defineComponent({
       feedbackTone: "info",
       tagDeleteDialogOpen: false,
       tagPendingDeletion: null,
-      tagDeleteConfirmationStage: "warning",
       tagDeletionPending: false,
       loadingAction: "",
       columns: [
@@ -196,22 +180,15 @@ export default defineComponent({
       if (!canDeleteManagedTag(tag)) return;
 
       this.tagPendingDeletion = tag;
-      this.tagDeleteConfirmationStage = "warning";
       this.tagDeleteDialogOpen = true;
-    },
-    advanceTagDeleteConfirmation() {
-      if (this.tagPendingDeletion && this.tagDeleteConfirmationStage === "warning") {
-        this.tagDeleteConfirmationStage = "certainty";
-      }
     },
     resetTagDeleteConfirmation() {
       this.tagPendingDeletion = null;
-      this.tagDeleteConfirmationStage = "warning";
     },
     async confirmPermanentTagDeletion() {
       const tag = this.tagPendingDeletion;
 
-      if (!tag || this.tagDeleteConfirmationStage !== "certainty") return;
+      if (!tag) return;
       if (this.tagDeletionPending) return;
 
       this.tagDeletionPending = true;

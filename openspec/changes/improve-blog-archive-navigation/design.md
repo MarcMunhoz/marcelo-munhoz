@@ -53,7 +53,7 @@ The application-level analytics consent dialog is not mounted while the active r
 
 The admin provides an owner-only tag-management area that lists each non-reserved article tag with its stable Contentful ID, visibility, and article usage count. Counts include editable articles across editorial states but do not expand the management area into an article browser. Existing tag creation remains available; renaming and bulk replacement are out of scope.
 
-Deletion is available only when the displayed article count is zero. It requires two sequential confirmations: the first identifies the tag and irreversible action, and the second asks the owner to confirm certainty immediately before the request. The server revalidates global entry and asset references and maps any Contentful refusal to a safe conflict response, preventing stale counts or non-article references from producing an unsafe success state.
+Deletion is available only when the displayed article count is zero. Clicking the destructive action opens one confirmation asking the owner to confirm the permanent deletion immediately before the request. The server revalidates global entry and asset references and maps any Contentful refusal to a safe conflict response, preventing stale counts or non-article references from producing an unsafe success state.
 
 In the existing article table, activating a tag chip applies that value to the current tag filter without clearing unrelated filters. The active tag uses the inverse chip colors shown by other selected admin actions; activating it again clears the tag filter.
 
@@ -87,7 +87,7 @@ Contentful Management requests retry one short `429` response using the provider
 
 The browser submits tag deletion as an owner-only POST command so method-specific transport restrictions cannot block the Netlify Function; the Function still performs a versioned DELETE against Contentful after reference validation. Compact dashboard search controls reset their horizontal flex basis when stacked so it cannot become vertical whitespace. Logout events and rejected access challenges replace the current route with Home; this forced signed-out navigation bypasses the editor's unsaved-change guard because the session has already ended. An incorrect phrase closes the challenge and emits the second hint `Você não é um AMIGO, até a próxima!`.
 
-Quasar UI feedback and confirmations use declarative components owned by their pages or persistent layout. Tag deletion advances one `<q-dialog>` through warning and certainty states before issuing the POST command, and the rejected-access hint uses a state-controlled `<q-banner>`. Responsive component state uses lifecycle-safe native `matchMedia` observers at the established breakpoints. The injected `$q` interface is prohibited by lint so optional plugin registration cannot silently break these flows again.
+Quasar UI feedback and confirmations use declarative components owned by their pages or persistent layout. Tag deletion uses one `<q-dialog>` confirmation before issuing the POST command, and the rejected-access hint uses a state-controlled `<q-banner>`. Responsive component state uses lifecycle-safe native `matchMedia` observers at the established breakpoints. The injected `$q` interface is prohibited by lint so optional plugin registration cannot silently break these flows again.
 
 ## Risks / Trade-offs
 

@@ -11,7 +11,7 @@ This handoff records verified local behavior and the checks that remain pending.
 - Article navigation exposes minimal previous and next links in global editorial chronology, using `fields.createAt` with `sys.createdAt` as fallback and tie-breaker.
 - Legacy `/blog/tags/:tag` routes redirect to `/blog?tag=...`.
 - Successful terminal editor actions replace the editor route with `/admin`; rejected actions remain in the editor.
-- Owners can list, create, and delete editorial tags from a dedicated admin area. The list shows article usage counts without embedding article results, hides reserved language tags, and requires two confirmations before deleting an unused tag.
+- Owners can list, create, and delete editorial tags from a dedicated admin area. The list shows article usage counts without embedding article results, hides reserved language tags, and requires one confirmation before deleting an unused tag.
 - Tag deletion revalidates references across all entry content types and assets with strict bounded responses before issuing a versioned delete; uncertain, stale, or conflicting provider state fails closed.
 - Article-table tag chips toggle the existing tag filter, preserve unrelated filters, and expose selected state visually and accessibly.
 - Author profiles accept a public Gravatar slug or profile URL and an optional allowlisted HTTPS fallback. The server stores a canonical hash without raw email or Identity data, while admin and public consumers fall through from Gravatar to fallback to initials.
@@ -52,7 +52,7 @@ The data-rich dashboard and media assets were simulated only in browser memory a
 - Confirm archive return behavior from an article and the direct-article `/blog` fallback.
 - Confirm oldest and newest article boundaries expose only the available chronological direction.
 - Confirm successful terminal admin actions return to `/admin` and failed actions retain editor state.
-- As an owner, create an editorial tag, confirm its list metadata and zero count, cancel each deletion confirmation independently, then accept both confirmations and confirm the row refreshes away.
+- As an owner, create an editorial tag, confirm its list metadata and zero count, cancel the deletion confirmation, then accept it and confirm the row refreshes away.
 - Confirm a tag assigned to an article cannot be deleted, displays actionable guidance, and becomes deletable only after its references are removed; repeat with any non-article or asset reference available for safe testing.
 - As a writer, confirm `/admin/tags` returns to `/admin`; as an owner, click and keyboard-toggle article tag chips and confirm only the tag filter changes.
 - Open an admin route with public consent still pending, confirm the cookie notice is absent, then return to a public route and confirm it remains pending.

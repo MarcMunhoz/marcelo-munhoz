@@ -44,7 +44,7 @@
 
 - [x] 7.1 Add owner-only admin contracts to list tags with article usage counts, create tags, revalidate zero usage, and delete an unused tag with sanitized conflict handling.
 - [x] 7.2 Add a tag-management area showing name, ID, visibility, and count without embedding article results.
-- [x] 7.3 Require two sequential confirmations before deletion and disable deletion while the article usage count is greater than zero.
+- [x] 7.3 Require one explicit confirmation before deletion and disable deletion while the article usage count is greater than zero.
 - [x] 7.4 Make article-table tag chips toggle the existing tag filter and render the active chip with inverse colors while preserving unrelated filters.
 - [x] 7.5 Exclude `article-lang-pt-br` and `article-lang-en-us` from public filters, article-editor choices, and tag management.
 

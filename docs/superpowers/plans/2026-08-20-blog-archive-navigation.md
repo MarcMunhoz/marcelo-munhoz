@@ -21,7 +21,7 @@
 - Preserve legacy `/blog/tags/:tag` URLs through an internal redirect.
 - Keep Contentful diagnostics and configuration out of public API errors.
 - Restrict tag deletion and tag-management access to the owner role.
-- Require two sequential confirmations and server-side zero-usage revalidation before deleting a tag.
+- Require one explicit confirmation and server-side zero-usage revalidation before deleting a tag.
 - Exclude `article-lang-pt-br` and `article-lang-en-us` from public and administrative tag choices.
 - Preserve desktop table, editor, public navigation, and lifecycle behavior while adapting compact layouts.
 - Use 700 pixels as the public compact breakpoint and 720 pixels as the administrative compact breakpoint.
@@ -705,7 +705,7 @@ Expected: FAIL because the page, route, filter toggle, reserved-tag option filte
 
 - [ ] **Step 5: Implement the focused UI**
 
-Build the management table without embedded article results. Reuse the existing tag creation flow, show a remove-tags-first explanation for nonzero counts, and implement two sequential Quasar confirmations for zero-count deletion. Make table tag chips keyboard-operable and toggle only the tag filter.
+Build the management table without embedded article results. Reuse the existing tag creation flow, show a remove-tags-first explanation for nonzero counts, and implement one declarative Quasar confirmation for zero-count deletion. Make table tag chips keyboard-operable and toggle only the tag filter.
 
 - [ ] **Step 6: Run focused frontend tests and verify GREEN**
 
@@ -737,7 +737,7 @@ Expected: every command exits 0 and the credential scan reports no credential pa
 
 - [ ] **Step 2: Request focused review**
 
-Request review specifically for owner authorization, complete count semantics, stale-count/provider conflicts, reserved-tag filtering, double confirmation, and preservation of unrelated article filters. Resolve findings before checking OpenSpec Task 8.3.
+Request review specifically for owner authorization, complete count semantics, stale-count/provider conflicts, reserved-tag filtering, single confirmation, and preservation of unrelated article filters. Resolve findings before checking OpenSpec Task 8.3.
 
 - [ ] **Step 3: Perform staging smoke checks**
 

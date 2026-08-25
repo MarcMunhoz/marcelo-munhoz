@@ -625,9 +625,11 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /articleCount/);
     assert.match(page, /<q-dialog v-model="tagDeleteDialogOpen"[^>]*persistent/);
     assert.match(page, /tagPendingDeletion/);
-    assert.match(page, /tagDeleteConfirmationStage/);
-    assert.match(page, /@click="advanceTagDeleteConfirmation"/);
+    assert.doesNotMatch(page, /tagDeleteConfirmationStage/);
+    assert.doesNotMatch(page, /advanceTagDeleteConfirmation/);
     assert.match(page, /@click="confirmPermanentTagDeletion"/);
+    assert.match(page, /Are you sure you want to permanently delete/);
+    assert.doesNotMatch(page, /<h2>Are you sure\?<\/h2>/);
     assert.match(page, /:disable="tagDeletionPending"/);
     assert.match(page, /if \(this\.tagDeletionPending\) return;/);
     assert.doesNotMatch(page, /this\.\$q\.dialog/);
