@@ -18,16 +18,3 @@ export const toggleArticleTagFilter = (filters = {}, selectedTag = "") => {
 };
 
 export const canDeleteManagedTag = (tag = {}) => Number(tag.articleCount) === 0;
-
-export const runDoubleConfirmedTagDeletion = async ({ tag, confirm, remove } = {}) => {
-  if (!canDeleteManagedTag(tag)) {
-    return false;
-  }
-
-  if (!(await confirm("warning", tag)) || !(await confirm("certainty", tag))) {
-    return false;
-  }
-
-  await remove(tag);
-  return true;
-};

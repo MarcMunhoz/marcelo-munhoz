@@ -147,6 +147,16 @@
         </q-form>
       </q-card>
     </q-dialog>
+
+    <q-banner
+      v-if="adminAccessNotice"
+      class="admin-access-notice"
+      rounded
+      role="alert"
+      aria-live="assertive"
+    >
+      {{ adminAccessNotice }}
+    </q-banner>
   </q-layout>
 </template>
 
@@ -179,6 +189,8 @@ export default defineComponent({
       adminAccessClickState: null,
       nameNavigationTimer: null,
       adminLoginRequested: false,
+      adminAccessNotice: "",
+      adminAccessNoticeTimer: null,
     };
   },
   computed: {
@@ -205,6 +217,7 @@ export default defineComponent({
   },
   beforeUnmount() {
     clearTimeout(this.nameNavigationTimer);
+    clearTimeout(this.adminAccessNoticeTimer);
   },
   methods: {
     bindIdentityCallbacks() {
@@ -282,7 +295,7 @@ export default defineComponent({
         this.adminAccessDialog = false;
         this.adminAccessPhrase = "";
         await rejectAdminAccess({
-          notifyImpl: (options) => this.$q.notify(options),
+          notifyImpl: ({ message }) => this.showAdminAccessNotice(message),
           router: this.$router,
           currentPath: this.$route.path,
         });
@@ -291,6 +304,14 @@ export default defineComponent({
 
       this.adminAccessDialog = false;
       this.adminLoginRequested = openAdminLogin();
+    },
+    showAdminAccessNotice(message) {
+      clearTimeout(this.adminAccessNoticeTimer);
+      this.adminAccessNotice = String(message || "");
+      this.adminAccessNoticeTimer = setTimeout(() => {
+        this.adminAccessNotice = "";
+        this.adminAccessNoticeTimer = null;
+      }, 3500);
     },
   },
 });
@@ -336,6 +357,18 @@ export default defineComponent({
 .admin-access-copy {
   color: #546e7a;
   margin: 0;
+}
+
+.admin-access-notice {
+  background: #ffebee;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  color: #b71c1c;
+  left: 50%;
+  max-width: calc(100vw - 32px);
+  position: fixed;
+  transform: translateX(-50%);
+  width: max-content;
+  z-index: 7000;
 }
 
 .admin-account-summary {

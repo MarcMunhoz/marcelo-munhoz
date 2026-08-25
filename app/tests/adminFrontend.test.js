@@ -58,7 +58,6 @@ import { buildMediaEditorOptions, normalizeMediaEditorExport, openCloudinaryMedi
 import {
   canDeleteManagedTag,
   normalizeEditorialTagOptions,
-  runDoubleConfirmedTagDeletion,
   toggleArticleTagFilter,
 } from "../src/utils/adminTags.js";
 import { publicAuthorProfile } from "../src/utils/authorProfiles.js";
@@ -607,51 +606,9 @@ describe("admin frontend writer workflow", () => {
     );
   });
 
-  it("requires zero usage and two accepted confirmations before deleting a tag", async () => {
-    const events = [];
-    const tag = { id: "ai", label: "AI", articleCount: 0 };
-
-    assert.equal(canDeleteManagedTag({ ...tag, articleCount: 1 }), false);
-    assert.equal(
-      await runDoubleConfirmedTagDeletion({
-        tag,
-        confirm: async (stage) => {
-          events.push(`confirm:${stage}`);
-          return false;
-        },
-        remove: async () => events.push("remove"),
-      }),
-      false
-    );
-    assert.deepEqual(events, ["confirm:warning"]);
-
-    events.length = 0;
-    assert.equal(
-      await runDoubleConfirmedTagDeletion({
-        tag,
-        confirm: async (stage) => {
-          events.push(`confirm:${stage}`);
-          return stage === "warning";
-        },
-        remove: async () => events.push("remove"),
-      }),
-      false
-    );
-    assert.deepEqual(events, ["confirm:warning", "confirm:certainty"]);
-
-    events.length = 0;
-    assert.equal(
-      await runDoubleConfirmedTagDeletion({
-        tag,
-        confirm: async (stage) => {
-          events.push(`confirm:${stage}`);
-          return true;
-        },
-        remove: async () => events.push("remove"),
-      }),
-      true
-    );
-    assert.deepEqual(events, ["confirm:warning", "confirm:certainty", "remove"]);
+  it("allows deletion only for tags with zero article usage", () => {
+    assert.equal(canDeleteManagedTag({ articleCount: 0 }), true);
+    assert.equal(canDeleteManagedTag({ articleCount: 1 }), false);
   });
 
   it("renders owner tag management without embedding article results", () => {
@@ -666,7 +623,15 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /\.tag-admin-header\s*\{[^}]*background:\s*#fff;[^}]*border-left:\s*4px solid #455a64;/s);
     assert.match(page, /\.tag-admin-title\s*\{[^}]*font-size:\s*1\.75rem;[^}]*font-weight:\s*700;/s);
     assert.match(page, /articleCount/);
-    assert.match(page, /runDoubleConfirmedTagDeletion/);
+    assert.match(page, /<q-dialog v-model="tagDeleteDialogOpen"[^>]*persistent/);
+    assert.match(page, /tagPendingDeletion/);
+    assert.match(page, /tagDeleteConfirmationStage/);
+    assert.match(page, /@click="advanceTagDeleteConfirmation"/);
+    assert.match(page, /@click="confirmPermanentTagDeletion"/);
+    assert.match(page, /:disable="tagDeletionPending"/);
+    assert.match(page, /if \(this\.tagDeletionPending\) return;/);
+    assert.doesNotMatch(page, /this\.\$q\.dialog/);
+    assert.doesNotMatch(page, /runDoubleConfirmedTagDeletion/);
     assert.match(page, /isOwnerSession/);
     assert.match(page, /v-if="props\.row\.articleCount > 0" class="tag-delete-guidance"/);
     assert.match(page, /Remove this tag from matching articles first/);
@@ -1409,6 +1374,9 @@ describe("admin frontend writer workflow", () => {
     assert.match(layout, /adminNavLabel/);
     assert.match(layout, /Author profile/);
     assert.match(layout, /signOut/);
+    assert.match(layout, /<q-banner[\s\S]*v-if="adminAccessNotice"[\s\S]*role="alert"[\s\S]*aria-live="assertive"/);
+    assert.match(layout, /notifyImpl:\s*\(\{ message \}\) => this\.showAdminAccessNotice\(message\)/);
+    assert.doesNotMatch(layout, /\$q\.notify/);
   });
 
   it("renders a separate author profile page backed by Contentful profile APIs", () => {
@@ -1537,7 +1505,8 @@ describe("admin frontend writer workflow", () => {
     const card = read("../src/components/AdminArticleCard.vue");
 
     assert.match(page, /import AdminArticleCard from "\.\.\/components\/AdminArticleCard\.vue"/);
-    assert.match(page, /:grid="\$q\.screen\.width <= 720"/);
+    assert.match(page, /:grid="compactArticleGrid"/);
+    assert.match(page, /observeMediaQuery\("\(max-width: 720px\)"/);
     assert.match(page, /<template #item="props">[\s\S]*<div class="q-table__grid-item col-xs-12">[\s\S]*<admin-article-card/);
     assert.match(page, /:article="props\.row"/);
     assert.match(page, /:session="session"/);

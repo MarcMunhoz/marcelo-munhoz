@@ -549,14 +549,14 @@ describe("public blog frontend", () => {
     const paginationDisplay = component.computed.paginationDisplay;
 
     assert.equal(typeof paginationDisplay, "function");
-    assert.deepEqual(JSON.parse(JSON.stringify(paginationDisplay.call({ $q: { screen: { lt: { sm: true } } } }))), {
+    assert.deepEqual(JSON.parse(JSON.stringify(paginationDisplay.call({ compactPagination: true }))), {
       input: true,
       boundaryLinks: false,
       boundaryNumbers: false,
       ellipses: false,
       maxPages: 1,
     });
-    assert.deepEqual(JSON.parse(JSON.stringify(paginationDisplay.call({ $q: { screen: { lt: { sm: false } } } }))), {
+    assert.deepEqual(JSON.parse(JSON.stringify(paginationDisplay.call({ compactPagination: false }))), {
       input: false,
       boundaryLinks: false,
       boundaryNumbers: true,
@@ -570,6 +570,7 @@ describe("public blog frontend", () => {
     assert.match(pagination, /direction-links/);
     assert.match(page, /Page \{\{ archiveState\.page \}\} of \{\{ totalPages \}\}/);
     assert.match(page, /\.blog-pagination[\s\S]*:deep\(\.q-field\)[\s\S]*max-width:\s*8rem/);
+    assert.match(page, /observeMediaQuery\("\(max-width: 599px\)"/);
   });
 
   it("gives the compact page input a real programmatic name without changing desktop pagination", () => {

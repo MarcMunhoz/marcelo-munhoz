@@ -65,7 +65,7 @@
                   :disable="!canDeleteManagedTag(props.row)"
                   :loading="loadingAction === `delete-${props.row.id}`"
                   :aria-label="`Delete ${props.row.label}`"
-                  @click="deleteTag(props.row)"
+                  @click="openTagDeleteConfirmation(props.row)"
                 >
                   <q-tooltip v-if="props.row.articleCount === 0">Delete unused tag</q-tooltip>
                 </q-btn>
@@ -75,6 +75,42 @@
         </q-table>
       </section>
     </main>
+
+    <q-dialog v-model="tagDeleteDialogOpen" persistent @hide="resetTagDeleteConfirmation">
+      <q-card class="tag-delete-dialog">
+        <q-card-section>
+          <h2>{{ tagDeleteConfirmationStage === "warning" ? "Delete tag" : "Are you sure?" }}</h2>
+          <p v-if="tagDeleteConfirmationStage === 'warning'">
+            Delete <strong>{{ tagPendingDeletion?.label }}</strong>? This action cannot be undone.
+          </p>
+          <p v-else>
+            Are you sure you want to permanently delete <strong>{{ tagPendingDeletion?.label }}</strong>?
+          </p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps color="blue-grey-7" label="Cancel" :disable="tagDeletionPending" v-close-popup />
+          <q-btn
+            v-if="tagDeleteConfirmationStage === 'warning'"
+            unelevated
+            no-caps
+            color="negative"
+            label="Continue"
+            @click="advanceTagDeleteConfirmation"
+          />
+          <q-btn
+            v-else
+            unelevated
+            no-caps
+            color="negative"
+            icon="delete_forever"
+            label="Delete permanently"
+            :disable="tagDeletionPending"
+            :loading="tagDeletionPending"
+            @click="confirmPermanentTagDeletion"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -82,7 +118,7 @@
 import { defineComponent } from "vue";
 import { AdminApiError, adminUserMessage, createContentfulTag, deleteContentfulTag, listManagedContentfulTags } from "../utils/adminApi.js";
 import { getAdminSession, isOwnerSession } from "../utils/adminAuth.js";
-import { canDeleteManagedTag, normalizeEditorialTagOptions, runDoubleConfirmedTagDeletion } from "../utils/adminTags.js";
+import { canDeleteManagedTag, normalizeEditorialTagOptions } from "../utils/adminTags.js";
 
 export default defineComponent({
   name: "AdminTagsPage",
@@ -94,6 +130,10 @@ export default defineComponent({
       newTagName: "",
       feedbackMessage: "",
       feedbackTone: "info",
+      tagDeleteDialogOpen: false,
+      tagPendingDeletion: null,
+      tagDeleteConfirmationStage: "warning",
+      tagDeletionPending: false,
       loadingAction: "",
       columns: [
         { name: "label", label: "Tag name", field: "label", align: "left", sortable: true },
@@ -152,39 +192,38 @@ export default defineComponent({
         this.loadingAction = "";
       }
     },
-    confirmDeletion(stage, tag) {
-      const message =
-        stage === "warning"
-          ? `Delete ${tag.label}? This action cannot be undone.`
-          : `Are you sure you want to permanently delete ${tag.label}?`;
+    openTagDeleteConfirmation(tag) {
+      if (!canDeleteManagedTag(tag)) return;
 
-      return new Promise((resolve) => {
-        this.$q
-          .dialog({
-            title: stage === "warning" ? "Delete tag" : "Are you sure?",
-            message,
-            cancel: true,
-            persistent: true,
-            ok: { color: "negative", label: stage === "warning" ? "Continue" : "Delete permanently" },
-          })
-          .onOk(() => resolve(true))
-          .onCancel(() => resolve(false));
-      });
+      this.tagPendingDeletion = tag;
+      this.tagDeleteConfirmationStage = "warning";
+      this.tagDeleteDialogOpen = true;
     },
-    async deleteTag(tag) {
+    advanceTagDeleteConfirmation() {
+      if (this.tagPendingDeletion && this.tagDeleteConfirmationStage === "warning") {
+        this.tagDeleteConfirmationStage = "certainty";
+      }
+    },
+    resetTagDeleteConfirmation() {
+      this.tagPendingDeletion = null;
+      this.tagDeleteConfirmationStage = "warning";
+    },
+    async confirmPermanentTagDeletion() {
+      const tag = this.tagPendingDeletion;
+
+      if (!tag || this.tagDeleteConfirmationStage !== "certainty") return;
+      if (this.tagDeletionPending) return;
+
+      this.tagDeletionPending = true;
       try {
-        await runDoubleConfirmedTagDeletion({
-          tag,
-          confirm: (stage, selectedTag) => this.confirmDeletion(stage, selectedTag),
-          remove: async (selectedTag) => {
-            this.loadingAction = `delete-${selectedTag.id}`;
-            await deleteContentfulTag({ tagId: selectedTag.id, session: this.session });
-            await this.loadTags();
-          },
-        });
+        this.loadingAction = `delete-${tag.id}`;
+        await deleteContentfulTag({ tagId: tag.id, session: this.session });
+        this.tagDeleteDialogOpen = false;
+        await this.loadTags();
       } catch (error) {
         this.showError(error);
       } finally {
+        this.tagDeletionPending = false;
         this.loadingAction = "";
       }
     },

@@ -87,7 +87,7 @@
                 row-key="id"
                 :rows="filteredArticles"
                 :columns="articleColumns"
-                :grid="$q.screen.width <= 720"
+                :grid="compactArticleGrid"
                 :loading="loadingAction === 'articles'"
                 :pagination="{ rowsPerPage: 6 }"
                 no-data-label="No articles match the current filters"
@@ -281,6 +281,7 @@ import {
 } from "../utils/adminDashboard.js";
 import { toggleArticleTagFilter } from "../utils/adminTags.js";
 import { getAdminSession, isOwnerSession, isWriterSession, signOutAdmin } from "../utils/adminAuth.js";
+import { observeMediaQuery } from "../utils/responsiveMedia.js";
 
 export default defineComponent({
   name: "AdminPage",
@@ -308,6 +309,8 @@ export default defineComponent({
       feedbackTimer: null,
       dashboardError: "",
       loadingAction: "",
+      compactArticleGrid: false,
+      stopCompactArticleGridObserver: null,
       articleColumns: [
         { name: "title", label: "Title", field: "title", align: "left", sortable: true },
         { name: "status", label: "Status", field: "status", align: "left", sortable: true },
@@ -365,6 +368,9 @@ export default defineComponent({
     },
   },
   async mounted() {
+    this.stopCompactArticleGridObserver = observeMediaQuery("(max-width: 720px)", (matches) => {
+      this.compactArticleGrid = matches;
+    });
     this.bindIdentityCallbacks();
     this.session = await getAdminSession();
     this.sessionResolved = true;
@@ -372,6 +378,7 @@ export default defineComponent({
     this.loadArticleDashboard();
   },
   beforeUnmount() {
+    this.stopCompactArticleGridObserver?.();
     if (this.feedbackTimer) {
       clearTimeout(this.feedbackTimer);
     }

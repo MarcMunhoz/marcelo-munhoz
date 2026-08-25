@@ -123,6 +123,7 @@ import BlogHighlights from "../components/BlogHighlights.vue";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { blogRouteQuery, normalizeBlogRouteQuery } from "../utils/blogArchive.js";
 import { isArticleLanguageTag } from "../utils/articleDates.js";
+import { observeMediaQuery } from "../utils/responsiveMedia.js";
 
 const sameArchiveState = (left, right) => ["page", "q", "year", "tag"].every((key) => left[key] === right[key]);
 
@@ -223,14 +224,13 @@ export default defineComponent({
       pageSize: 12,
       searchTimer: null,
       archiveRequestId: 0,
+      compactPagination: false,
+      stopCompactPaginationObserver: null,
     };
   },
   computed: {
-    compactPagination() {
-      return this.$q.screen.lt.sm;
-    },
     paginationDisplay() {
-      const compact = this.$q.screen.lt.sm;
+      const compact = this.compactPagination;
 
       return {
         input: compact,
@@ -255,7 +255,13 @@ export default defineComponent({
     this.loadTags();
     this.loadArchive();
   },
+  mounted() {
+    this.stopCompactPaginationObserver = observeMediaQuery("(max-width: 599px)", (matches) => {
+      this.compactPagination = matches;
+    });
+  },
   beforeUnmount() {
+    this.stopCompactPaginationObserver?.();
     clearTimeout(this.searchTimer);
     this.archiveRequestId += 1;
   },
