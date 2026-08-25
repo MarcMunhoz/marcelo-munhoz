@@ -81,3 +81,16 @@
 - [x] 12.2 Complete focused public and admin reviews and resolve every reported finding.
 - [x] 12.3 Exercise public pages, archive navigation, dashboard states, editor shells, media controls, dialogs, and keyboard focus in Brave from 320 pixels through desktop without document-level overflow.
 - [ ] 12.4 Repeat responsive smoke checks on deployed staging with real administrative data and provider-backed workflows.
+
+## 13. Discreet Admin Access And Navigation
+
+- [x] 13.1 Add the three-click `AMIGO` challenge, hide signed-out admin navigation, and keep cancelled login recoverable.
+- [x] 13.2 Return direct signed-out admin visits to Home and mark administrative routes for crawler exclusion.
+- [x] 13.3 Replace compact icon-only actions with one labelled icon-and-text dropdown while preserving authenticated actions and desktop presentation.
+
+## 14. Tag Management Follow-up
+
+- [x] 14.1 Retry bounded Contentful `429` responses once and return an actionable sanitized error when throttling persists.
+- [x] 14.2 Center the visibility value structurally and add focused regression coverage for access, navigation, deletion, and indexing.
+- [x] 14.3 Run focused and full verification, lint, production build, credential scan, strict OpenSpec validation, and repository hygiene checks.
+- [ ] 14.4 Repeat the affected login, compact navigation, and unused-tag deletion smoke checks on deployed staging.

@@ -77,6 +77,14 @@ The focused editor removes min-content width constraints from its card and Markd
 
 Responsive source-contract tests protect the breakpoints, accessibility labels, action parity, and containment rules. Manual Brave checks cover 320, 375, 430, and 768 pixels plus desktop; data-rich dashboard and media states may be simulated in browser memory for layout checks without writing provider data. Real provider workflows and deployed behavior remain staging responsibilities.
 
+### Discreet Administrative Entry And Compact Navigation
+
+Signed-out public navigation does not render an Admin action. Three sequential clicks on the site name within a short window open an in-app challenge; only the exact trimmed phrase `AMIGO` opens Netlify Identity. Cancelling Identity leaves the public route usable, while a successful challenge login opens `/admin`. Direct signed-out administrative visits return to Home without opening Identity. Administrative routes emit `noindex,nofollow` and are disallowed by `robots.txt`; API authorization remains the security boundary.
+
+At the public compact breakpoint, About and Blog move into one labelled dropdown whose items retain icon and text. Authenticated dashboard, profile, and sign-out actions join that menu; the existing account dropdown remains available on wider screens.
+
+Contentful Management requests retry one short `429` response using the provider reset header. Longer or repeated rate limits fail with a safe actionable message. Tag usage revalidation and version locking remain unchanged.
+
 ## Risks / Trade-offs
 
 - Filtering and pagination can produce invalid or stale query values: normalize them at the public boundary and synchronize the returned canonical page.

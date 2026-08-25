@@ -5,7 +5,7 @@ The system SHALL preserve public routes, content, and desktop presentation while
 
 #### Scenario: Reader uses the compact global shell
 - **WHEN** a public surface renders at or below the compact breakpoint
-- **THEN** About, Blog, and Admin controls retain stable accessible names, keyboard behavior, and bounded tooltips or menus while their visual labels may be hidden
+- **THEN** About and Blog remain available in a bounded labelled menu with icon-and-text items and keyboard behavior
 - **AND** the page title, footer, and pending consent notice remain contained and legible within the viewport
 
 #### Scenario: Reader views compact public content
@@ -16,6 +16,24 @@ The system SHALL preserve public routes, content, and desktop presentation while
 #### Scenario: Reader uses a wider public viewport
 - **WHEN** a public surface renders above the compact breakpoint
 - **THEN** the existing desktop navigation labels and page composition remain available
+
+### Requirement: Administrative Entry Is Discreet And Recoverable
+The system SHALL omit administrative navigation for signed-out visitors and SHALL open Netlify Identity only after the site-name challenge succeeds.
+
+#### Scenario: Signed-out visitor discovers administrative entry
+- **WHEN** the visitor clicks the site name three times sequentially and submits the exact phrase `AMIGO`
+- **THEN** the Netlify Identity login opens
+- **AND** cancelling it leaves the public route usable for another attempt
+
+#### Scenario: Signed-out visitor opens an administrative URL directly
+- **WHEN** no authenticated session is available
+- **THEN** the application returns to Home without opening the login widget
+- **AND** administrative routes declare `noindex,nofollow` and are disallowed to compliant crawlers
+
+#### Scenario: Authenticated visitor uses navigation
+- **WHEN** an administrative session is available
+- **THEN** desktop navigation shows the account menu
+- **AND** compact navigation includes Dashboard, profile, and sign-out items with icon and text
 
 ### Requirement: Public Blog Provides A Scalable Hybrid Archive
 The system SHALL present automatic recent highlights and a compact paginated archive whose state is represented by the public URL.

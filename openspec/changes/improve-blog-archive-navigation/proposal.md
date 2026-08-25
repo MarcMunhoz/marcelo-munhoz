@@ -14,6 +14,8 @@ The public blog cannot preserve archive state across navigation, its fixed three
 - Keep the public cookie notice out of authenticated administrative routes without accepting consent on the user's behalf.
 - Keep the global shell, Home, About, articles, and consent notice contained and accessible at the existing 700-pixel public breakpoint.
 - Adapt the dashboard, complete article actions, focused editor, and media dialog at the existing 720-pixel admin breakpoint while preserving desktop presentation.
+- Hide administrative discovery from signed-out navigation and search crawlers, and reveal Netlify Identity only through the three-click `AMIGO` challenge.
+- Replace ambiguous compact header icons with one labelled navigation menu and make tag deletion resilient to bounded Contentful rate limits.
 
 ## Capabilities
 

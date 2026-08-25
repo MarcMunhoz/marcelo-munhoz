@@ -114,6 +114,11 @@ The system SHALL let the owner review and manage Contentful article tags from th
 - **THEN** the system keeps the tag and returns a safe conflict message
 - **AND** it does not expose provider diagnostics or configuration
 
+#### Scenario: Contentful briefly rate limits tag deletion
+- **WHEN** a deletion check receives a short `429` reset interval
+- **THEN** the server retries once after the provider reset
+- **AND** a repeated or long rate limit returns a safe actionable error without weakening usage revalidation
+
 #### Scenario: Writer accesses tag management
 - **WHEN** an authenticated non-owner requests the tag-management page or destructive API
 - **THEN** the system denies the owner-only operation
