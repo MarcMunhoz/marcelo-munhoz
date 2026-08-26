@@ -6,7 +6,7 @@ services:
       context: .
       target: "develop"
     ports:
-      - "4242:4242"  # Frontend Quasar (dev)
+      - "1991:1991"  # Frontend Quasar (dev)
       - "3000:3000"  # Backend Express
     volumes:
       - ./app:/app

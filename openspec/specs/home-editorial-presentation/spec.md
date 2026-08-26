@@ -1,4 +1,10 @@
-## ADDED Requirements
+# home-editorial-presentation Specification
+
+## Purpose
+
+Defines the public Home page's editorial identity, hero presentation, and scannable personal information.
+
+## Requirements
 
 ### Requirement: Home Presents A Concise Editorial Identity
 The Home page SHALL identify Marcelo, his web-development focus, and his cultural interests through a short, scannable hierarchy rather than long uninterrupted paragraphs.
@@ -14,13 +20,13 @@ The Home page SHALL identify Marcelo, his web-development focus, and his cultura
 - **AND** no single introductory block requires the reader to scan a large uninterrupted paragraph
 
 ### Requirement: Home Uses The Supplied Hero Image
-The Home page SHALL use the supplied Cloudinary hero asset as its primary image and preserve a cover-oriented visual composition.
+The Home page SHALL use the supplied Cloudinary hero asset as its primary image, span the viewport width, and preserve a cover-oriented visual composition.
 
 #### Scenario: Hero image loads
 - **WHEN** the Home page renders its hero
 - **THEN** the image source is `https://res.cloudinary.com/marcelo-munhoz/image/upload/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png`
 - **AND** the image has meaningful alternative text
-- **AND** the image fills its bounded hero container using cover behavior without widening the document
+- **AND** the image fills the viewport-width hero using cover behavior without creating horizontal document overflow
 
 ### Requirement: Home Facts Remain Current And Scannable
 The Home page SHALL continue to derive time-sensitive experience facts from the existing dynamic date logic while presenting them as compact labelled information.

@@ -12,9 +12,9 @@ describe("local middleware CORS policy", () => {
     }
 
     assert.equal(typeof isAllowedCorsOrigin, "function");
-    assert.equal(isAllowedCorsOrigin("http://localhost:4242", { nodeEnv: "development" }), true);
-    assert.equal(isAllowedCorsOrigin("http://127.0.0.1:4242", { nodeEnv: "development" }), true);
-    assert.equal(isAllowedCorsOrigin("http://localhost:4242", { nodeEnv: "production" }), false);
+    assert.equal(isAllowedCorsOrigin("http://localhost:1991", { nodeEnv: "development" }), true);
+    assert.equal(isAllowedCorsOrigin("http://127.0.0.1:1991", { nodeEnv: "development" }), true);
+    assert.equal(isAllowedCorsOrigin("http://localhost:1991", { nodeEnv: "production" }), false);
     assert.equal(isAllowedCorsOrigin("https://staging.example.test", { nodeEnv: "production", allowedOrigins: ["https://staging.example.test"] }), true);
     assert.equal(isAllowedCorsOrigin("https://untrusted.example.test", { nodeEnv: "development" }), false);
     assert.equal(isAllowedCorsOrigin(undefined, { nodeEnv: "production" }), true);

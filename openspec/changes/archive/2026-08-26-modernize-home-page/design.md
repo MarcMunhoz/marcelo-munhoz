@@ -19,7 +19,7 @@ The Home page is implemented in the public SPA as a single page with a Cloudinar
 
 ## Decisions
 
-- **Use the supplied Cloudinary URL as the hero source.** The page will reference the exact asset and retain a bounded hero container with `object-fit: cover`; `object-position` remains adjustable if visual inspection shows the focal point needs correction. A local copy is not introduced.
+- **Use the supplied Cloudinary URL as the hero source.** The page will reference the exact asset and render it as a viewport-width hero with `object-fit: cover`; `object-position` remains adjustable if visual inspection shows the focal point needs correction. A local copy is not introduced.
 - **Use an editorial hierarchy instead of a dashboard-like grid.** The page will lead with name/role and concise supporting copy, then show compact facts, grouped knowledge, and project links. This follows the clarity of the supplied reference sites while preserving the existing “Projetos (in)úteis” personality.
 - **Keep dynamic experience values.** The existing year-count logic remains the source for time-based facts, avoiding stale hard-coded values. The facts are reformatted, not removed.
 - **Prefer semantic links and labelled groups over icon-only affordances.** Knowledge items retain their existing data and icons but expose visible labels or accessible text. Projects remain real links with their current destinations and tooltips/descriptions.

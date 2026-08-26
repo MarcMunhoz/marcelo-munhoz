@@ -84,7 +84,7 @@ export default configure(function (ctx) {
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#devServer
     devServer: {
       // https: true
-      port: 4242,
+      port: 1991,
       proxy: {
         "/api/admin/contentful": {
           target: "http://localhost:3000",

@@ -18,7 +18,7 @@ COPY ./app .
 
 # Develop stage
 FROM base AS develop
-EXPOSE 4242 3000
+EXPOSE 1991 3000
 CMD [ "npm", "run", "dev" ]
 
 # Production stage

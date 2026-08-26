@@ -41,13 +41,18 @@ describe("public responsive layout", () => {
     const article = read("../src/components/BlogArticle.vue");
 
     assert.match(home, /clamp\(/);
-    assert.match(home, /class="home-hero flex flex-nowrap justify-center max-h-\[500px\]"/);
-    assert.match(home, /knowledge-grid/);
+    assert.match(home, /class="home-hero"/);
+    assert.match(home, /\.home-hero\s*\{[^}]*width:\s*100%/);
+    assert.match(home, /class="home-section home-knowledge"/);
+    assert.match(home, /class="knowledge-list"/);
     assert.match(home, /home-projects/);
+    assert.match(home, /marcelomunhoz_hero\.png/);
+    assert.match(home, /alt="Marcelo Munhoz"/);
+    assert.match(home, /class="home-facts"/);
+    assert.match(home, /yearCount\("2004-06-04"\)/);
     assert.match(home, /@media \(max-width:\s*700px\)/);
-    const compactProjectChipRule = home.match(/\.home-projects :deep\(\.q-chip\) \{([\s\S]*?)\n  \}/)?.[1] || "";
-    assert.match(compactProjectChipRule, /height:\s*auto/);
-    assert.match(compactProjectChipRule, /min-height:\s*2em/);
+    assert.match(home, /\.home-hero\s*\{[^}]*height:\s*72vw;[^}]*max-height:\s*390px;/);
+    assert.match(home, /\.knowledge-list\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
     assert.match(about, /about-introduction/);
     assert.match(about, /@media \(max-width:\s*700px\)/);
     assert.match(article, /article-tags/);

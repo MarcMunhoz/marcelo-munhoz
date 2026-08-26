@@ -38,7 +38,7 @@ Authenticated browser session
 Local development uses the same shared proxy behavior:
 
 ```text
-Browser on :4242
+Browser on :1991
   -> /api/contentful/*
   -> Quasar dev proxy
   -> Express local wrapper on :3000
@@ -162,7 +162,7 @@ make dev
 
 The development stack exposes:
 
-- Frontend: `http://localhost:4242`
+- Frontend: `http://localhost:1991`
 - Local API wrapper: `http://localhost:3000`
 - Health check: `http://localhost:3000/healthz`
 
