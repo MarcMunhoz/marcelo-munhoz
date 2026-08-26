@@ -1,14 +1,14 @@
 const routes = [
   {
     path: "/",
-    component: () => import("layouts/MainLayout.vue"),
+    component: () => import("@/layouts/MainLayout.vue"),
     children: [
-      { path: "", component: () => import("pages/IndexPage.vue"), meta: { title: "Home" } },
-      { path: "/about", name: "Prefácio", component: () => import("pages/About.vue"), meta: { title: "About" } },
+      { path: "", component: () => import("@/pages/IndexPage.vue"), meta: { title: "Home" } },
+      { path: "/about", name: "Prefácio", component: () => import("@/pages/About.vue"), meta: { title: "About" } },
       {
         path: "/blog",
         name: "Meus Artigos",
-        component: () => import("pages/Blog.vue"),
+        component: () => import("@/pages/Blog.vue"),
         meta: {
           title: "Artigos",
         },
@@ -16,12 +16,12 @@ const routes = [
       {
         path: "/blog/:slug",
         name: "Artigo",
-        component: () => import("components/BlogArticle.vue"),
+        component: () => import("@/components/BlogArticle.vue"),
       },
       {
         path: "/blog/authors/:slug",
         name: "Author",
-        component: () => import("pages/AuthorProfile.vue"),
+        component: () => import("@/pages/AuthorProfile.vue"),
         meta: {
           title: "Author",
         },
@@ -33,7 +33,7 @@ const routes = [
       {
         path: "/admin",
         name: "Admin",
-        component: () => import("pages/Admin.vue"),
+        component: () => import("@/pages/Admin.vue"),
         meta: {
           title: "Admin",
           requiresAdmin: true,
@@ -42,7 +42,7 @@ const routes = [
       {
         path: "/admin/articles/new",
         name: "Admin Article New",
-        component: () => import("pages/AdminArticleEditor.vue"),
+        component: () => import("@/pages/AdminArticleEditor.vue"),
         meta: {
           title: "New Article",
           requiresAdmin: true,
@@ -51,7 +51,7 @@ const routes = [
       {
         path: "/admin/articles/:entryId/edit",
         name: "Admin Article Edit",
-        component: () => import("pages/AdminArticleEditor.vue"),
+        component: () => import("@/pages/AdminArticleEditor.vue"),
         meta: {
           title: "Edit Article",
           requiresAdmin: true,
@@ -60,7 +60,7 @@ const routes = [
       {
         path: "/admin/profile",
         name: "Author Profile",
-        component: () => import("pages/AdminProfile.vue"),
+        component: () => import("@/pages/AdminProfile.vue"),
         meta: {
           title: "Author Profile",
           requiresAdmin: true,
@@ -69,7 +69,7 @@ const routes = [
       {
         path: "/admin/tags",
         name: "Admin Tags",
-        component: () => import("pages/AdminTags.vue"),
+        component: () => import("@/pages/AdminTags.vue"),
         meta: {
           title: "Tag management",
           requiresAdmin: true,
@@ -80,7 +80,7 @@ const routes = [
   },
   {
     path: "/:catchAll(.*)",
-    component: () => import("pages/ErrorNotFound.vue"),
+    component: () => import("@/pages/ErrorNotFound.vue"),
   },
 ];
 

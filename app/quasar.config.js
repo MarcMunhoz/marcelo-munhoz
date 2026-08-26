@@ -6,13 +6,13 @@
 // Configuration for your app
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-js
 
-import { configure } from "quasar/wrappers";
+import { defineConfig } from "#q-app";
 import dotenv from "dotenv";
 import os from "os";
 
 const isWSL = os.release().toLowerCase().includes("microsoft");
 
-export default configure(function (ctx) {
+export default defineConfig(function (ctx) {
   dotenv.config();
 
   return {
@@ -40,7 +40,7 @@ export default configure(function (ctx) {
     extras: [
       // 'ionicons-v4',
       // 'mdi-v5',
-      "fontawesome-v6",
+      "fontawesome-v7",
       // 'eva-icons',
       // 'themify',
       // 'line-awesome',
