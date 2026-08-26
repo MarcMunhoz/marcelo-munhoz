@@ -1,7 +1,31 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { adminAccountInitials, adminSessionDisplay, createPreviewSession, getAdminSession, isAdminSignOutNavigation, openAdminLogin, redirectSignedOutAdmin, selectedPreviewRole, signOutAdmin } from "../src/utils/adminAuth.js";
+import {
+  adminAccountInitials,
+  adminSessionDisplay,
+  bindIdentityCallbacks,
+  completeAdminIdentityLogin,
+  createAdminProfileLoader,
+  createPreviewSession,
+  getAdminSession,
+  isAdminSignOutNavigation,
+  openAdminLogin,
+  redirectSignedOutAdmin,
+  selectedPreviewRole,
+  signOutAdmin,
+} from "../src/utils/adminAuth.js";
+
+const deferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, reject, resolve };
+};
 
 describe("admin auth preview sessions", () => {
   it("uses owner as the default local preview role for full admin testing", () => {
@@ -147,6 +171,197 @@ describe("admin auth preview sessions", () => {
     } finally {
       globalThis.netlifyIdentity = previousIdentity;
     }
+  });
+
+  it("binds Identity login and logout effects and removes the same callbacks during cleanup", async () => {
+    const callbacks = new Map();
+    const removedCallbacks = [];
+    const effects = [];
+    const identity = {
+      on(event, callback) {
+        callbacks.set(event, callback);
+      },
+      off(event, callback) {
+        removedCallbacks.push([event, callback]);
+      },
+    };
+    const stop = bindIdentityCallbacks({
+      identity,
+      onLogin: async () => effects.push("login"),
+      onLogout: () => effects.push("logout"),
+    });
+
+    await callbacks.get("login")();
+    callbacks.get("logout")();
+    stop();
+
+    assert.deepEqual(effects, ["login", "logout"]);
+    assert.deepEqual(removedCallbacks, [
+      ["login", callbacks.get("login")],
+      ["logout", callbacks.get("logout")],
+    ]);
+  });
+
+  it("returns inert Identity cleanup when the widget callback API is unavailable", () => {
+    const stop = bindIdentityCallbacks({ identity: undefined });
+
+    assert.equal(typeof stop, "function");
+    assert.doesNotThrow(stop);
+  });
+
+  it("makes registered Identity callbacks inert after cleanup when the widget has no off API", async () => {
+    const callbacks = new Map();
+    const effects = [];
+    const identity = {
+      on(event, callback) {
+        callbacks.set(event, callback);
+      },
+    };
+    const stop = bindIdentityCallbacks({
+      identity,
+      onLogin: async () => effects.push("login"),
+      onLogout: () => effects.push("logout"),
+    });
+
+    stop();
+    await callbacks.get("login")();
+    callbacks.get("logout")();
+
+    assert.deepEqual(effects, []);
+  });
+
+  it("ignores a pending profile response invalidated by logout", async () => {
+    const pending = deferred();
+    const appliedProfiles = [];
+    const loader = createAdminProfileLoader({
+      getAuthorProfileImpl: async () => pending.promise,
+      applyProfile: (profile) => appliedProfiles.push(profile),
+    });
+    const loading = loader.load({ subject: "old-session" });
+
+    loader.invalidate();
+    pending.resolve({ profile: { name: "Stale author" } });
+    await loading;
+
+    assert.deepEqual(appliedProfiles, []);
+  });
+
+  it("allows only the newest session profile response to update layout state", async () => {
+    const oldPending = deferred();
+    const newPending = deferred();
+    const appliedProfiles = [];
+    const loader = createAdminProfileLoader({
+      getAuthorProfileImpl: ({ session }) =>
+        session.subject === "old-session" ? oldPending.promise : newPending.promise,
+      applyProfile: (profile) => appliedProfiles.push(profile),
+    });
+    const oldLoading = loader.load({ subject: "old-session" });
+    const newLoading = loader.load({ subject: "new-session" });
+
+    newPending.resolve({ profile: { name: "Current author" } });
+    await newLoading;
+    oldPending.resolve({ profile: { name: "Stale author" } });
+    await oldLoading;
+
+    assert.deepEqual(appliedProfiles, [{ name: "Current author" }]);
+  });
+
+  it("ignores pending profile success and failure after unmount invalidation", async () => {
+    for (const settle of ["resolve", "reject"]) {
+      const pending = deferred();
+      const appliedProfiles = [];
+      const loader = createAdminProfileLoader({
+        getAuthorProfileImpl: async () => pending.promise,
+        applyProfile: (profile) => appliedProfiles.push(profile),
+      });
+      const loading = loader.load({ subject: `session-${settle}` });
+
+      loader.invalidate();
+      pending[settle](settle === "resolve" ? { profile: { name: "Unmounted author" } } : new Error("late failure"));
+      await loading;
+
+      assert.deepEqual(appliedProfiles, []);
+    }
+  });
+
+  it("completes Identity login effects in modal, session, profile, and navigation order", async () => {
+    const events = [];
+    const session = { subject: "owner-session", roles: ["owner"] };
+
+    assert.deepEqual(
+      await completeAdminIdentityLogin({
+        identity: { close: () => events.push("close") },
+        getSessionImpl: async () => {
+          events.push("get-session");
+          return session;
+        },
+        setSession: (nextSession) => events.push(`set-session:${nextSession.subject}`),
+        loadProfile: async (nextSession) => events.push(`load-profile:${nextSession.subject}`),
+        isLoginRequested: () => true,
+        clearLoginRequest: () => events.push("clear-login-request"),
+        router: { push: async (path) => events.push(`push:${path}`) },
+      }),
+      { navigated: true, session }
+    );
+    assert.deepEqual(events, [
+      "close",
+      "get-session",
+      "set-session:owner-session",
+      "load-profile:owner-session",
+      "clear-login-request",
+      "push:/admin",
+    ]);
+  });
+
+  it("stops an in-flight Identity login before applying session effects when the layout becomes inactive", async () => {
+    const events = [];
+    let active = true;
+
+    assert.deepEqual(
+      await completeAdminIdentityLogin({
+        identity: { close: () => events.push("close") },
+        getSessionImpl: async () => {
+          events.push("get-session");
+          active = false;
+          return { subject: "late-session" };
+        },
+        setSession: () => events.push("set-session"),
+        loadProfile: async () => events.push("load-profile"),
+        isLoginRequested: () => true,
+        clearLoginRequest: () => events.push("clear-login-request"),
+        router: { push: async () => events.push("push") },
+        isActive: () => active,
+      }),
+      { navigated: false, session: null }
+    );
+    assert.deepEqual(events, ["close", "get-session"]);
+  });
+
+  it("does not navigate after the login session becomes stale while its profile is loading", async () => {
+    const events = [];
+    let currentSession = null;
+    const session = { subject: "stale-session" };
+
+    assert.deepEqual(
+      await completeAdminIdentityLogin({
+        identity: { close: () => events.push("close") },
+        getSessionImpl: async () => session,
+        setSession: (nextSession) => {
+          currentSession = nextSession;
+          events.push("set-session");
+        },
+        loadProfile: async () => {
+          events.push("load-profile");
+          currentSession = null;
+        },
+        isLoginRequested: () => true,
+        clearLoginRequest: () => events.push("clear-login-request"),
+        router: { push: async () => events.push("push") },
+        isSessionCurrent: (candidate) => currentSession === candidate,
+      }),
+      { navigated: false, session }
+    );
+    assert.deepEqual(events, ["close", "set-session", "load-profile"]);
   });
 
   it("signs out only after confirmation", async () => {

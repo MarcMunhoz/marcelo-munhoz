@@ -3,7 +3,16 @@ import { describe, it } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 
 import { createContentfulHandler } from "../middleware/contentfulProxy.js";
-import { blogArticleLocation, blogReturnLocation, blogRouteQuery, normalizeBlogRouteQuery } from "../src/utils/blogArchive.js";
+import {
+  blogArticleLocation,
+  blogReturnLocation,
+  blogRouteQuery,
+  isCurrentArticleNavigationRequest,
+  isCurrentArticleRouteRequest,
+  normalizeBlogRouteQuery,
+  validateBlogArticleNavigationPayload,
+  validateBlogArticlePayload,
+} from "../src/utils/blogArchive.js";
 
 const contentTypeLink = {
   sys: { type: "Link", linkType: "ContentType", id: "article" },
@@ -113,6 +122,57 @@ const nextArticle = {
 };
 
 describe("blog navigation cross-layer contract", () => {
+  it("validates renderable article and chronological-navigation payloads", () => {
+    assert.equal(validateBlogArticlePayload(currentArticle), currentArticle);
+    assert.throws(
+      () => validateBlogArticlePayload({ ...currentArticle, fields: { ...currentArticle.fields, body: "" } }),
+      { name: "TypeError", message: "Invalid blog article payload" }
+    );
+
+    const navigation = {
+      previous: { title: "Previous systems article", slug: "previous-systems-article" },
+      next: { title: "Next systems article", slug: "next-systems-article" },
+    };
+    assert.equal(validateBlogArticleNavigationPayload(navigation), navigation);
+    assert.throws(
+      () => validateBlogArticleNavigationPayload({ previous: { title: "", slug: "broken" }, next: null }),
+      { name: "TypeError", message: "Invalid blog article navigation payload" }
+    );
+  });
+
+  it("accepts only article and navigation responses for the current slug and request ids", () => {
+    assert.equal(
+      isCurrentArticleRouteRequest({ requestId: 4, currentRequestId: 4, requestedSlug: "current", currentSlug: "current" }),
+      true
+    );
+    assert.equal(
+      isCurrentArticleRouteRequest({ requestId: 3, currentRequestId: 4, requestedSlug: "old", currentSlug: "current" }),
+      false
+    );
+    assert.equal(
+      isCurrentArticleNavigationRequest({
+        requestId: 8,
+        currentRequestId: 8,
+        articleRequestId: 4,
+        currentArticleRequestId: 4,
+        requestedSlug: "current",
+        currentSlug: "current",
+      }),
+      true
+    );
+    assert.equal(
+      isCurrentArticleNavigationRequest({
+        requestId: 7,
+        currentRequestId: 8,
+        articleRequestId: 3,
+        currentArticleRequestId: 4,
+        requestedSlug: "old",
+        currentSlug: "current",
+      }),
+      false
+    );
+  });
+
   it("keeps canonical archive state, the selected slug, and chronological neighbors aligned", async () => {
     const expectedQueries = [
       {

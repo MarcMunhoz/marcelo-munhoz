@@ -78,37 +78,20 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
-import cld from "../utils/coudinaryGallery";
-import { fit } from "@cloudinary/url-gen/actions/resize";
+<script setup>
 import projectsList from "../utils/projectsList";
-import socialNetwork from "../utils/socialNetwork";
 import confortableWith from "../utils/confortableWith";
+import { sortAnything } from "../utils/homeMedia.js";
 
-export default defineComponent({
+defineOptions({
   name: "IndexPage",
-  data() {
-    return {
-      projectsList,
-      socialNetwork,
-      confortableWith,
-    };
-  },
-  methods: {
-    cloudinaryImg(imgName, imgWidth) {
-      const image = cld.image(`marcelo-munhoz-website/${imgName}`);
-      return image.resize(fit().width(imgWidth)).toURL();
-    },
-    yearCount(initialDate) {
-      const countedDate = new Date(Date.now() - new Date(initialDate).getTime());
-      return Math.abs(countedDate.getFullYear() - 1970);
-    },
-    sortAnything(thing, thingProperty) {
-      return thing.slice().sort((a, b) => a[thingProperty].localeCompare(b[thingProperty]));
-    },
-  },
 });
+
+const yearCount = (initialDate) => {
+  const countedDate = new Date(Date.now() - new Date(initialDate).getTime());
+
+  return Math.abs(countedDate.getFullYear() - 1970);
+};
 </script>
 
 <style lang="scss" scoped>

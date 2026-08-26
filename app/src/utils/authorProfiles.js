@@ -36,5 +36,15 @@ export const publicAuthorProfile = (author = {}) => ({
   photoUrl: authorPhotoUrl(author),
 });
 
+export const publicAuthorMetadata = (author = {}) => ({
+  title: `Marcelo Munhoz - ${author.name || "Author"}`,
+  meta: {
+    description: {
+      name: "description",
+      content: author.biography || `Articles by ${author.name || ""}`,
+    },
+  },
+});
+
 export const articleAuthorProfile = (article = {}) => publicAuthorProfile(article.fields?.author || article.author || {});
 import { authorPhotoCandidates } from "./authorPhotos.js";

@@ -160,13 +160,17 @@
   </q-layout>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { getAuthorProfile } from "../utils/adminApi.js";
 import {
   adminAccessPhraseMatches,
   adminAccountInitials,
   adminSessionDisplay,
+  bindIdentityCallbacks,
+  completeAdminIdentityLogin,
+  createAdminProfileLoader,
   getAdminSession,
   nextAdminAccessClick,
   openAdminLogin,
@@ -176,144 +180,147 @@ import {
 } from "../utils/adminAuth.js";
 import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
 
-export default defineComponent({
-  name: "MainLayout",
-  data() {
-    return {
-      avatar: "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c",
-      adminSession: null,
-      adminProfile: null,
-      adminProfilePhotoIndex: 0,
-      adminAccessDialog: false,
-      adminAccessPhrase: "",
-      adminAccessClickState: null,
-      nameNavigationTimer: null,
-      adminLoginRequested: false,
-      adminAccessNotice: "",
-      adminAccessNoticeTimer: null,
-    };
-  },
-  computed: {
-    adminDisplay() {
-      return adminSessionDisplay(this.adminSession);
-    },
-    adminNavLabel() {
-      return this.adminSession ? this.adminDisplay.name : "Admin";
-    },
-    adminNavCaption() {
-      return this.adminSession ? `${this.adminDisplay.role} · ${this.adminDisplay.context}` : "Sign in required";
-    },
-    adminInitials() {
-      return adminAccountInitials(this.adminSession);
-    },
-    adminProfilePhotoUrl() {
-      return authorPhotoCandidates(this.adminProfile || {})[this.adminProfilePhotoIndex] || "";
-    },
-  },
-  async mounted() {
-    this.adminSession = await getAdminSession();
-    await this.loadAdminProfile();
-    this.bindIdentityCallbacks();
-  },
-  beforeUnmount() {
-    clearTimeout(this.nameNavigationTimer);
-    clearTimeout(this.adminAccessNoticeTimer);
-  },
-  methods: {
-    bindIdentityCallbacks() {
-      const identity = globalThis.netlifyIdentity;
+const route = useRoute();
+const router = useRouter();
+const avatar = "https://en.gravatar.com/userimage/6120444/f6673ca4647b547645d7384a96b8921c";
+const adminSession = ref(null);
+const adminProfile = ref(null);
+const adminProfilePhotoIndex = ref(0);
+const adminAccessDialog = ref(false);
+const adminAccessPhrase = ref("");
+const adminAccessClickState = ref(null);
+const nameNavigationTimer = ref(null);
+const adminLoginRequested = ref(false);
+const adminAccessNotice = ref("");
+const adminAccessNoticeTimer = ref(null);
+const adminDisplay = computed(() => adminSessionDisplay(adminSession.value));
+const adminNavLabel = computed(() => (adminSession.value ? adminDisplay.value.name : "Admin"));
+const adminNavCaption = computed(() =>
+  adminSession.value ? `${adminDisplay.value.role} · ${adminDisplay.value.context}` : "Sign in required"
+);
+const adminInitials = computed(() => adminAccountInitials(adminSession.value));
+const adminProfilePhotoUrl = computed(
+  () => authorPhotoCandidates(adminProfile.value || {})[adminProfilePhotoIndex.value] || ""
+);
+let stopIdentityCallbacks = () => {};
+let unmounted = false;
 
-      if (typeof identity?.on !== "function") {
-        return;
-      }
+const profileLoader = createAdminProfileLoader({
+  getAuthorProfileImpl: getAuthorProfile,
+  applyProfile: (profile) => {
+    adminProfile.value = profile;
+    adminProfilePhotoIndex.value = 0;
+  },
+});
 
-      identity.on("login", async () => {
-        if (typeof identity.close === "function") {
-          identity.close();
-        }
+const loadAdminProfile = (session = adminSession.value) => profileLoader.load(session);
 
-        this.adminSession = await getAdminSession();
-        await this.loadAdminProfile();
-        if (this.adminLoginRequested && this.adminSession) {
-          this.adminLoginRequested = false;
-          await this.$router.push("/admin");
-        }
+const advanceAdminProfilePhoto = () => {
+  adminProfilePhotoIndex.value = nextAuthorPhotoIndex(
+    authorPhotoCandidates(adminProfile.value || {}),
+    adminProfilePhotoIndex.value
+  );
+};
+
+const finishAdminSignOut = async () => {
+  profileLoader.invalidate();
+  adminSession.value = null;
+  adminProfile.value = null;
+  adminProfilePhotoIndex.value = 0;
+  await redirectSignedOutAdmin({ router, currentPath: route.path });
+};
+
+const signOut = async () => {
+  const signedOut = await signOutAdmin();
+
+  if (signedOut && adminSession.value) await finishAdminSignOut();
+};
+
+const navigateHome = () => {
+  if (route.path !== "/") router.push("/");
+};
+
+const handleNameClick = () => {
+  const result = nextAdminAccessClick(adminAccessClickState.value);
+  adminAccessClickState.value = result.state;
+  clearTimeout(nameNavigationTimer.value);
+
+  if (result.unlock) {
+    adminAccessPhrase.value = "";
+    adminAccessDialog.value = true;
+    return;
+  }
+
+  nameNavigationTimer.value = setTimeout(() => {
+    adminAccessClickState.value = null;
+    navigateHome();
+  }, 600);
+};
+
+const showAdminAccessNotice = (message) => {
+  clearTimeout(adminAccessNoticeTimer.value);
+  adminAccessNotice.value = String(message || "");
+  adminAccessNoticeTimer.value = setTimeout(() => {
+    adminAccessNotice.value = "";
+    adminAccessNoticeTimer.value = null;
+  }, 3500);
+};
+
+const submitAdminAccess = async () => {
+  if (!adminAccessPhraseMatches(adminAccessPhrase.value)) {
+    adminAccessDialog.value = false;
+    adminAccessPhrase.value = "";
+    await rejectAdminAccess({
+      notifyImpl: ({ message }) => showAdminAccessNotice(message),
+      router,
+      currentPath: route.path,
+    });
+    return;
+  }
+
+  adminAccessDialog.value = false;
+  adminLoginRequested.value = openAdminLogin();
+};
+
+onMounted(async () => {
+  const session = await getAdminSession();
+
+  if (unmounted) return;
+  adminSession.value = session;
+  await loadAdminProfile();
+  if (unmounted) return;
+
+  const identity = globalThis.netlifyIdentity;
+  stopIdentityCallbacks = bindIdentityCallbacks({
+    identity,
+    onLogin: () => {
+      profileLoader.invalidate();
+      return completeAdminIdentityLogin({
+        identity,
+        getSessionImpl: getAdminSession,
+        setSession: (sessionAfterLogin) => {
+          adminSession.value = sessionAfterLogin;
+        },
+        loadProfile: loadAdminProfile,
+        isLoginRequested: () => adminLoginRequested.value,
+        clearLoginRequest: () => {
+          adminLoginRequested.value = false;
+        },
+        router,
+        isActive: () => !unmounted,
+        isSessionCurrent: (sessionAfterLogin) => adminSession.value === sessionAfterLogin,
       });
-      identity.on("logout", () => this.finishAdminSignOut());
     },
-    async loadAdminProfile() {
-      if (!this.adminSession) {
-        this.adminProfile = null;
-        this.adminProfilePhotoIndex = 0;
-        return;
-      }
+    onLogout: () => finishAdminSignOut(),
+  });
+});
 
-      try {
-        const response = await getAuthorProfile({ session: this.adminSession });
-        this.adminProfile = response.profile || null;
-        this.adminProfilePhotoIndex = 0;
-      } catch {
-        this.adminProfile = null;
-        this.adminProfilePhotoIndex = 0;
-      }
-    },
-    advanceAdminProfilePhoto() {
-      this.adminProfilePhotoIndex = nextAuthorPhotoIndex(authorPhotoCandidates(this.adminProfile || {}), this.adminProfilePhotoIndex);
-    },
-    async signOut() {
-      const signedOut = await signOutAdmin();
-
-      if (signedOut && this.adminSession) await this.finishAdminSignOut();
-    },
-    async finishAdminSignOut() {
-      this.adminSession = null;
-      this.adminProfile = null;
-      this.adminProfilePhotoIndex = 0;
-      await redirectSignedOutAdmin({ router: this.$router, currentPath: this.$route.path });
-    },
-    navigateHome() {
-      if (this.$route.path !== "/") this.$router.push("/");
-    },
-    handleNameClick() {
-      const result = nextAdminAccessClick(this.adminAccessClickState);
-      this.adminAccessClickState = result.state;
-      clearTimeout(this.nameNavigationTimer);
-
-      if (result.unlock) {
-        this.adminAccessPhrase = "";
-        this.adminAccessDialog = true;
-        return;
-      }
-
-      this.nameNavigationTimer = setTimeout(() => {
-        this.adminAccessClickState = null;
-        this.navigateHome();
-      }, 600);
-    },
-    async submitAdminAccess() {
-      if (!adminAccessPhraseMatches(this.adminAccessPhrase)) {
-        this.adminAccessDialog = false;
-        this.adminAccessPhrase = "";
-        await rejectAdminAccess({
-          notifyImpl: ({ message }) => this.showAdminAccessNotice(message),
-          router: this.$router,
-          currentPath: this.$route.path,
-        });
-        return;
-      }
-
-      this.adminAccessDialog = false;
-      this.adminLoginRequested = openAdminLogin();
-    },
-    showAdminAccessNotice(message) {
-      clearTimeout(this.adminAccessNoticeTimer);
-      this.adminAccessNotice = String(message || "");
-      this.adminAccessNoticeTimer = setTimeout(() => {
-        this.adminAccessNotice = "";
-        this.adminAccessNoticeTimer = null;
-      }, 3500);
-    },
-  },
+onBeforeUnmount(() => {
+  unmounted = true;
+  profileLoader.invalidate();
+  clearTimeout(nameNavigationTimer.value);
+  clearTimeout(adminAccessNoticeTimer.value);
+  stopIdentityCallbacks();
 });
 </script>
 

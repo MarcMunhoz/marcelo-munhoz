@@ -55,43 +55,34 @@
   </section>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+import { computed } from "vue";
 import { articleLocaleFromArticle, publicArticleDates } from "../utils/articleDates.js";
 import { blogArticleLocation } from "../utils/blogArchive.js";
 import { articleCardImageUrl } from "../utils/contentfulImages.js";
 
-export default defineComponent({
+defineOptions({
   name: "BlogHighlights",
-  props: {
-    articles: { type: Array, default: () => [] },
-    returnTo: { type: String, default: "/blog" },
-  },
-  computed: {
-    primaryArticle() {
-      return this.articles[0] || null;
-    },
-    secondaryArticles() {
-      return this.articles.slice(1, 3);
-    },
-  },
-  methods: {
-    articleCardImageUrl,
-    blogArticleLocation,
-    articleAuthor(article) {
-      return article.fields?.author?.fields?.name || "";
-    },
-    articleDates(article) {
-      const fields = article.fields || {};
-      return publicArticleDates({
-        createAt: fields.createAt,
-        updatedAt: fields.updatedAt,
-        fallbackCreatedAt: article.sys?.createdAt,
-        locale: articleLocaleFromArticle(fields),
-      });
-    },
-  },
 });
+
+const props = defineProps({
+  articles: { type: Array, default: () => [] },
+  returnTo: { type: String, default: "/blog" },
+});
+
+const primaryArticle = computed(() => props.articles[0] || null);
+const secondaryArticles = computed(() => props.articles.slice(1, 3));
+const articleAuthor = (article) => article.fields?.author?.fields?.name || "";
+const articleDates = (article) => {
+  const fields = article.fields || {};
+
+  return publicArticleDates({
+    createAt: fields.createAt,
+    updatedAt: fields.updatedAt,
+    fallbackCreatedAt: article.sys?.createdAt,
+    locale: articleLocaleFromArticle(fields),
+  });
+};
 </script>
 
 <style lang="scss" scoped>

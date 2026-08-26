@@ -19,32 +19,36 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
-import cloudinaryImg from "../pages/IndexPage.vue";
-import sortAnything from "../pages/IndexPage.vue";
+<script setup>
+import { onBeforeUnmount, onMounted } from "vue";
+import { cloudinaryImg, sortAnything } from "../utils/homeMedia.js";
+import socialNetwork from "../utils/socialNetwork.js";
 
-export default defineComponent({
+defineOptions({
   name: "AboutPage",
-  mixins: [cloudinaryImg, sortAnything],
-  methods: {
-    filteredSocialList() {
-      // sortAnything method require the socialNetwork data that comes from its component
-      return this.sortAnything(this.socialNetwork, "nameAccount").filter((social) => social.useItOn.includes("where"));
-    },
-  },
-  mounted() {
-    const icons = document.querySelectorAll(".social-links i");
+});
 
-    icons.forEach((e) => {
-      e.addEventListener("mouseover", (e) => {
-        e.target.classList.add("fa-flip");
-      });
-      e.addEventListener("mouseleave", (e) => {
-        e.target.classList.remove("fa-flip");
-      });
-    });
-  },
+const filteredSocialList = () =>
+  sortAnything(socialNetwork, "nameAccount").filter((social) => social.useItOn.includes("where"));
+const onClickItem = (link) => window.open(link, "project");
+const addFlip = (event) => event.target.classList.add("fa-flip");
+const removeFlip = (event) => event.target.classList.remove("fa-flip");
+let icons = [];
+
+onMounted(() => {
+  icons = Array.from(document.querySelectorAll(".social-links i"));
+
+  icons.forEach((icon) => {
+    icon.addEventListener("mouseover", addFlip);
+    icon.addEventListener("mouseleave", removeFlip);
+  });
+});
+
+onBeforeUnmount(() => {
+  icons.forEach((icon) => {
+    icon.removeEventListener("mouseover", addFlip);
+    icon.removeEventListener("mouseleave", removeFlip);
+  });
 });
 </script>
 

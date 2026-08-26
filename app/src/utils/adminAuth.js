@@ -104,6 +104,95 @@ export const openAdminLogin = ({ identity = globalThis.netlifyIdentity, location
   return false;
 };
 
+export const bindIdentityCallbacks = ({ identity = globalThis.netlifyIdentity, onLogin, onLogout } = {}) => {
+  if (typeof identity?.on !== "function") {
+    return () => {};
+  }
+
+  let active = true;
+  const loginCallback = (...args) => (active ? onLogin?.(...args) : undefined);
+  const logoutCallback = (...args) => (active ? onLogout?.(...args) : undefined);
+
+  identity.on("login", loginCallback);
+  identity.on("logout", logoutCallback);
+
+  return () => {
+    if (!active) return;
+    active = false;
+
+    if (typeof identity.off === "function") {
+      identity.off("login", loginCallback);
+      identity.off("logout", logoutCallback);
+    }
+  };
+};
+
+export const createAdminProfileLoader = ({ getAuthorProfileImpl, applyProfile } = {}) => {
+  let requestId = 0;
+
+  const invalidate = () => {
+    requestId += 1;
+  };
+
+  const load = async (session) => {
+    const currentRequestId = ++requestId;
+
+    if (!session) {
+      applyProfile?.(null);
+      return null;
+    }
+
+    try {
+      const response = await getAuthorProfileImpl({ session });
+
+      if (currentRequestId !== requestId) return null;
+      const profile = response?.profile || null;
+      applyProfile?.(profile);
+      return profile;
+    } catch {
+      if (currentRequestId !== requestId) return null;
+      applyProfile?.(null);
+      return null;
+    }
+  };
+
+  return { invalidate, load };
+};
+
+export const completeAdminIdentityLogin = async ({
+  identity = globalThis.netlifyIdentity,
+  getSessionImpl = getAdminSession,
+  setSession,
+  loadProfile,
+  isLoginRequested = () => false,
+  clearLoginRequest,
+  router,
+  isActive = () => true,
+  isSessionCurrent = () => true,
+} = {}) => {
+  if (typeof identity?.close === "function") {
+    identity.close();
+  }
+
+  const session = await getSessionImpl();
+
+  if (!isActive()) return { navigated: false, session: null };
+  setSession?.(session);
+  await loadProfile?.(session);
+
+  if (!isActive() || !isSessionCurrent(session)) {
+    return { navigated: false, session };
+  }
+
+  if (isLoginRequested() && session && typeof router?.push === "function") {
+    clearLoginRequest?.();
+    await router.push("/admin");
+    return { navigated: true, session };
+  }
+
+  return { navigated: false, session };
+};
+
 export const adminSessionDisplay = (session) => {
   if (!session) {
     return {

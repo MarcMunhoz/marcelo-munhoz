@@ -29,46 +29,32 @@
   </ul>
 </template>
 
-<script>
-import { defineComponent } from "vue";
-import { articleLocaleFromArticle, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
-import { blogArticleLocation } from "../utils/blogArchive.js";
+<script setup>
+import { articleLocaleFromArticle, publicArticleDates } from "../utils/articleDates.js";
+import { articleArchiveTags, blogArticleLocation } from "../utils/blogArchive.js";
 import { articleCardImageUrl } from "../utils/contentfulImages.js";
 
-export default defineComponent({
+defineOptions({
   name: "BlogArchiveList",
-  props: {
-    articles: { type: Array, default: () => [] },
-    returnTo: { type: String, default: "/blog" },
-  },
-  methods: {
-    articleCardImageUrl,
-    blogArticleLocation,
-    articleAuthor(article) {
-      return article.fields?.author?.fields?.name || "";
-    },
-    articleDates(article) {
-      const fields = article.fields || {};
-      return publicArticleDates({
-        createAt: fields.createAt,
-        updatedAt: fields.updatedAt,
-        fallbackCreatedAt: article.sys?.createdAt,
-        locale: articleLocaleFromArticle(fields),
-      });
-    },
-    articleTags(article) {
-      const tags = article.metadata?.tags;
-
-      if (!Array.isArray(tags)) {
-        return [];
-      }
-
-      return tags
-        .map((tag) => String(tag?.sys?.id || "").trim())
-        .filter((tag) => tag && !isArticleLanguageTag(tag));
-    },
-  },
 });
+
+defineProps({
+  articles: { type: Array, default: () => [] },
+  returnTo: { type: String, default: "/blog" },
+});
+
+const articleAuthor = (article) => article.fields?.author?.fields?.name || "";
+const articleDates = (article) => {
+  const fields = article.fields || {};
+
+  return publicArticleDates({
+    createAt: fields.createAt,
+    updatedAt: fields.updatedAt,
+    fallbackCreatedAt: article.sys?.createdAt,
+    locale: articleLocaleFromArticle(fields),
+  });
+};
+const articleTags = articleArchiveTags;
 </script>
 
 <style lang="scss" scoped>

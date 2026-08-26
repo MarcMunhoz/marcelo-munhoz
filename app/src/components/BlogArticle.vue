@@ -123,263 +123,216 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { Marked } from "marked";
 import { mangle } from "marked-mangle";
 import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
-import { createMetaMixin } from "quasar";
+import { useMeta } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { articleBylineLabels, articleLocaleFromArticle, articleNavigationLabels, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
 import { articleAuthorProfile } from "../utils/authorProfiles.js";
-import { blogArticleLocation, blogReturnLocation } from "../utils/blogArchive.js";
+import {
+  blogArticleLocation,
+  blogReturnLocation,
+  isCurrentArticleNavigationRequest,
+  isCurrentArticleRouteRequest,
+  validateBlogArticleNavigationPayload,
+  validateBlogArticlePayload,
+} from "../utils/blogArchive.js";
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
 const articleMarkdown = new Marked(mangle(), gfmHeadingId({ prefix: "marked-" }));
+const route = useRoute();
+const article = ref({});
+const articleImg = ref("");
+const articleAuthor = ref("");
+const articleAuthorSlug = ref("");
+const articleTags = ref([]);
+const createAt = ref(null);
+const articleLocale = ref("pt-BR");
+const articleNavigation = ref({ previous: null, next: null });
+const progress = ref(true);
+let articleRequestId = 0;
+let navigationRequestId = 0;
 
-const nonEmptyString = (value) => typeof value === "string" && Boolean(value.trim());
+const archiveLocation = computed(() => blogReturnLocation(typeof window === "undefined" ? {} : window.history.state));
+const getUrlToShare = computed(() => document.baseURI);
+const navigationLabels = computed(() => articleNavigationLabels(articleLocale.value));
+const bylineLabels = computed(() => articleBylineLabels(articleLocale.value, article.value));
+const articleDates = computed(() =>
+  publicArticleDates({
+    createAt: article.value.createAt,
+    updatedAt: article.value.updatedAt,
+    fallbackCreatedAt: createAt.value,
+    locale: articleLocale.value,
+  })
+);
 
-const isRenderableArticlePayload = (article) => {
-  if (!article || typeof article !== "object" || Array.isArray(article)) {
-    return false;
+useMeta(() => ({
+  title: `Marcelo Munhoz - ${article.value.title}`,
+  meta: {
+    description: {
+      name: "description",
+      content: article.value.description,
+    },
+    ogType: {
+      property: "og:type",
+      content: "article",
+    },
+    ogUrl: {
+      property: "og:url",
+      content: getUrlToShare.value,
+    },
+    ogTitle: {
+      property: "og:title",
+      content: `Marcelo Munhoz - ${article.value.title}`,
+    },
+    ogDescription: {
+      property: "og:description",
+      content: article.value.description,
+    },
+    ogImage: {
+      property: "og:image",
+      content: articleImg.value,
+    },
+    twitterCard: {
+      property: "twitter:card",
+      content: "summary_large_image",
+    },
+    twitteUrl: {
+      property: "twitter:url",
+      content: getUrlToShare.value,
+    },
+    twitteTitle: {
+      property: "twitter:title",
+      content: `Marcelo Munhoz - ${article.value.title}`,
+    },
+    twitteDescription: {
+      property: "twitter:description",
+      content: article.value.description,
+    },
+    twitteImage: {
+      property: "twitter:image",
+      content: articleImg.value,
+    },
+  },
+}));
+
+const articleNeighborLocation = (neighbor) => blogArticleLocation(neighbor, archiveLocation.value);
+
+const loadArticleNavigation = async (slug, requestedArticleRequestId) => {
+  const requestId = ++navigationRequestId;
+
+  try {
+    const res = await fetch(buildApiUrl(`/api/contentful/article-navigation/${encodeURIComponent(slug)}`));
+    if (!res.ok) {
+      throw new Error(`Article navigation API returned ${res.status}`);
+    }
+
+    const navigation = validateBlogArticleNavigationPayload(await res.json());
+
+    if (
+      !isCurrentArticleNavigationRequest({
+        requestId,
+        currentRequestId: navigationRequestId,
+        articleRequestId: requestedArticleRequestId,
+        currentArticleRequestId: articleRequestId,
+        requestedSlug: slug,
+        currentSlug: route.params.slug,
+      })
+    ) {
+      return;
+    }
+
+    articleNavigation.value = {
+      previous: navigation.previous || null,
+      next: navigation.next || null,
+    };
+  } catch (loadError) {
+    if (requestId === navigationRequestId && requestedArticleRequestId === articleRequestId) {
+      articleNavigation.value = { previous: null, next: null };
+      console.error("Erro ao carregar navegação do artigo:", loadError);
+    }
   }
-
-  const { fields, metadata, sys } = article;
-  const authorName = fields?.author?.fields?.name || fields?.author?.name;
-  const tags = metadata?.tags;
-
-  return (
-    sys &&
-    typeof sys === "object" &&
-    nonEmptyString(sys.createdAt) &&
-    fields &&
-    typeof fields === "object" &&
-    !Array.isArray(fields) &&
-    nonEmptyString(fields.title) &&
-    nonEmptyString(fields.slug) &&
-    typeof fields.description === "string" &&
-    nonEmptyString(fields.body) &&
-    nonEmptyString(authorName) &&
-    metadata &&
-    typeof metadata === "object" &&
-    Array.isArray(tags) &&
-    tags.every((tag) => nonEmptyString(tag?.sys?.id)) &&
-    (fields.locale === undefined || typeof fields.locale === "string") &&
-    (fields.createAt === undefined || typeof fields.createAt === "string") &&
-    (fields.updatedAt === undefined || typeof fields.updatedAt === "string") &&
-    (fields.alt === undefined || typeof fields.alt === "string")
-  );
 };
 
-export default defineComponent({
-  name: "BlogArticle",
-  data() {
-    return {
-      article: {},
-      articleImg: "",
-      articleAuthor: "",
-      articleAuthorSlug: "",
-      articleTags: [],
-      createAt: null,
-      articleLocale: "pt-BR",
-      articleNavigation: { previous: null, next: null },
-      articleRequestId: 0,
-      navigationRequestId: 0,
-      progress: true,
-    };
-  },
-  components: {
-    SEmail,
-    SFacebook,
-    SLinkedIn,
-    STelegram,
-    STwitter,
-    SWhatsApp,
-  },
-  mixins: [
-    createMetaMixin(function () {
-      return {
-        title: `Marcelo Munhoz - ${this.article.title}`,
-        meta: {
-          description: {
-            name: "description",
-            content: this.article.description,
-          },
-          ogType: {
-            property: "og:type",
-            content: "article",
-          },
-          ogUrl: {
-            property: "og:url",
-            content: this.getUrlToShare,
-          },
-          ogTitle: {
-            property: "og:title",
-            content: `Marcelo Munhoz - ${this.article.title}`,
-          },
-          ogDescription: {
-            property: "og:description",
-            content: this.article.description,
-          },
-          ogImage: {
-            property: "og:image",
-            content: this.articleImg,
-          },
-          twitterCard: {
-            property: "twitter:card",
-            content: "summary_large_image",
-          },
-          twitteUrl: {
-            property: "twitter:url",
-            content: this.getUrlToShare,
-          },
-          twitteTitle: {
-            property: "twitter:title",
-            content: `Marcelo Munhoz - ${this.article.title}`,
-          },
-          twitteDescription: {
-            property: "twitter:description",
-            content: this.article.description,
-          },
-          twitteImage: {
-            property: "twitter:image",
-            content: this.articleImg,
-          },
-        },
-      };
-    }),
-  ],
-  async mounted() {
-    await this.loadArticle(this.$route.params.slug);
-  },
-  watch: {
-    "$route.params.slug"(slug) {
-      this.loadArticle(slug);
-    },
-  },
-  methods: {
-    articleNeighborLocation(neighbor) {
-      return blogArticleLocation(neighbor, this.archiveLocation);
-    },
-    async loadArticle(slug = this.$route.params.slug) {
-      const requestedSlug = String(slug || "");
-      const requestId = ++this.articleRequestId;
-      this.navigationRequestId += 1;
-      this.articleNavigation = { previous: null, next: null };
-      this.progress = true;
+const loadArticle = async (slug = route.params.slug) => {
+  const requestedSlug = String(slug || "");
+  const requestId = ++articleRequestId;
+  navigationRequestId += 1;
+  articleNavigation.value = { previous: null, next: null };
+  progress.value = true;
 
-      try {
-        const res = await fetch(buildApiUrl(`/api/contentful/article/${encodeURIComponent(requestedSlug)}`));
-        if (!res.ok) {
-          throw new Error(`Blog API returned ${res.status}`);
-        }
+  try {
+    const res = await fetch(buildApiUrl(`/api/contentful/article/${encodeURIComponent(requestedSlug)}`));
+    if (!res.ok) {
+      throw new Error(`Blog API returned ${res.status}`);
+    }
 
-        const article = await res.json();
-        if (requestId !== this.articleRequestId || requestedSlug !== String(this.$route.params.slug || "")) {
-          return;
-        }
-        if (!isRenderableArticlePayload(article)) {
-          throw new Error("Blog API returned an invalid article payload");
-        }
+    const loadedArticle = await res.json();
+    if (
+      !isCurrentArticleRouteRequest({
+        requestId,
+        currentRequestId: articleRequestId,
+        requestedSlug,
+        currentSlug: route.params.slug,
+      })
+    ) {
+      return;
+    }
 
-        this.createAt = article.sys.createdAt;
-        this.article = article.fields;
-        this.articleLocale = articleLocaleFromArticle({ ...article.fields, metadata: article.metadata }, "pt-BR");
-        const author = articleAuthorProfile(article);
-        this.articleAuthor = author.name;
-        this.articleAuthorSlug = author.slug;
-        this.articleImg = articleHeroImageUrl(article.fields);
+    validateBlogArticlePayload(loadedArticle);
+    createAt.value = loadedArticle.sys.createdAt;
+    article.value = loadedArticle.fields;
+    articleLocale.value = articleLocaleFromArticle({ ...loadedArticle.fields, metadata: loadedArticle.metadata }, "pt-BR");
+    const author = articleAuthorProfile(loadedArticle);
+    articleAuthor.value = author.name;
+    articleAuthorSlug.value = author.slug;
+    articleImg.value = articleHeroImageUrl(loadedArticle.fields);
 
-        const rawBody = article.fields.body;
+    const parsedArticleBody = articleMarkdown.parse(loadedArticle.fields.body);
+    const linkToIframe = parsedArticleBody.replace(
+      /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi,
+      `<div id="video-container" class="relative pb-[56.25%] h-0">
+        <iframe src="$2" allowfullscreen class="absolute top-0 left-0 h-full w-full"></iframe>
+      </div>`
+    );
 
-        const parsedArticleBody = articleMarkdown.parse(rawBody);
+    document.querySelector(".rendered-text").innerHTML = linkToIframe;
 
-        const linkToIframe = parsedArticleBody.replace(
-          /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi,
-          `<div id="video-container" class="relative pb-[56.25%] h-0">
-            <iframe src="$2" allowfullscreen class="absolute top-0 left-0 h-full w-full"></iframe>
-          </div>`
-        );
+    const hashtags = loadedArticle.metadata?.tags || [];
+    articleTags.value = hashtags.map((tag) => tag.sys.id).filter((tag) => !isArticleLanguageTag(tag));
 
-        document.querySelector(".rendered-text").innerHTML = linkToIframe;
+    const headerArticleName = document.querySelector(".header-title");
+    if (headerArticleName) {
+      headerArticleName.innerHTML = article.value.title;
+    }
 
-        const hashtags = article.metadata?.tags || [];
-        this.articleTags = hashtags.map((tag) => tag.sys.id).filter((tag) => !isArticleLanguageTag(tag));
+    document.title = `Marcelo Munhoz - ${article.value.title}`;
+    progress.value = false;
+    await loadArticleNavigation(requestedSlug, requestId);
+  } catch (loadError) {
+    if (requestId === articleRequestId) {
+      console.error("Erro ao carregar artigo:", loadError);
+    }
+  }
+};
 
-        const headerArticleName = document.querySelector(".header-title");
-        if (headerArticleName) {
-          headerArticleName.innerHTML = this.article.title;
-        }
+onMounted(async () => {
+  await loadArticle(route.params.slug);
+});
 
-        document.title = `Marcelo Munhoz - ${this.article.title}`;
-        this.progress = false;
-        await this.loadArticleNavigation(requestedSlug, requestId);
-      } catch (err) {
-        if (requestId === this.articleRequestId) {
-          console.error("Erro ao carregar artigo:", err);
-        }
-      }
-    },
-    async loadArticleNavigation(slug, articleRequestId) {
-      const requestId = ++this.navigationRequestId;
+watch(
+  () => route.params.slug,
+  (slug) => loadArticle(slug)
+);
 
-      try {
-        const res = await fetch(buildApiUrl(`/api/contentful/article-navigation/${encodeURIComponent(slug)}`));
-        if (!res.ok) {
-          throw new Error(`Article navigation API returned ${res.status}`);
-        }
-
-        const navigation = await res.json();
-        const isNavigationLink = (value) =>
-          value === null ||
-          (value && typeof value === "object" && typeof value.title === "string" && value.title.trim() && typeof value.slug === "string" && value.slug.trim());
-        if (!navigation || typeof navigation !== "object" || !isNavigationLink(navigation.previous) || !isNavigationLink(navigation.next)) {
-          throw new Error("Article navigation API returned an invalid payload");
-        }
-
-        if (
-          requestId !== this.navigationRequestId ||
-          articleRequestId !== this.articleRequestId ||
-          slug !== String(this.$route.params.slug || "")
-        ) {
-          return;
-        }
-
-        this.articleNavigation = {
-          previous: navigation.previous || null,
-          next: navigation.next || null,
-        };
-      } catch (err) {
-        if (requestId === this.navigationRequestId && articleRequestId === this.articleRequestId) {
-          this.articleNavigation = { previous: null, next: null };
-          console.error("Erro ao carregar navegação do artigo:", err);
-        }
-      }
-    },
-  },
-  computed: {
-    archiveLocation() {
-      return blogReturnLocation(typeof window === "undefined" ? {} : window.history.state);
-    },
-    getUrlToShare() {
-      return document.baseURI;
-    },
-    navigationLabels() {
-      return articleNavigationLabels(this.articleLocale);
-    },
-    bylineLabels() {
-      return articleBylineLabels(this.articleLocale, this.article);
-    },
-    articleDates() {
-      return publicArticleDates({
-        createAt: this.article.createAt,
-        updatedAt: this.article.updatedAt,
-        fallbackCreatedAt: this.createAt,
-        locale: this.articleLocale,
-      });
-    },
-  },
+onBeforeUnmount(() => {
+  articleRequestId += 1;
+  navigationRequestId += 1;
 });
 </script>
 

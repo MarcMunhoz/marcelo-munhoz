@@ -38,7 +38,7 @@
         />
       </section>
 
-      <BlogHighlights v-if="featured.length" :articles="featured" :return-to="$route.fullPath" />
+      <BlogHighlights v-if="featured.length" :articles="featured" :return-to="route.fullPath" />
 
       <section class="blog-archive" aria-labelledby="blog-archive-heading" :aria-busy="loading">
         <div class="blog-archive__heading">
@@ -64,7 +64,7 @@
             <p>No articles match these filters.</p>
           </div>
 
-          <BlogArchiveList v-else :articles="articles" :return-to="$route.fullPath" />
+          <BlogArchiveList v-else :articles="articles" :return-to="route.fullPath" />
         </div>
 
         <nav v-if="!loading && !error && totalPages > 1" class="blog-pagination" aria-label="Article archive pagination">
@@ -116,304 +116,224 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import BlogArchiveList from "../components/BlogArchiveList.vue";
 import BlogHighlights from "../components/BlogHighlights.vue";
 import { buildApiUrl } from "../utils/apiBase.js";
-import { blogRouteQuery, normalizeBlogRouteQuery } from "../utils/blogArchive.js";
-import { isArticleLanguageTag } from "../utils/articleDates.js";
+import {
+  blogPaginationDisplay,
+  blogRouteQuery,
+  blogTagOptions,
+  normalizeBlogRouteQuery,
+  validateBlogIndexPayload,
+  validateBlogYearsPayload,
+} from "../utils/blogArchive.js";
 import { observeMediaQuery } from "../utils/responsiveMedia.js";
 
-const sameArchiveState = (left, right) => ["page", "q", "year", "tag"].every((key) => left[key] === right[key]);
-
-const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-
-const hasValidArticleTags = (article) => {
-  const tags = article.metadata?.tags;
-
-  if (tags === undefined) {
-    return true;
-  }
-
-  return (
-    Array.isArray(tags) &&
-    tags.every((tag) => isRecord(tag) && isRecord(tag.sys) && typeof tag.sys.id === "string" && tag.sys.id.trim().length > 0)
-  );
-};
-
-const isBlogArticle = (article) => {
-  const fields = article?.fields;
-
-  return (
-    article !== null &&
-    typeof article === "object" &&
-    !Array.isArray(article) &&
-    fields !== null &&
-    typeof fields === "object" &&
-    !Array.isArray(fields) &&
-    typeof fields.title === "string" &&
-    fields.title.trim().length > 0 &&
-    typeof fields.slug === "string" &&
-    fields.slug.trim().length > 0 &&
-    hasValidArticleTags(article)
-  );
-};
-
-const validateBlogIndexPayload = (payload) => {
-  const validCollection = (items, limit) => Array.isArray(items) && items.length <= limit && items.every(isBlogArticle);
-  const valid =
-    payload !== null &&
-    typeof payload === "object" &&
-    !Array.isArray(payload) &&
-    validCollection(payload.featured, 3) &&
-    validCollection(payload.items, 12) &&
-    Number.isInteger(payload.total) &&
-    payload.total >= 0 &&
-    Number.isInteger(payload.page) &&
-    payload.page >= 1 &&
-    payload.pageSize === 12 &&
-    Number.isInteger(payload.totalPages) &&
-    payload.totalPages >= 1 &&
-    payload.page <= payload.totalPages;
-
-  if (!valid) {
-    throw new TypeError("Invalid blog index payload");
-  }
-
-  return payload;
-};
-
-const validateBlogYearsPayload = (payload) => {
-  const years = payload?.years;
-  const validYears =
-    Array.isArray(years) &&
-    years.every((year) => /^(?:19\d{2}|20\d{2}|2100)$/.test(year)) &&
-    new Set(years).size === years.length &&
-    years.every((year, index) => index === 0 || Number(year) < Number(years[index - 1]));
-
-  if (!isRecord(payload) || !validYears) {
-    throw new TypeError("Invalid blog years payload");
-  }
-
-  return payload;
-};
-
-export default defineComponent({
+defineOptions({
   name: "BlogPage",
-  components: {
-    BlogArchiveList,
-    BlogHighlights,
-  },
-  data() {
-    const archiveState = normalizeBlogRouteQuery(this.$route.query);
+});
 
-    return {
-      archiveState,
-      searchInput: archiveState.q,
-      featured: [],
-      articles: [],
-      yearOptions: [],
-      yearsLoading: false,
-      tagOptions: [],
-      tagsLoading: false,
-      loading: true,
-      error: "",
-      total: 0,
-      totalPages: 1,
-      pageSize: 12,
-      searchTimer: null,
-      archiveRequestId: 0,
-      compactPagination: false,
-      stopCompactPaginationObserver: null,
-    };
-  },
-  computed: {
-    paginationDisplay() {
-      const compact = this.compactPagination;
+const sameArchiveState = (left, right) => ["page", "q", "year", "tag"].every((key) => left[key] === right[key]);
+const route = useRoute();
+const router = useRouter();
+const initialArchiveState = normalizeBlogRouteQuery(route.query);
 
-      return {
-        input: compact,
-        boundaryLinks: false,
-        boundaryNumbers: !compact,
-        ellipses: !compact,
-        maxPages: compact ? 1 : 9,
-      };
-    },
-  },
-  watch: {
-    "$route.query": {
-      deep: true,
-      handler(query) {
-        this.applyRouteQuery(query);
-      },
-    },
-  },
-  created() {
-    this.ensureCanonicalRoute(this.$route.query, this.archiveState);
-    this.loadYears();
-    this.loadTags();
-    this.loadArchive();
-  },
-  mounted() {
-    this.stopCompactPaginationObserver = observeMediaQuery("(max-width: 599px)", (matches) => {
-      this.compactPagination = matches;
-    });
-  },
-  beforeUnmount() {
-    this.stopCompactPaginationObserver?.();
-    clearTimeout(this.searchTimer);
-    this.archiveRequestId += 1;
-  },
-  methods: {
-    isCanonicalRouteQuery(query, state) {
-      const canonical = blogRouteQuery(state);
-      const queryKeys = Object.keys(query);
-      const canonicalKeys = Object.keys(canonical);
+const archiveState = ref(initialArchiveState);
+const searchInput = ref(initialArchiveState.q);
+const featured = ref([]);
+const articles = ref([]);
+const yearOptions = ref([]);
+const yearsLoading = ref(false);
+const tagOptions = ref([]);
+const tagsLoading = ref(false);
+const loading = ref(true);
+const error = ref("");
+const total = ref(0);
+const totalPages = ref(1);
+const pageSize = ref(12);
+const compactPagination = ref(false);
+let searchTimer = null;
+let archiveRequestId = 0;
+let stopCompactPaginationObserver = null;
 
-      return (
-        queryKeys.length === canonicalKeys.length &&
-        canonicalKeys.every((key) => !Array.isArray(query[key]) && String(query[key] ?? "") === canonical[key])
-      );
-    },
-    ensureCanonicalRoute(query, state) {
-      if (!this.isCanonicalRouteQuery(query, state)) {
-        this.$router.replace({ query: blogRouteQuery(state) });
-      }
-    },
-    applyRouteQuery(query) {
-      clearTimeout(this.searchTimer);
-      const nextState = normalizeBlogRouteQuery(query);
-      const changed = !sameArchiveState(nextState, this.archiveState);
+const paginationDisplay = computed(() => blogPaginationDisplay(compactPagination.value));
 
-      this.archiveState = nextState;
-      this.searchInput = nextState.q;
-      this.ensureCanonicalRoute(query, nextState);
+const isCanonicalRouteQuery = (query, state) => {
+  const canonical = blogRouteQuery(state);
+  const queryKeys = Object.keys(query);
+  const canonicalKeys = Object.keys(canonical);
 
-      if (changed) {
-        this.loadArchive();
-      }
-    },
-    onSearchInput(value) {
-      this.searchInput = String(value || "");
-      clearTimeout(this.searchTimer);
-      this.searchTimer = setTimeout(() => {
-        this.replaceArchiveState({ q: this.searchInput, page: 1 });
-      }, 300);
-    },
-    onFilterChange(key, value) {
-      clearTimeout(this.searchTimer);
-      this.replaceArchiveState({ q: this.searchInput, [key]: value || "", page: 1 });
-    },
-    replaceArchiveState(patch) {
-      const nextState = normalizeBlogRouteQuery({ ...this.archiveState, ...patch });
-      this.$router.replace({ query: blogRouteQuery(nextState) });
-    },
-    changePage(page) {
-      const nextState = normalizeBlogRouteQuery({ ...this.archiveState, page });
-      this.$router.push({ query: blogRouteQuery(nextState) });
-    },
-    changePageFromInput(value) {
-      const rawValue = value?.target?.value ?? value;
-      const parsedPage = Number.parseInt(String(rawValue ?? ""), 10);
-      const page = Number.isFinite(parsedPage) ? Math.min(this.totalPages, Math.max(1, parsedPage)) : this.archiveState.page;
+  return (
+    queryKeys.length === canonicalKeys.length &&
+    canonicalKeys.every((key) => !Array.isArray(query[key]) && String(query[key] ?? "") === canonical[key])
+  );
+};
 
-      if (page !== this.archiveState.page) {
-        this.changePage(page);
-      }
-    },
-    async loadYears() {
-      this.yearsLoading = true;
+const ensureCanonicalRoute = (query, state) => {
+  if (!isCanonicalRouteQuery(query, state)) {
+    router.replace({ query: blogRouteQuery(state) });
+  }
+};
 
-      try {
-        const response = await fetch(buildApiUrl("/api/contentful/blog-years"));
+const replaceArchiveState = (patch) => {
+  const nextState = normalizeBlogRouteQuery({ ...archiveState.value, ...patch });
+  router.replace({ query: blogRouteQuery(nextState) });
+};
 
-        if (!response.ok) {
-          throw new Error(`Blog years API returned ${response.status}`);
-        }
+const loadYears = async () => {
+  yearsLoading.value = true;
 
-        const data = validateBlogYearsPayload(await response.json());
-        this.yearOptions = data.years.map((year) => ({ label: year, value: year }));
-      } catch (error) {
-        console.error("Erro ao carregar anos do blog:", error);
-        this.yearOptions = [];
-      } finally {
-        this.yearsLoading = false;
-      }
-    },
-    async loadTags() {
-      this.tagsLoading = true;
+  try {
+    const response = await fetch(buildApiUrl("/api/contentful/blog-years"));
 
-      try {
-        const response = await fetch(buildApiUrl("/api/contentful/tags"));
+    if (!response.ok) {
+      throw new Error(`Blog years API returned ${response.status}`);
+    }
 
-        if (!response.ok) {
-          throw new Error(`Tags API returned ${response.status}`);
-        }
+    const data = validateBlogYearsPayload(await response.json());
+    yearOptions.value = data.years.map((year) => ({ label: year, value: year }));
+  } catch (loadError) {
+    console.error("Erro ao carregar anos do blog:", loadError);
+    yearOptions.value = [];
+  } finally {
+    yearsLoading.value = false;
+  }
+};
 
-        const data = await response.json();
-        this.tagOptions = (data.items || [])
-          .map((tag) => ({
-            label: String(tag.name || tag.sys?.id || ""),
-            value: String(tag.sys?.id || ""),
-          }))
-          .filter((tag) => tag.value && !isArticleLanguageTag(tag.value));
-      } catch (error) {
-        console.error("Erro ao carregar tags:", error);
-        this.tagOptions = [];
-      } finally {
-        this.tagsLoading = false;
-      }
-    },
-    async loadArchive() {
-      const requestId = ++this.archiveRequestId;
-      const params = new URLSearchParams(blogRouteQuery(this.archiveState));
-      const queryString = params.toString();
+const loadTags = async () => {
+  tagsLoading.value = true;
 
-      this.loading = true;
-      this.error = "";
-      this.featured = [];
+  try {
+    const response = await fetch(buildApiUrl("/api/contentful/tags"));
 
-      try {
-        const response = await fetch(buildApiUrl(`/api/contentful/blog-index${queryString ? `?${queryString}` : ""}`));
+    if (!response.ok) {
+      throw new Error(`Tags API returned ${response.status}`);
+    }
 
-        if (!response.ok) {
-          throw new Error(`Blog API returned ${response.status}`);
-        }
+    tagOptions.value = blogTagOptions(await response.json());
+  } catch (loadError) {
+    console.error("Erro ao carregar tags:", loadError);
+    tagOptions.value = [];
+  } finally {
+    tagsLoading.value = false;
+  }
+};
 
-        const data = validateBlogIndexPayload(await response.json());
+const loadArchive = async () => {
+  const requestId = ++archiveRequestId;
+  const params = new URLSearchParams(blogRouteQuery(archiveState.value));
+  const queryString = params.toString();
 
-        if (requestId !== this.archiveRequestId) {
-          return;
-        }
+  loading.value = true;
+  error.value = "";
+  featured.value = [];
 
-        const returnedPage = normalizeBlogRouteQuery({ ...this.archiveState, page: data.page }).page;
-        this.featured = Array.isArray(data.featured) ? data.featured : [];
-        this.articles = Array.isArray(data.items) ? data.items : [];
-        this.total = Number.isFinite(Number(data.total)) ? Math.max(0, Number(data.total)) : 0;
-        this.totalPages = Number.isFinite(Number(data.totalPages)) ? Math.max(1, Number(data.totalPages)) : 1;
-        this.pageSize = 12;
+  try {
+    const response = await fetch(buildApiUrl(`/api/contentful/blog-index${queryString ? `?${queryString}` : ""}`));
 
-        if (returnedPage !== this.archiveState.page) {
-          this.archiveState = { ...this.archiveState, page: returnedPage };
-          this.$router.replace({ query: blogRouteQuery(this.archiveState) });
-        }
-      } catch (error) {
-        if (requestId !== this.archiveRequestId) {
-          return;
-        }
+    if (!response.ok) {
+      throw new Error(`Blog API returned ${response.status}`);
+    }
 
-        console.error("Erro ao carregar artigos:", error);
-        this.featured = [];
-        this.articles = [];
-        this.error = "archive-load-failed";
-      } finally {
-        if (requestId === this.archiveRequestId) {
-          this.loading = false;
-        }
-      }
-    },
-  },
+    const data = validateBlogIndexPayload(await response.json());
+
+    if (requestId !== archiveRequestId) {
+      return;
+    }
+
+    const returnedPage = normalizeBlogRouteQuery({ ...archiveState.value, page: data.page }).page;
+    featured.value = Array.isArray(data.featured) ? data.featured : [];
+    articles.value = Array.isArray(data.items) ? data.items : [];
+    total.value = Number.isFinite(Number(data.total)) ? Math.max(0, Number(data.total)) : 0;
+    totalPages.value = Number.isFinite(Number(data.totalPages)) ? Math.max(1, Number(data.totalPages)) : 1;
+    pageSize.value = 12;
+
+    if (returnedPage !== archiveState.value.page) {
+      archiveState.value = { ...archiveState.value, page: returnedPage };
+      router.replace({ query: blogRouteQuery(archiveState.value) });
+    }
+  } catch (loadError) {
+    if (requestId !== archiveRequestId) {
+      return;
+    }
+
+    console.error("Erro ao carregar artigos:", loadError);
+    featured.value = [];
+    articles.value = [];
+    error.value = "archive-load-failed";
+  } finally {
+    if (requestId === archiveRequestId) {
+      loading.value = false;
+    }
+  }
+};
+
+const applyRouteQuery = (query) => {
+  clearTimeout(searchTimer);
+  const nextState = normalizeBlogRouteQuery(query);
+  const changed = !sameArchiveState(nextState, archiveState.value);
+
+  archiveState.value = nextState;
+  searchInput.value = nextState.q;
+  ensureCanonicalRoute(query, nextState);
+
+  if (changed) {
+    loadArchive();
+  }
+};
+
+const onSearchInput = (value) => {
+  searchInput.value = String(value || "");
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    replaceArchiveState({ q: searchInput.value, page: 1 });
+  }, 300);
+};
+
+const onFilterChange = (key, value) => {
+  clearTimeout(searchTimer);
+  replaceArchiveState({ q: searchInput.value, [key]: value || "", page: 1 });
+};
+
+const changePage = (page) => {
+  const nextState = normalizeBlogRouteQuery({ ...archiveState.value, page });
+  router.push({ query: blogRouteQuery(nextState) });
+};
+
+const changePageFromInput = (value) => {
+  const rawValue = value?.target?.value ?? value;
+  const parsedPage = Number.parseInt(String(rawValue ?? ""), 10);
+  const page = Number.isFinite(parsedPage) ? Math.min(totalPages.value, Math.max(1, parsedPage)) : archiveState.value.page;
+
+  if (page !== archiveState.value.page) {
+    changePage(page);
+  }
+};
+
+watch(
+  () => route.query,
+  (query) => applyRouteQuery(query),
+  { deep: true }
+);
+
+ensureCanonicalRoute(route.query, archiveState.value);
+loadYears();
+loadTags();
+loadArchive();
+
+onMounted(() => {
+  stopCompactPaginationObserver = observeMediaQuery("(max-width: 599px)", (matches) => {
+    compactPagination.value = matches;
+  });
+});
+
+onBeforeUnmount(() => {
+  stopCompactPaginationObserver?.();
+  clearTimeout(searchTimer);
+  archiveRequestId += 1;
 });
 </script>
 

@@ -63,6 +63,7 @@ import {
 import { publicAuthorProfile } from "../src/utils/authorProfiles.js";
 import { articleBylineLabels, publicArticleDates } from "../src/utils/articleDates.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
+import { appMetadata } from "../src/utils/cookieNotice.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -167,10 +168,9 @@ describe("admin frontend writer workflow", () => {
   });
 
   it("keeps administrative routes out of search indexes", () => {
-    const app = read("../src/App.vue");
     const robots = read("../public/robots.txt");
 
-    assert.match(app, /requiresAdmin\s*\?\s*"noindex,nofollow"\s*:\s*"index,follow"/);
+    assert.equal(appMetadata({ meta: { requiresAdmin: true } }).meta.robots.content, "noindex,nofollow");
     assert.match(robots, /Disallow:\s*\/admin/);
   });
 
@@ -1377,7 +1377,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(layout, /Author profile/);
     assert.match(layout, /signOut/);
     assert.match(layout, /<q-banner[\s\S]*v-if="adminAccessNotice"[\s\S]*role="alert"[\s\S]*aria-live="assertive"/);
-    assert.match(layout, /notifyImpl:\s*\(\{ message \}\) => this\.showAdminAccessNotice\(message\)/);
+    assert.match(layout, /notifyImpl:\s*\(\{ message \}\) => showAdminAccessNotice\(message\)/);
     assert.doesNotMatch(layout, /\$q\.notify/);
   });
 
@@ -1426,7 +1426,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(article, /name:\s*'Author'|name:\s*"Author"/);
     assert.match(article, /articleAuthorSlug/);
     assert.match(article, /bylineLabels\.by[\s\S]*<router-link/);
-    assert.match(authorPage, /\/api\/contentful\/author\/\$\{this\.\$route\.params\.slug\}/);
+    assert.match(authorPage, /\/api\/contentful\/author\/\$\{route\.params\.slug\}/);
     assert.match(authorPage, /publicAuthorProfile/);
     assert.match(authorPage, /authorInitials/);
     assert.match(authorPage, /\.author-profile[\s\S]*max-width:\s*none/);
@@ -1534,7 +1534,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(card, /:aria-pressed="activeTag === tag\.id"/);
     assert.match(card, /:loading="loadingAction === `request-unpublication-\$\{article\.id\}`"/);
     assert.doesNotMatch(card, /loadingAction === 'unpublish'/);
-    const cardTemplate = card.slice(0, card.indexOf("<script>"));
+    const cardTemplate = card.match(/<template>[\s\S]*?<\/template>/)?.[0] || "";
     assert.doesNotMatch(cardTemplate, /(?<![$\w])emit\(/);
     assert.match(cardTemplate, /@keyup\.enter="\$emit\('toggle-tag', tag\.id\)"/);
     assert.match(cardTemplate, /@keyup\.space\.prevent="\$emit\('toggle-tag', tag\.id\)"/);

@@ -12,49 +12,26 @@
   </q-dialog>
 </template>
 
-<script>
-import { defineComponent, ref } from "vue";
-import { createMetaMixin } from "quasar";
-import { shouldShowCookieNotice } from "./utils/cookieNotice.js";
+<script setup>
+import { useMeta } from "quasar";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import { appDocumentTitle, appMetadata, shouldShowCookieNotice } from "./utils/cookieNotice.js";
 
-export default defineComponent({
-  name: "App",
-  setup() {
-    return {
-      alert: ref(true),
-      address: ref(""),
-    };
+const route = useRoute();
+const alert = ref(true);
+const showCookieNotice = computed(() => shouldShowCookieNotice(route, alert.value));
+const metadata = computed(() => appMetadata(route));
+
+useMeta(() => metadata.value);
+
+watch(
+  () => route.fullPath,
+  () => {
+    document.title = appDocumentTitle(route);
   },
-  mixins: [
-    createMetaMixin(function () {
-      return {
-        meta: {
-          description: {
-            name: "description",
-            content: "Some brief histories of my past-present development experience. The life, the universe and everything about a tech life",
-          },
-          robots: {
-            name: "robots",
-            content: this.$route.meta?.requiresAdmin ? "noindex,nofollow" : "index,follow",
-          },
-        },
-      };
-    }),
-  ],
-  computed: {
-    showCookieNotice() {
-      return shouldShowCookieNotice(this.$route, this.alert);
-    },
-  },
-  watch: {
-    $route: {
-      immediate: true,
-      handler(to, from) {
-        document.title = `Marcelo Munhoz - ${to.meta.title}` || "Marcelo Munhoz";
-      },
-    },
-  },
-});
+  { immediate: true }
+);
 </script>
 
 <style lang="scss">

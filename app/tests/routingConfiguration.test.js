@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import contentfulRoutes from "../middleware/routes/contentful.js";
-import { scrollBehavior } from "../src/router/index.js";
 import routes from "../src/router/routes.js";
-import { shouldShowCookieNotice } from "../src/utils/cookieNotice.js";
+import { scrollBehavior } from "../src/router/scrollBehavior.js";
+import { publicAuthorMetadata } from "../src/utils/authorProfiles.js";
+import { appDocumentTitle, appMetadata, shouldShowCookieNotice } from "../src/utils/cookieNotice.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -14,6 +15,42 @@ describe("routing configuration", () => {
     assert.equal(shouldShowCookieNotice({ meta: {} }, true), true);
     assert.equal(shouldShowCookieNotice({ meta: { requiresAdmin: true } }, true), false);
     assert.equal(shouldShowCookieNotice({ meta: {} }, false), false);
+  });
+
+  it("derives public and administrative shell metadata from the active route", () => {
+    const route = { meta: {} };
+
+    assert.equal(appDocumentTitle({ meta: { title: "About" } }), "Marcelo Munhoz - About");
+    assert.deepEqual(appMetadata(route), {
+      meta: {
+        description: {
+          name: "description",
+          content: "Some brief histories of my past-present development experience. The life, the universe and everything about a tech life",
+        },
+        robots: { name: "robots", content: "index,follow" },
+      },
+    });
+    route.meta.requiresAdmin = true;
+    assert.equal(appMetadata(route).meta.robots.content, "noindex,nofollow");
+  });
+
+  it("derives reactive author metadata from default and loaded public profiles", () => {
+    const author = { name: "", biography: "" };
+
+    assert.deepEqual(publicAuthorMetadata(author), {
+      title: "Marcelo Munhoz - Author",
+      meta: {
+        description: { name: "description", content: "Articles by " },
+      },
+    });
+    author.name = "Example Author";
+    author.biography = "Writes about software.";
+    assert.deepEqual(publicAuthorMetadata(author), {
+      title: "Marcelo Munhoz - Example Author",
+      meta: {
+        description: { name: "description", content: "Writes about software." },
+      },
+    });
   });
 
   it("keeps the routed view mounted when only the query changes", () => {

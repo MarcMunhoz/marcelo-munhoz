@@ -45,4 +45,18 @@ describe("hidden admin access", () => {
     assert.deepEqual(notifications, [{ type: "negative", message: "Você não é um AMIGO, até a próxima!" }]);
     assert.deepEqual(routes, ["/"]);
   });
+
+  it("keeps a rejected visitor on home without adding a redundant route replacement", async () => {
+    const notifications = [];
+    const routes = [];
+
+    await rejectAdminAccess({
+      currentPath: "/",
+      notifyImpl: (options) => notifications.push(options),
+      router: { replace: async (path) => routes.push(path) },
+    });
+
+    assert.deepEqual(notifications, [{ type: "negative", message: "Você não é um AMIGO, até a próxima!" }]);
+    assert.deepEqual(routes, []);
+  });
 });

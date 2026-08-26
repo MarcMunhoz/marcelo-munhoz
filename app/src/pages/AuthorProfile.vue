@@ -44,110 +44,101 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
-import { createMetaMixin } from "quasar";
+<script setup>
+import { useMeta } from "quasar";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { buildApiUrl } from "../utils/apiBase.js";
-import { publicAuthorProfile } from "../utils/authorProfiles.js";
+import { publicAuthorMetadata, publicAuthorProfile } from "../utils/authorProfiles.js";
 import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
 
 const WORDS_PER_MINUTE = 220;
 const ARTICLE_PAGE_SIZE = 8;
+const route = useRoute();
+const author = ref(publicAuthorProfile());
+const authorPhotoCandidateList = ref([]);
+const authorPhotoIndex = ref(0);
+const articles = ref([]);
+const articlePageSize = ARTICLE_PAGE_SIZE;
+const visibleArticleCount = ref(ARTICLE_PAGE_SIZE);
+const progress = ref(true);
+const metadata = computed(() => publicAuthorMetadata(author.value));
+const authorInitials = computed(() =>
+  String(author.value.name || "Author")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+);
+const authorPhotoUrl = computed(() => authorPhotoCandidateList.value[authorPhotoIndex.value] || "");
+const displayedArticles = computed(() => articles.value.slice(0, visibleArticleCount.value));
+const canLoadMore = computed(() => visibleArticleCount.value < articles.value.length);
+let authorRequestId = 0;
+let unmounted = false;
 
-export default defineComponent({
-  name: "AuthorProfile",
-  data() {
-    return {
-      author: publicAuthorProfile(),
-      authorPhotoCandidateList: [],
-      authorPhotoIndex: 0,
-      articles: [],
-      articlePageSize: ARTICLE_PAGE_SIZE,
-      visibleArticleCount: ARTICLE_PAGE_SIZE,
-      progress: true,
-    };
-  },
-  mixins: [
-    createMetaMixin(function () {
-      return {
-        title: `Marcelo Munhoz - ${this.author.name || "Author"}`,
-        meta: {
-          description: {
-            name: "description",
-            content: this.author.biography || `Articles by ${this.author.name}`,
-          },
-        },
-      };
-    }),
-  ],
-  computed: {
-    authorInitials() {
-      return String(this.author.name || "Author")
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join("")
-        .toUpperCase();
-    },
-    authorPhotoUrl() {
-      return this.authorPhotoCandidateList[this.authorPhotoIndex] || "";
-    },
-    displayedArticles() {
-      return this.articles.slice(0, this.visibleArticleCount);
-    },
-    canLoadMore() {
-      return this.visibleArticleCount < this.articles.length;
-    },
-  },
-  async mounted() {
-    await this.loadAuthor();
-  },
-  methods: {
-    readingTimeLabel(article = {}) {
-      const fields = article.fields || {};
-      const text = [fields.title, fields.description, fields.body].filter(Boolean).join(" ");
-      const words = text.trim().split(/\s+/).filter(Boolean).length;
-      const minutes = Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
+useMeta(() => metadata.value);
 
-      return `${minutes} min read`;
-    },
-    loadMoreArticles() {
-      this.visibleArticleCount = Math.min(this.visibleArticleCount + this.articlePageSize, this.articles.length);
-    },
-    showLessArticles() {
-      this.visibleArticleCount = this.articlePageSize;
-    },
-    advanceAuthorPhoto() {
-      this.authorPhotoIndex = nextAuthorPhotoIndex(this.authorPhotoCandidateList, this.authorPhotoIndex);
-    },
-    async loadAuthor() {
-      this.progress = true;
+const readingTimeLabel = (article = {}) => {
+  const fields = article.fields || {};
+  const text = [fields.title, fields.description, fields.body].filter(Boolean).join(" ");
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const minutes = Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
 
-      try {
-        const response = await fetch(buildApiUrl(`/api/contentful/author/${this.$route.params.slug}`));
+  return `${minutes} min read`;
+};
 
-        if (!response.ok) {
-          throw new Error(`Author API returned ${response.status}`);
-        }
+const loadMoreArticles = () => {
+  visibleArticleCount.value = Math.min(visibleArticleCount.value + articlePageSize, articles.value.length);
+};
 
-        const payload = await response.json();
-        this.authorPhotoCandidateList = authorPhotoCandidates(payload.author);
-        this.authorPhotoIndex = 0;
-        this.author = publicAuthorProfile(payload.author);
-        this.articles = payload.articles || [];
-        this.visibleArticleCount = this.articlePageSize;
-      } catch (error) {
-        console.error("Erro ao carregar autor:", error);
-        this.author = publicAuthorProfile();
-        this.authorPhotoCandidateList = [];
-        this.authorPhotoIndex = 0;
-        this.articles = [];
-      } finally {
-        this.progress = false;
-      }
-    },
-  },
+const showLessArticles = () => {
+  visibleArticleCount.value = articlePageSize;
+};
+
+const advanceAuthorPhoto = () => {
+  authorPhotoIndex.value = nextAuthorPhotoIndex(authorPhotoCandidateList.value, authorPhotoIndex.value);
+};
+
+const loadAuthor = async () => {
+  const requestId = ++authorRequestId;
+  progress.value = true;
+
+  try {
+    const response = await fetch(buildApiUrl(`/api/contentful/author/${route.params.slug}`));
+
+    if (!response.ok) {
+      throw new Error(`Author API returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+
+    if (requestId !== authorRequestId || unmounted) return;
+    authorPhotoCandidateList.value = authorPhotoCandidates(payload.author);
+    authorPhotoIndex.value = 0;
+    author.value = publicAuthorProfile(payload.author);
+    articles.value = payload.articles || [];
+    visibleArticleCount.value = articlePageSize;
+  } catch (error) {
+    if (requestId !== authorRequestId || unmounted) return;
+    console.error("Erro ao carregar autor:", error);
+    author.value = publicAuthorProfile();
+    authorPhotoCandidateList.value = [];
+    authorPhotoIndex.value = 0;
+    articles.value = [];
+  } finally {
+    if (requestId === authorRequestId && !unmounted) {
+      progress.value = false;
+    }
+  }
+};
+
+onMounted(loadAuthor);
+
+onBeforeUnmount(() => {
+  unmounted = true;
+  authorRequestId += 1;
 });
 </script>
 

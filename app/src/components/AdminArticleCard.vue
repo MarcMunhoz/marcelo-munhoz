@@ -49,8 +49,7 @@
   </article>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
 import {
   canArchiveArticleAction,
   canEditArticleAction,
@@ -59,49 +58,32 @@ import {
   canPrepareReviewAction,
   canRequestUnpublicationAction,
   canUnarchiveArticleAction,
+  statusLabel,
 } from "../utils/adminDashboard.js";
 
-export default defineComponent({
+defineOptions({
   name: "AdminArticleCard",
-  props: {
-    article: { type: Object, required: true },
-    session: { type: Object, default: null },
-    activeTag: { type: String, default: "" },
-    loadingAction: { type: String, default: "" },
-  },
-  emits: ["edit", "review", "request-unpublication", "publish", "unpublish", "archive", "unarchive", "delete", "toggle-tag"],
-  methods: {
-    canArchiveArticleAction,
-    canEditArticleAction,
-    canOwnerPublishAction,
-    canOwnerUnpublishAction,
-    canPrepareReviewAction,
-    canRequestUnpublicationAction,
-    canUnarchiveArticleAction,
-    statusColor(status) {
-      return {
-        published: "teal-8",
-        changed: "deep-orange-8",
-        draft: "blue-grey-7",
-        unpublished: "amber-9",
-        unpublicationRequested: "amber-9",
-        review: "indigo-7",
-        archived: "grey-7",
-      }[status] || "blue-grey-7";
-    },
-    statusLabel(status) {
-      return {
-        published: "Published",
-        changed: "Unpublished changes",
-        draft: "Draft",
-        unpublished: "Unpublished",
-        unpublicationRequested: "Unpublication requested",
-        review: "In review",
-        archived: "Archived",
-      }[status] || "Draft";
-    },
-  },
 });
+
+defineProps({
+  article: { type: Object, required: true },
+  session: { type: Object, default: null },
+  activeTag: { type: String, default: "" },
+  loadingAction: { type: String, default: "" },
+});
+
+defineEmits(["edit", "review", "request-unpublication", "publish", "unpublish", "archive", "unarchive", "delete", "toggle-tag"]);
+
+const statusColor = (status) =>
+  ({
+    published: "teal-8",
+    changed: "deep-orange-8",
+    draft: "blue-grey-7",
+    unpublished: "amber-9",
+    unpublicationRequested: "amber-9",
+    review: "indigo-7",
+    archived: "grey-7",
+  })[status] || "blue-grey-7";
 </script>
 
 <style lang="scss" scoped>
