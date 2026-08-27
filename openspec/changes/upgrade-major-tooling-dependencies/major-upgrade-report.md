@@ -59,3 +59,34 @@ The migration covers the 15 Vue SFCs below. Conversion stays in five waves so a 
 | `app/tests/routingConfiguration.test.js` and `app/tests/publicResponsiveLayout.test.js` | These read SFC source for route/template contracts rather than execute an Options object. | Recheck after waves 1 and 2; preserve the user-visible routing, SEO, and responsive-template guarantees while avoiding new structural assertions against Composition internals. |
 
 Initial RED verification intentionally targets only wave 1. Later arrays are already present in the structural test and are activated one at a time immediately before their corresponding conversion; no SFC is converted by this inventory task.
+
+## Composition API Validation
+
+- Converted all 15 Vue SFCs to Composition API with `<script setup>`.
+- Removed structural Options API remnants and updated tests that depended on Options object internals.
+- Preserved native dialog usage, administrative authorization, request guards, metadata, timers, template refs, and the editor route-leave guard.
+- Validation in the container: structural scan covers 15/15 SFCs; lint passes; all 312 tests pass; the production SPA build passes; and `/`, `/blog`, `/admin`, `/admin/tags`, `/admin/profile`, and `/admin/articles/new` return HTML with status 200.
+
+## ESLint Tooling Group
+
+- Installed `eslint@10.9.1`, `eslint-plugin-vue@10.10.0`, and the required `vue-eslint-parser@10.4.1` peer.
+- Retained the existing flat configuration and replaced the filename-based `Admin.vue` suppression with an explicit multi-word component name through `defineOptions`.
+- No `--force`, persistent legacy-peer setting, or broad lint suppression was introduced. A one-time lockfile bootstrap ignored the stale ESLint 9 peer tree, after which a normal install and `npm ls` confirmed a valid ESLint 10 dependency graph.
+- Validation in the container: lint passes, all 312 tests pass, and npm reports zero known vulnerabilities for the installed application dependency tree.
+
+## Tailwind CSS Group
+
+- Browser decision: accepted the Tailwind CSS v4 baseline of Chrome 111+, Edge 111+, Safari 16.4+, and Firefox 128+; the Quasar browser targets now declare those minimums with ES2022 output.
+- Installed `tailwindcss@4.3.3` and `@tailwindcss/postcss@4.3.3`; removed the redundant Autoprefixer integration because Tailwind v4 handles imports and vendor prefixing through its official build path.
+- Replaced the v3 `@tailwind` directives with `@import "tailwindcss" important` to preserve the project's existing global utility precedence. Removed the empty legacy JavaScript configuration because v4 discovers application sources automatically and the only non-default setting moved into CSS.
+- The production build generates standard, arbitrary-value, and responsive utilities used by representative public pages, including the article width and embedded-video aspect ratio rules. Public and administrative templates and component styles were not otherwise changed by this group.
+- Compatibility impact: browsers older than the accepted minimum are no longer supported. Route smoke checks pass, but representative public/admin desktop and mobile visual inspection remains pending because generated utility presence does not detect every Preflight or layout change.
+
+## Final Validation And Review
+
+- Clean install: `npm ci` completes from the committed manifest/lockfile contract; `npm audit --audit-level=high` reports zero known vulnerabilities.
+- Static/runtime validation: lint passes, all 312 tests pass, the production SPA build succeeds, and representative public/admin routes return HTML with status 200 from the container runtime.
+- Independent review found and resolved two Composition regressions: the article editor now dereferences its textarea template ref before reading selection/focus APIs, and administrative Identity callbacks now unsubscribe or become inert on unmount with latest-request guards for asynchronous page loads.
+- Upgraded majors: Quasar CLI/Vite 3, Quasar extras 2, Vue Router 5, ESLint 10, Vue ESLint plugin/parser 10, and Tailwind CSS/PostCSS 4.
+- Deferred majors: none. Reverted majors: none.
+- Remaining acceptance evidence: desktop and mobile visual inspection of representative public/admin pages in staging is still required for Tailwind task 5.3.
