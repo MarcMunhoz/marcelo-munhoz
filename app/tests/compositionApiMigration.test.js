@@ -53,6 +53,10 @@ describe("Composition API migration", () => {
   it("keeps the third migration wave on the script setup structural contract", () => {
     assertScriptSetupMigration(thirdWave);
   });
+
+  it("keeps the administrative migration wave on the script setup structural contract", () => {
+    assertScriptSetupMigration(fourthWave);
+  });
 });
 
 export { firstWave, secondWave, thirdWave, fourthWave, fifthWave };

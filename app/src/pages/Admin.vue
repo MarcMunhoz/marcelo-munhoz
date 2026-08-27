@@ -249,8 +249,10 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+defineOptions({ name: "AdminDashboardPage" });
+import { computed, onBeforeUnmount, onMounted, reactive, toRefs } from "vue";
+import { useRouter } from "vue-router";
 import AdminArticleCard from "../components/AdminArticleCard.vue";
 import {
   archiveArticle,
@@ -261,7 +263,6 @@ import {
   unarchiveArticle,
   unpublishArticle,
   adminUserMessage,
-  AdminApiError,
 } from "../utils/adminApi.js";
 import {
   canArchiveArticleAction,
@@ -280,14 +281,14 @@ import {
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
 import { toggleArticleTagFilter } from "../utils/adminTags.js";
-import { getAdminSession, isOwnerSession, isWriterSession, signOutAdmin } from "../utils/adminAuth.js";
+import { bindIdentityCallbacks, getAdminSession, isOwnerSession, isWriterSession, signOutAdmin } from "../utils/adminAuth.js";
 import { observeMediaQuery } from "../utils/responsiveMedia.js";
 
-export default defineComponent({
-  name: "AdminPage",
-  components: { AdminArticleCard },
-  data() {
-    return {
+const router = useRouter();
+let active = true;
+let dashboardRequestId = 0;
+let stopIdentityCallbacks = () => {};
+const state = reactive({
       session: null,
       sessionResolved: false,
       activeSection: "dashboard",
@@ -335,130 +336,77 @@ export default defineComponent({
         { label: "Published", value: "published" },
         { label: "Archived", value: "archived" },
       ],
-    };
-  },
-  computed: {
-    canWrite() {
-      return isWriterSession(this.session);
+});
+const {
+  session, sessionResolved, articles, adminSummary, reviewRequests, filters, deleteDialogOpen,
+  articlePendingDeletion, deleteConfirmation, feedbackMessage, dashboardError, loadingAction,
+  compactArticleGrid, articleColumns, statusOptions, filterTabOptions,
+} = toRefs(state);
+const canWrite = computed(() => isWriterSession(state.session));
+const showAdminSurface = computed(() => state.sessionResolved);
+const isOwner = computed(() => isOwnerSession(state.session));
+const dashboardSummary = computed(() => state.adminSummary || summarizeArticleStatuses(state.articles));
+const ownerQueues = computed(() => ownerReviewQueues(state.articles));
+const ownerQueueCount = computed(() => ownerQueues.value.submissions.length + ownerQueues.value.unpublicationRequests.length);
+const filteredArticles = computed(() => filterAdminArticles(state.articles, state.filters));
+const feedbackClass = computed(() => ({
+  "feedback-success": state.feedbackTone === "success",
+  "feedback-error": state.feedbackTone === "error",
+  "feedback-info": state.feedbackTone === "info",
+}));
+const registerIdentityCallbacks = () => {
+  const identity = globalThis.netlifyIdentity;
+  stopIdentityCallbacks = bindIdentityCallbacks({
+    identity,
+    onLogin: async () => {
+      identity?.close?.();
+      const sessionAfterLogin = await getAdminSession();
+      if (!active) return;
+      state.session = sessionAfterLogin;
+      await loadArticleDashboard();
     },
-    showAdminSurface() {
-      return this.sessionResolved;
-    },
-    isOwner() {
-      return isOwnerSession(this.session);
-    },
-    dashboardSummary() {
-      return this.adminSummary || summarizeArticleStatuses(this.articles);
-    },
-    ownerQueues() {
-      return ownerReviewQueues(this.articles);
-    },
-    ownerQueueCount() {
-      return this.ownerQueues.submissions.length + this.ownerQueues.unpublicationRequests.length;
-    },
-    filteredArticles() {
-      return filterAdminArticles(this.articles, this.filters);
-    },
-    feedbackClass() {
-      return {
-        "feedback-success": this.feedbackTone === "success",
-        "feedback-error": this.feedbackTone === "error",
-        "feedback-info": this.feedbackTone === "info",
-      };
-    },
-  },
-  async mounted() {
-    this.stopCompactArticleGridObserver = observeMediaQuery("(max-width: 720px)", (matches) => {
-      this.compactArticleGrid = matches;
-    });
-    this.bindIdentityCallbacks();
-    this.session = await getAdminSession();
-    this.sessionResolved = true;
-    this.redirectSignedOutVisitor();
-    this.loadArticleDashboard();
-  },
-  beforeUnmount() {
-    this.stopCompactArticleGridObserver?.();
-    if (this.feedbackTimer) {
-      clearTimeout(this.feedbackTimer);
-    }
-  },
-  methods: {
-    bindIdentityCallbacks() {
-      const identity = globalThis.netlifyIdentity;
-
-      if (typeof identity?.on !== "function") {
+  });
+};
+const redirectSignedOutVisitor = () => {
+      if (!state.session) {
+        router.replace("/");
+      }
+};
+const applyResolvedSession = (session = {}) => {
+  if (session.authorEntryId) state.session = { ...state.session, authorEntryId: session.authorEntryId };
+};
+const loadArticleDashboard = async () => {
+      const currentRequestId = ++dashboardRequestId;
+      if (!canWrite.value) {
         return;
       }
 
-      identity.on("login", async () => {
-        if (typeof identity.close === "function") {
-          identity.close();
-        }
-
-        this.session = await getAdminSession();
-        this.loadArticleDashboard();
-      });
-    },
-    redirectSignedOutVisitor() {
-      if (!this.session) {
-        this.$router.replace("/");
-      }
-    },
-    async loadArticleDashboard() {
-      if (!this.canWrite) {
-        return;
-      }
-
-      this.dashboardError = "";
-      this.loadingAction = "articles";
+      state.dashboardError = "";
+      state.loadingAction = "articles";
 
       try {
-        const response = await listAdminArticles({ session: this.session });
-        this.applyResolvedSession(response.session);
+        const response = await listAdminArticles({ session: state.session });
+        if (!active || currentRequestId !== dashboardRequestId) return;
+        applyResolvedSession(response.session);
         const dashboard = reconcileAdminDashboardData(response);
-        this.articles = dashboard.articles;
-        this.adminSummary = dashboard.summary;
-        this.reviewRequests = dashboard.reviewRequests;
+        state.articles = dashboard.articles;
+        state.adminSummary = dashboard.summary;
+        state.reviewRequests = dashboard.reviewRequests;
       } catch (error) {
-        this.articles = [];
-        this.adminSummary = summarizeArticleStatuses([]);
-        this.reviewRequests = [];
-        this.dashboardError = adminUserMessage(error);
+        if (!active || currentRequestId !== dashboardRequestId) return;
+        state.articles = [];
+        state.adminSummary = summarizeArticleStatuses([]);
+        state.reviewRequests = [];
+        state.dashboardError = adminUserMessage(error);
       } finally {
-        this.loadingAction = "";
+        if (active && currentRequestId === dashboardRequestId) state.loadingAction = "";
       }
-    },
-    setStatusFilter(status) {
-      this.filters.status = this.filters.status === status ? "" : status || "";
-      this.activeSection = "dashboard";
-    },
-    toggleTagFilter(tagId) {
-      this.filters = toggleArticleTagFilter(this.filters, tagId);
-    },
-    openEditorForNewArticle() {
-      this.$router.push("/admin/articles/new");
-    },
-    applyResolvedSession(session = {}) {
-      if (!session.authorEntryId) {
-        return;
-      }
-
-      this.session = {
-        ...this.session,
-        authorEntryId: session.authorEntryId,
-      };
-    },
-    openEditorForArticle(article) {
-      this.$router.push(`/admin/articles/${encodeURIComponent(article.slug || article.id)}/edit`);
-    },
-    startNewArticle() {
-      this.openEditorForNewArticle();
-    },
-    editArticle(article) {
-      this.openEditorForArticle(article);
-    },
-    statusColor(status) {
+};
+const setStatusFilter = (status) => { state.filters.status = state.filters.status === status ? "" : status || ""; state.activeSection = "dashboard"; };
+const toggleTagFilter = (tagId) => { state.filters = toggleArticleTagFilter(state.filters, tagId); };
+const openEditorForNewArticle = () => router.push("/admin/articles/new");
+const openEditorForArticle = (article) => router.push(`/admin/articles/${encodeURIComponent(article.slug || article.id)}/edit`);
+const statusColor = (status) => {
       return {
         published: "teal-8",
         changed: "deep-orange-8",
@@ -468,8 +416,8 @@ export default defineComponent({
         review: "indigo-7",
         archived: "grey-7",
       }[status] || "blue-grey-7";
-    },
-    statusLabel(status) {
+};
+const statusLabel = (status) => {
       return {
         published: "Published",
         changed: "Unpublished changes",
@@ -479,55 +427,46 @@ export default defineComponent({
         review: "In review",
         archived: "Archived",
       }[status] || "Draft";
-    },
-    async signOut() {
+};
+const signOut = async () => {
       const signedOut = await signOutAdmin();
 
       if (signedOut) {
-        this.session = null;
-        this.articles = [];
-        this.adminSummary = summarizeArticleStatuses([]);
-        this.reviewRequests = [];
+        state.session = null; state.articles = []; state.adminSummary = summarizeArticleStatuses([]); state.reviewRequests = [];
       }
-    },
-    canEditArticleAction,
-    canPrepareReviewAction,
-    canRequestUnpublicationAction,
-    canOwnerPublishAction,
-    canOwnerUnpublishAction,
-    canArchiveArticleAction,
-    canUnarchiveArticleAction,
-    async requestUnpublicationFromRow(article) {
-      this.loadingAction = `request-unpublication-${article.id}`;
+};
+const requestUnpublicationFromRow = async (article) => {
+      state.loadingAction = `request-unpublication-${article.id}`;
 
       try {
         await requestArticleUnpublication({
           articleId: article.id,
           version: article.version,
           notes: "",
-          session: this.session,
+          session: state.session,
         });
-        await this.loadArticleDashboard();
-        this.showFeedback("Unpublication request sent.", "success");
+        await loadArticleDashboard(); showFeedback("Unpublication request sent.", "success");
       } catch (error) {
-        this.handleAdminError(error);
+        handleAdminError(error);
       } finally {
-        this.loadingAction = "";
+        state.loadingAction = "";
       }
-    },
-    updateArticleStatus(articleId, status) {
-      this.articles = updateArticleStatusById(this.articles, articleId, status);
-    },
-    removeArticle(articleId) {
-      this.articles = removeArticleById(this.articles, articleId);
-    },
-    async runOwnerLifecycleAction(article, actionName, operation, successMessage, afterSuccess) {
-      if (!this.isOwner) {
-        this.showFeedback("Only owners can perform this action.", "error");
+};
+const updateArticleStatus = (articleId, status) => { state.articles = updateArticleStatusById(state.articles, articleId, status); };
+const removeArticle = (articleId) => { state.articles = removeArticleById(state.articles, articleId); };
+const showFeedback = (message, tone = "info") => {
+  if (state.feedbackTimer) clearTimeout(state.feedbackTimer);
+  state.feedbackMessage = message; state.feedbackTone = tone;
+  state.feedbackTimer = setTimeout(() => { state.feedbackMessage = ""; state.feedbackTimer = null; }, 5000);
+};
+const handleAdminError = (error) => showFeedback(adminUserMessage(error), "error");
+const runOwnerLifecycleAction = async (article, actionName, operation, successMessage, afterSuccess) => {
+      if (!isOwner.value) {
+        showFeedback("Only owners can perform this action.", "error");
         return;
       }
 
-      this.loadingAction = `${actionName}-${article.id}`;
+      state.loadingAction = `${actionName}-${article.id}`;
 
       try {
         const result = await operation({
@@ -535,77 +474,59 @@ export default defineComponent({
           version: article.version,
           requestId: article.requestId,
           requestVersion: article.requestVersion,
-          session: this.session,
+          session: state.session,
         });
         afterSuccess?.();
-        await this.loadArticleDashboard();
+        await loadArticleDashboard();
         if (result?.editorialRequestClosurePending) {
-          this.showFeedback("Article published. Review cleanup is pending.", "info");
+          showFeedback("Article published. Review cleanup is pending.", "info");
         } else {
-          this.showFeedback(successMessage, "success");
+          showFeedback(successMessage, "success");
         }
       } catch (error) {
-        this.handleAdminError(error);
+        handleAdminError(error);
       } finally {
-        this.loadingAction = "";
+        state.loadingAction = "";
       }
-    },
-    publishSelectedArticle(article) {
+};
+const publishSelectedArticle = (article) => {
       const successMessage = article.lifecycleStatus === "changed" ? "Article changes published." : "Article published.";
-      return this.runOwnerLifecycleAction(article, "publish", publishArticle, successMessage, () => this.updateArticleStatus(article.id, "published"));
-    },
-    unpublishSelectedArticle(article) {
-      return this.runOwnerLifecycleAction(article, "unpublish", unpublishArticle, "Article unpublished.", () => this.updateArticleStatus(article.id, "unpublished"));
-    },
-    archiveSelectedArticle(article) {
-      return this.runOwnerLifecycleAction(article, "archive", archiveArticle, "Article archived.", () => this.updateArticleStatus(article.id, "archived"));
-    },
-    unarchiveSelectedArticle(article) {
-      return this.runOwnerLifecycleAction(article, "unarchive", unarchiveArticle, "Article unarchived.", () => this.updateArticleStatus(article.id, "draft"));
-    },
-    openDeleteConfirmation(article) {
-      if (!this.isOwner) {
-        this.showFeedback("Only owners can perform this action.", "error");
+      return runOwnerLifecycleAction(article, "publish", publishArticle, successMessage, () => updateArticleStatus(article.id, "published"));
+};
+const unpublishSelectedArticle = (article) => runOwnerLifecycleAction(article, "unpublish", unpublishArticle, "Article unpublished.", () => updateArticleStatus(article.id, "unpublished"));
+const archiveSelectedArticle = (article) => runOwnerLifecycleAction(article, "archive", archiveArticle, "Article archived.", () => updateArticleStatus(article.id, "archived"));
+const unarchiveSelectedArticle = (article) => runOwnerLifecycleAction(article, "unarchive", unarchiveArticle, "Article unarchived.", () => updateArticleStatus(article.id, "draft"));
+const openDeleteConfirmation = (article) => {
+      if (!isOwner.value) {
+        showFeedback("Only owners can perform this action.", "error");
         return;
       }
 
-      this.articlePendingDeletion = article;
-      this.deleteConfirmation = "";
-      this.deleteDialogOpen = true;
-    },
-    async confirmPermanentDeletion() {
-      const article = this.articlePendingDeletion;
+      state.articlePendingDeletion = article; state.deleteConfirmation = ""; state.deleteDialogOpen = true;
+};
+const confirmPermanentDeletion = async () => {
+      const article = state.articlePendingDeletion;
 
-      if (!canConfirmArticleDeletion(article, this.deleteConfirmation)) {
+      if (!canConfirmArticleDeletion(article, state.deleteConfirmation)) {
         return;
       }
 
-      await this.runOwnerLifecycleAction(article, "delete", deleteArticle, "Article permanently deleted.", () => this.removeArticle(article.id));
-      this.deleteDialogOpen = false;
-      this.articlePendingDeletion = null;
-      this.deleteConfirmation = "";
-    },
-    handleAdminError(error) {
-      if (error instanceof AdminApiError) {
-        this.showFeedback(adminUserMessage(error), "error");
-        return;
-      }
-
-      this.showFeedback(adminUserMessage(error), "error");
-    },
-    showFeedback(message, tone = "info") {
-      if (this.feedbackTimer) {
-        clearTimeout(this.feedbackTimer);
-      }
-
-      this.feedbackMessage = message;
-      this.feedbackTone = tone;
-      this.feedbackTimer = setTimeout(() => {
-        this.feedbackMessage = "";
-        this.feedbackTimer = null;
-      }, 5000);
-    },
-  },
+      await runOwnerLifecycleAction(article, "delete", deleteArticle, "Article permanently deleted.", () => removeArticle(article.id));
+      state.deleteDialogOpen = false; state.articlePendingDeletion = null; state.deleteConfirmation = "";
+};
+onMounted(async () => {
+  state.stopCompactArticleGridObserver = observeMediaQuery("(max-width: 720px)", (matches) => { state.compactArticleGrid = matches; });
+  registerIdentityCallbacks();
+  const initialSession = await getAdminSession();
+  if (!active) return;
+  state.session = initialSession; state.sessionResolved = true; redirectSignedOutVisitor(); loadArticleDashboard();
+});
+onBeforeUnmount(() => {
+  active = false;
+  dashboardRequestId += 1;
+  stopIdentityCallbacks();
+  state.stopCompactArticleGridObserver?.();
+  if (state.feedbackTimer) clearTimeout(state.feedbackTimer);
 });
 </script>
 

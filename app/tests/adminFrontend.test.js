@@ -120,21 +120,21 @@ describe("admin frontend writer workflow", () => {
     const methods = ["saveDraft", "submitReview", "requestUnpublication", "ownerUnpublish"];
 
     for (const method of methods) {
-      const methodStart = editor.indexOf(`    async ${method}()`);
+      const methodStart = editor.indexOf(`async ${method}()`);
       assert.notEqual(methodStart, -1, `${method} should exist`);
-      const methodEnd = editor.indexOf("    async ", methodStart + 1);
+      const methodEnd = editor.indexOf("\nasync ", methodStart + 1);
       const methodSource = editor.slice(methodStart, methodEnd === -1 ? editor.length : methodEnd);
-      const tryBlock = methodSource.match(/try \{([\s\S]*?)\n      \} catch/);
-      const catchBlock = methodSource.match(/\} catch \(error\) \{([\s\S]*?)\n      \} finally/);
+      const tryBlock = methodSource.match(/try \{([\s\S]*?)\n\s*\} catch/);
+      const catchBlock = methodSource.match(/\} catch \(error\) \{([\s\S]*?)\n\s*\} finally/);
 
       assert.ok(tryBlock, `${method} should have a try block`);
       assert.ok(catchBlock, `${method} should have a catch block`);
       assert.match(tryBlock[1], /await runTerminalAdminAction\(/);
       assert.match(tryBlock[1], /operation:/);
       assert.match(tryBlock[1], /onSuccess:/);
-      assert.match(tryBlock[1], /router: this\.\$router/);
+      assert.match(tryBlock[1], /router: router/);
       assert.doesNotMatch(catchBlock[1], /returnToAdminDashboard/);
-      assert.doesNotMatch(methodSource.match(/finally \{([\s\S]*?)\n    \}/)?.[1] || "", /returnToAdminDashboard/);
+      assert.doesNotMatch(methodSource.match(/finally \{([\s\S]*?)\n\s*\}/)?.[1] || "", /returnToAdminDashboard/);
     }
   });
 
@@ -188,10 +188,10 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(page, /v-if="showAdminSurface"/);
     assert.match(page, /sessionResolved:\s*false/);
-    assert.match(page, /showAdminSurface\(\)/);
+    assert.match(page, /const showAdminSurface = computed/);
     assert.match(page, /redirectSignedOutVisitor/);
-    assert.match(page, /if\s*\(!this\.session\)\s*{/);
-    assert.match(page, /this\.\$router\.replace\("\/"\)/);
+    assert.match(page, /if\s*\(!state\.session\)\s*{/);
+    assert.match(page, /router\.replace\("\/"\)/);
     assert.doesNotMatch(page, /openAdminLogin/);
   });
 
@@ -199,10 +199,13 @@ describe("admin frontend writer workflow", () => {
     const page = read("../src/pages/Admin.vue");
 
     assert.match(page, /bindIdentityCallbacks/);
-    assert.match(page, /identity\.on\("login"/);
-    assert.match(page, /identity\.close\(\)/);
-    assert.match(page, /this\.session\s*=\s*await getAdminSession\(\)/);
-    assert.match(page, /this\.loadArticleDashboard\(\)/);
+    assert.match(page, /stopIdentityCallbacks\s*=\s*bindIdentityCallbacks/);
+    assert.match(page, /identity\?\.close\?\.\(\)/);
+    assert.match(page, /const sessionAfterLogin\s*=\s*await getAdminSession\(\)/);
+    assert.match(page, /if \(!active\) return/);
+    assert.match(page, /state\.session\s*=\s*sessionAfterLogin/);
+    assert.match(page, /loadArticleDashboard\(\)/);
+    assert.match(page, /stopIdentityCallbacks\(\)/);
   });
 
   it("loads the Netlify Identity widget and allows it through CSP", () => {
@@ -631,7 +634,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /Are you sure you want to permanently delete/);
     assert.doesNotMatch(page, /<h2>Are you sure\?<\/h2>/);
     assert.match(page, /:disable="tagDeletionPending"/);
-    assert.match(page, /if \(this\.tagDeletionPending\) return;/);
+    assert.match(page, /if \(!tag \|\| tagDeletionPending\.value\) return;/);
     assert.doesNotMatch(page, /this\.\$q\.dialog/);
     assert.doesNotMatch(page, /runDoubleConfirmedTagDeletion/);
     assert.match(page, /isOwnerSession/);
@@ -839,7 +842,7 @@ describe("admin frontend writer workflow", () => {
 
     assert.match(page, /@update:model-value="updateArticleTitle"/);
     assert.match(page, /@update:model-value="markSlugTouched"/);
-    assert.match(page, /this\.articleForm\.slug\s*=\s*slugFromTitle\(value\)/);
+    assert.match(page, /state\.articleForm\.slug\s*=\s*slugFromTitle\(value\)/);
   });
 
   it("creates new article forms with focused-editor display fields and internal technical state", () => {
@@ -1276,7 +1279,7 @@ describe("admin frontend writer workflow", () => {
       assert.match(page, new RegExp(text));
     }
 
-    assert.match(page, /this\.\$router\.push\("\/admin\/articles\/new"\)/);
+    assert.match(page, /router\.push\("\/admin\/articles\/new"\)/);
     assert.match(page, /\/admin\/articles\/\$\{encodeURIComponent\(article\.slug \|\| article\.id\)\}\/edit/);
     assert.match(page, /canUnarchiveArticleAction,\s*[\r\n]/);
     assert.match(page, /unarchiveSelectedArticle/);
@@ -1295,9 +1298,9 @@ describe("admin frontend writer workflow", () => {
       assert.match(editor, new RegExp(`v-model="articleForm\\.${field}"`));
     }
 
-    assert.match(editor, /beforeRouteLeave/);
+    assert.match(editor, /onBeforeRouteLeave/);
     assert.match(editor, /Leave the article editor and discard unsaved changes/);
-    assert.match(editor, /if \(isAdminSignOutNavigation\(\)\)\s*\{\s*next\(\);\s*return;/);
+    assert.match(editor, /if \(isAdminSignOutNavigation\(\)\)\s*return\s+next\(\);/);
     assert.doesNotMatch(editor, /v-model="articleForm\.version"/);
     assert.doesNotMatch(editor, /v-model="articleForm\.notes"/);
     assert.doesNotMatch(editor, /label="Author entry ID"/);
@@ -1315,7 +1318,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /Delete permanently/);
     assert.match(page, /confirmPermanentDeletion/);
     assert.match(page, /v-if="isOwner"/);
-    assert.match(page, /isOwnerSession\(this\.session\)/);
+    assert.match(page, /isOwnerSession\(state\.session\)/);
     assert.match(editor, /Select image/);
     assert.match(editor, /Upload image/);
     assert.match(editor, /thumbnail-preview/);
@@ -1492,7 +1495,7 @@ describe("admin frontend writer workflow", () => {
     const page = read("../src/pages/AdminArticleEditor.vue");
 
     assert.match(page, /:label="saveButtonLabel"[\s\S]*dense[\s\S]*no-caps/);
-    assert.match(page, /\["published", "changed"\]\.includes\(this\.loadedArticle\?\.status\) \? "Save" : "Save draft"/);
+    assert.match(page, /\["published", "changed"\]\.includes\(state\.loadedArticle\?\.status\) \? "Save" : "Save draft"/);
     assert.match(page, /label="Submit for review"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /label="Request unpublication"[\s\S]*dense[\s\S]*no-caps/);
     assert.match(page, /label="Unpublish"[\s\S]*dense[\s\S]*no-caps/);
@@ -1523,7 +1526,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /@unarchive="unarchiveSelectedArticle"/);
     assert.match(page, /@delete="openDeleteConfirmation"/);
     assert.match(page, /@toggle-tag="toggleTagFilter"/);
-    assert.match(page, /async requestUnpublicationFromRow\(article\)\s*\{\s*this\.loadingAction = `request-unpublication-\$\{article\.id\}`/);
+    assert.match(page, /const requestUnpublicationFromRow = async \(article\)\s*=>\s*\{\s*state\.loadingAction = `request-unpublication-\$\{article\.id\}`/);
     assert.match(page, /canRequestUnpublicationAction\(props\.row, session\)[\s\S]*?:loading="loadingAction === `request-unpublication-\$\{props\.row\.id\}`"/);
 
     assert.match(card, /article\.title/);
@@ -1740,6 +1743,7 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /markdown-editor/);
     assert.match(editor, /bodyEditorMode/);
     assert.match(editor, /insertMarkdown/);
+    assert.match(editor, /templateRefs\[`\$\{field\}Editor`\]\?\.value/);
     assert.match(editor, /formatMarkdownSelection/);
     assert.match(editor, /q-btn-dropdown[\s\S]*Headings/);
     assert.match(editor, /q-btn-dropdown[\s\S]*More actions/);

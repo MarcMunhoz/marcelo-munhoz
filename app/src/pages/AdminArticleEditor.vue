@@ -313,8 +313,9 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs } from "vue"
+import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router"
 import {
   createArticleDraft,
   createContentfulTag,
@@ -346,627 +347,590 @@ import {
   runTerminalAdminAction,
   slugFromTitle,
 } from "../utils/adminDashboard.js";
-import { getAdminSession, isAdminSignOutNavigation, isWriterSession } from "../utils/adminAuth.js";
+import { bindIdentityCallbacks as bindAdminIdentityCallbacks, getAdminSession, isAdminSignOutNavigation, isWriterSession } from "../utils/adminAuth.js";
 import { normalizeEditorialTagOptions } from "../utils/adminTags.js";
 import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
 import { marked } from "marked";
-
-export default defineComponent({
-  name: "AdminArticleEditor",
-  data() {
-    return {
-      session: null,
-      sessionResolved: false,
-      articleForm: createEmptyArticleForm(),
-      originalFormSnapshot: "",
-      slugTouched: false,
-      errors: {},
-      mediaAssets: [],
-      mediaDialogOpen: false,
-      mediaError: "",
-      mediaEditorConfig: null,
-      mediaUploadFile: null,
-      availableTagOptions: [],
-      filteredTagOptions: [],
-      tagsLoading: false,
-      showMediaDiagnostics: false,
-      bodyEditorMode: "editor",
-      bodyEditorModeOptions: [
-        { label: "Editor", value: "editor" },
-        { label: "Preview", value: "preview" },
-      ],
-      articleLocaleOptions: [
-        { label: "PT", value: "pt-BR" },
-        { label: "EN", value: "en-US" },
-      ],
-      loadedArticle: null,
-      statusMessage: "",
-      feedbackMessage: "",
-      feedbackTone: "info",
-      dashboardError: "",
-      loadingAction: "",
-      editorLoading: false,
-    };
-  },
-  computed: {
-    canWrite() {
-      return isWriterSession(this.session);
-    },
-    showEditorSurface() {
-      return this.sessionResolved;
-    },
-    isNewArticle() {
-      return this.$route.name === "Admin Article New";
-    },
-    hasUnsavedChanges() {
-      return this.originalFormSnapshot !== JSON.stringify(this.articleForm);
-    },
-    mediaState() {
-      return mediaLibraryState({
-        assets: this.mediaAssets,
-        error: this.mediaError,
-        isLoading: this.loadingAction === "media-list",
-      });
-    },
-    feedbackClass() {
-      return {
-        "feedback-success": this.feedbackTone === "success",
-        "feedback-error": this.feedbackTone === "error",
-        "feedback-info": this.feedbackTone === "info",
-      };
-    },
-    canSaveArticle() {
-      return this.isNewArticle || canEditArticleAction(this.loadedArticle, this.session);
-    },
-    canSubmitArticleForReview() {
-      return canPrepareReviewAction(this.loadedArticle, this.session);
-    },
-    canRequestArticleUnpublication() {
-      return canRequestUnpublicationAction(this.loadedArticle, this.session);
-    },
-    canOwnerUnpublishArticle() {
-      return canOwnerUnpublishAction(this.loadedArticle, this.session);
-    },
-    saveButtonLabel() {
-      return ["published", "changed"].includes(this.loadedArticle?.status) ? "Save" : "Save draft";
-    },
-    articleBodyPreview() {
-      return marked.parse(this.articleForm.body || "");
-    },
-  },
-  async mounted() {
-    this.bindIdentityCallbacks();
-    this.session = await getAdminSession();
-    this.sessionResolved = true;
-    this.redirectSignedOutVisitor();
-    await this.loadEditor();
-  },
-  beforeRouteLeave(_to, _from, next) {
-    if (isAdminSignOutNavigation()) {
-      next();
-      return;
-    }
-
-    if (this.hasUnsavedChanges && !globalThis.confirm?.("Leave the article editor and discard unsaved changes?")) {
-      next(false);
-      return;
-    }
-
-    next();
-  },
-  methods: {
-    bindIdentityCallbacks() {
-      const identity = globalThis.netlifyIdentity;
-
-      if (typeof identity?.on !== "function") {
-        return;
-      }
-
-      identity.on("login", async () => {
-        if (typeof identity.close === "function") {
-          identity.close();
-        }
-
-        this.session = await getAdminSession();
-        await this.loadEditor();
-      });
-    },
-    redirectSignedOutVisitor() {
-      if (!this.session) {
-        this.$router.replace("/");
-      }
-    },
-    snapshotForm() {
-      this.originalFormSnapshot = JSON.stringify(this.articleForm);
-    },
-    async loadEditor() {
-      if (!this.canWrite) {
-        return;
-      }
-
-      this.editorLoading = true;
-
-      try {
-        await this.loadContentfulTags();
-
-        if (this.isNewArticle) {
-          this.articleForm = createEmptyArticleForm();
-          this.loadedArticle = null;
-          await this.applyCurrentAuthorProfile();
-          this.statusMessage = "New draft";
-          this.slugTouched = false;
-          this.snapshotForm();
-          return;
-        }
-
-        this.loadingAction = "articles";
-        this.dashboardError = "";
-
-        const response = await listAdminArticles({ session: this.session });
-        this.applyResolvedSession(response.session);
-        const dashboard = reconcileAdminDashboardData(response);
-        const articleRouteKey = this.$route.params.entryId;
-        const article = dashboard.articles.find((item) => item.id === articleRouteKey || item.slug === articleRouteKey);
-
-        if (!article) {
-          this.dashboardError = "Article not found or not editable by this account.";
-          return;
-        }
-
-        if (!canEditArticleAction(article, this.session)) {
-          this.loadedArticle = article;
-          this.dashboardError = "This article belongs to another author. Use owner moderation actions from the dashboard instead.";
-          return;
-        }
-
-        this.loadedArticle = article;
-        this.articleForm = articleToForm(article);
-        this.statusMessage = "Loaded";
-        this.slugTouched = true;
-        this.snapshotForm();
-      } catch (error) {
-        this.dashboardError = adminUserMessage(error);
-      } finally {
-        this.loadingAction = "";
-        this.editorLoading = false;
-      }
-    },
-    applyResolvedSession(session = {}) {
-      if (!session.authorEntryId) {
-        return;
-      }
-
-      this.session = {
-        ...this.session,
-        authorEntryId: session.authorEntryId,
-      };
-    },
-    async applyCurrentAuthorProfile() {
-      try {
-        const response = await getAuthorProfile({ session: this.session });
-        this.applyResolvedSession(response.session);
-        const profile = response.profile || {};
-        this.articleForm.author = profile.id || this.session?.authorEntryId || "";
-        this.articleForm.authorEntryId = profile.id || this.session?.authorEntryId || "";
-        this.articleForm.authorName = profile.name || this.session?.name || "";
-      } catch (error) {
-        this.articleForm.author = this.session?.authorEntryId || "";
-        this.articleForm.authorEntryId = this.session?.authorEntryId || "";
-        this.articleForm.authorName = this.session?.name || "";
-        this.dashboardError = adminUserMessage(error);
-      }
-    },
-    normalizeTagOptions(tags = []) {
-      return normalizeEditorialTagOptions(tags);
-    },
-    async loadContentfulTags() {
-      this.tagsLoading = true;
-
-      try {
-        const response = await listContentfulTags({ session: this.session });
-        this.availableTagOptions = this.normalizeTagOptions(response.tags);
-        this.filteredTagOptions = this.availableTagOptions;
-      } catch (error) {
-        this.availableTagOptions = [];
-        this.filteredTagOptions = [];
-        this.dashboardError = adminUserMessage(error);
-      } finally {
-        this.tagsLoading = false;
-      }
-    },
-    filterTagOptions(value, update) {
-      const needle = String(value || "").trim().toLowerCase();
-
-      update(() => {
-        this.filteredTagOptions = needle
-          ? this.availableTagOptions.filter((tag) => `${tag.label} ${tag.id}`.toLowerCase().includes(needle))
-          : this.availableTagOptions;
-      });
-    },
-    async createNewContentfulTag(value, done) {
-      const name = String(value || "").trim();
-
-      if (!name) {
-        done();
-        return;
-      }
-
-      const existingTag = this.availableTagOptions.find((tag) => tag.label.toLowerCase() === name.toLowerCase() || tag.id.toLowerCase() === name.toLowerCase());
-
-      if (existingTag) {
-        done(existingTag.id, "add-unique");
-        this.$nextTick(this.syncArticleTags);
-        return;
-      }
-
-      this.tagsLoading = true;
-
-      try {
-        const response = await createContentfulTag({ name, session: this.session });
-        const createdTag = this.normalizeTagOptions([response.tag])[0];
-
-        if (!createdTag) {
-          done();
-          this.showFeedback("The tag could not be created.", "error");
-          return;
-        }
-
-        this.availableTagOptions = [...this.availableTagOptions.filter((tag) => tag.id !== createdTag.id), createdTag].sort((left, right) =>
-          left.label.localeCompare(right.label)
-        );
-        this.filteredTagOptions = this.availableTagOptions;
-        done(createdTag.id, "add-unique");
-        this.$nextTick(this.syncArticleTags);
-        this.showFeedback("Tag created.", "success");
-      } catch (error) {
-        done();
-        this.handleAdminError(error);
-      } finally {
-        this.tagsLoading = false;
-      }
-    },
-    leaveEditor() {
-      this.$router.push("/admin");
-    },
-    updateArticleTitle(value) {
-      this.articleForm.title = value;
-
-      if (!this.articleForm.id && !this.slugTouched) {
-        this.articleForm.slug = slugFromTitle(value);
-      }
-    },
-    markSlugTouched() {
-      this.slugTouched = true;
-    },
-    validateArticleForm() {
-      const errors = {};
-
-      if (!this.articleForm.title.trim()) {
-        errors.title = "Title is required";
-      }
-
-      if (!/^[a-z]+(?:-[a-z]+)*$/.test(this.articleForm.slug)) {
-        errors.slug = "Use letters and hyphens only";
-      }
-
-      if (!this.articleForm.description.trim()) {
-        errors.description = "Description is required";
-      }
-
-      if (!this.articleForm.body.trim()) {
-        errors.body = "Body is required";
-      }
-
-      if (!String(this.articleForm.authorEntryId || this.articleForm.author || "").trim()) {
-        errors.author = "Author profile is required";
-      }
-
-      if (this.articleForm.thumbnailUrl && !this.articleForm.thumbnailPublicId) {
-        errors.thumbnail = "Select media again so the Cloudinary public ID is saved.";
-      }
-
-      this.errors = errors;
-      return Object.keys(errors).length === 0;
-    },
-    async saveDraft() {
-      if (!this.canSaveArticle) {
-        this.showFeedback("This article belongs to another author. Use moderation actions from the dashboard.", "error");
-        return;
-      }
-
-      if (!this.validateArticleForm()) {
-        this.showFeedback("Fix the highlighted fields before saving.", "error");
-        return;
-      }
-
-      this.loadingAction = "save";
-
-      try {
-        const payload = buildArticlePayload(this.articleForm);
-        await runTerminalAdminAction({
-          operation: () =>
-            this.articleForm.id
-              ? updateArticleDraft({ articleId: this.articleForm.id, article: payload, session: this.session })
-              : createArticleDraft({ article: payload, session: this.session }),
-          onSuccess: (response) => {
-            this.articleForm = applyArticleResponseToForm(this.articleForm, response);
-            const previousLifecycleStatus = this.loadedArticle?.lifecycleStatus || this.loadedArticle?.status;
-            const savedStatus = ["published", "changed"].includes(previousLifecycleStatus) ? "changed" : "draft";
-
-            this.loadedArticle = {
-              ...(this.loadedArticle || {}),
-              id: this.articleForm.id,
-              status: savedStatus,
-              lifecycleStatus: savedStatus,
-              authorEntryId: this.articleForm.authorEntryId,
-              writerSubject: this.session?.subject || this.loadedArticle?.writerSubject || "",
-            };
-            this.statusMessage = "Draft saved";
-            this.snapshotForm();
-            this.showFeedback("Draft saved.", "success");
-          },
-          router: this.$router,
-        });
-      } catch (error) {
-        this.handleAdminError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    async submitReview() {
-      this.loadingAction = "review";
-
-      try {
-        await runTerminalAdminAction({
-          operation: () =>
-            submitArticleForReview({
-              articleId: this.articleForm.id,
-              version: this.articleForm.version,
-              notes: "",
-              session: this.session,
-            }),
-          onSuccess: () => {
-            this.snapshotForm();
-            this.showFeedback("Submitted for owner review.", "success");
-          },
-          router: this.$router,
-        });
-      } catch (error) {
-        this.handleAdminError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    async requestUnpublication() {
-      this.loadingAction = "unpublish";
-
-      try {
-        await runTerminalAdminAction({
-          operation: () =>
-            requestArticleUnpublication({
-              articleId: this.articleForm.id,
-              version: this.articleForm.version,
-              notes: "",
-              session: this.session,
-            }),
-          onSuccess: () => {
-            this.snapshotForm();
-            this.showFeedback("Unpublication request sent.", "success");
-          },
-          router: this.$router,
-        });
-      } catch (error) {
-        this.handleAdminError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    async ownerUnpublish() {
-      this.loadingAction = "owner-unpublish";
-
-      try {
-        await runTerminalAdminAction({
-          operation: () =>
-            unpublishArticle({
-              articleId: this.articleForm.id,
-              version: this.articleForm.version,
-              session: this.session,
-            }),
-          onSuccess: () => {
-            this.loadedArticle = { ...(this.loadedArticle || {}), status: "unpublished" };
-            this.snapshotForm();
-            this.showFeedback("Article unpublished.", "success");
-          },
-          router: this.$router,
-        });
-      } catch (error) {
-        this.handleAdminError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    async openMediaLibrary() {
-      this.mediaDialogOpen = true;
-      this.mediaError = "";
-      this.loadingAction = "media-list";
-
-      try {
-        const response = await listMediaAssets({ session: this.session });
-        this.mediaAssets = response.assets || [];
-      } catch (error) {
-        this.handleMediaError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    applySelectedMedia(asset = {}) {
-      this.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || "";
-      this.articleForm.thumbnailUrl = asset.thumbnailUrl || asset.secure_url || asset.url || "";
-      this.articleForm.thumbnail = asset.asset || {
-        public_id: this.articleForm.thumbnailPublicId,
-        secure_url: this.articleForm.thumbnailUrl,
-        url: this.articleForm.thumbnailUrl,
-      };
-      this.articleForm.alt = this.articleForm.alt || asset.alt || asset.title || "";
-      this.mediaDialogOpen = false;
-      this.showMediaDiagnostics = false;
-      this.showFeedback("Image selected.", "success");
-    },
-    applyEditedMedia(asset = {}) {
-      const secureUrl = asset.secureUrl || asset.secure_url || asset.url || "";
-
-      if (!secureUrl) {
-        this.showFeedback("The editor did not return an image URL. Select or upload an image instead.", "error");
-        return;
-      }
-
-      this.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || this.articleForm.thumbnailPublicId;
-      this.articleForm.thumbnailUrl = secureUrl;
-      this.articleForm.thumbnail = {
-        ...(this.articleForm.thumbnail || {}),
-        public_id: this.articleForm.thumbnailPublicId,
-        secure_url: secureUrl,
-        url: secureUrl,
-      };
-      this.showMediaDiagnostics = false;
-      this.showFeedback("Edited image applied. Save the draft to keep it.", "success");
-    },
-    async loadMediaEditorConfig() {
-      if (this.mediaEditorConfig) {
-        return this.mediaEditorConfig;
-      }
-
-      const response = await getMediaEditorConfig({ session: this.session });
-      this.mediaEditorConfig = response.mediaEditor || null;
-      return this.mediaEditorConfig;
-    },
-    async editThumbnailImage() {
-      if (!this.articleForm.thumbnailPublicId) {
-        this.showFeedback("Select an image before opening the editor.", "error");
-        return;
-      }
-
-      this.mediaError = "";
-      this.loadingAction = "media-editor";
-
-      try {
-        const config = await this.loadMediaEditorConfig();
-        await openCloudinaryMediaEditor({
-          cloudName: config?.cloudName,
-          publicId: this.articleForm.thumbnailPublicId,
-          onExport: this.applyEditedMedia,
-        });
-        this.showFeedback("Image editor opened. Export an image there to update the thumbnail.", "info");
-      } catch (error) {
-        this.handleMediaEditorError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    clearThumbnail() {
-      this.articleForm.thumbnailPublicId = "";
-      this.articleForm.thumbnailUrl = "";
-      this.articleForm.thumbnail = null;
-      this.showMediaDiagnostics = false;
-      this.showFeedback("Image cleared.", "info");
-    },
-    syncArticleTags() {
-      this.articleForm.tags = this.articleForm.tagList.join(", ");
-    },
-    removeTagFromArticleForm(tag) {
-      this.articleForm.tagList = this.articleForm.tagList.filter((item) => item !== tag);
-      this.syncArticleTags();
-    },
-    insertMarkdown(field, before, after = "", placeholder = "text") {
-      const editor = this.$refs[`${field}Editor`];
-      const currentValue = String(this.articleForm[field] || "");
-      const result = formatMarkdownSelection({
-        value: currentValue,
-        selectionStart: editor?.selectionStart,
-        selectionEnd: editor?.selectionEnd,
-        before,
-        after,
-        placeholder,
-      });
-
-      this.articleForm[field] = result.value;
-      this.$nextTick(() => {
-        if (typeof editor?.focus === "function") {
-          editor.focus();
-        }
-
-        if (typeof editor?.setSelectionRange === "function") {
-          editor.setSelectionRange(result.selectionStart, result.selectionEnd);
-        }
-      });
-    },
-    async handleMediaFile(file) {
-      if (!file) {
-        return;
-      }
-
-      this.mediaError = "";
-      this.loadingAction = "media-upload";
-
-      try {
-        const dataUrl = await this.readFileAsDataUrl(file);
-        const response = await uploadMediaAsset({
-          file: dataUrl,
-          filename: file.name,
-          session: this.session,
-        });
-
-        this.applySelectedMedia(response.asset);
-        this.mediaUploadFile = null;
-      } catch (error) {
-        this.handleMediaError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    readFileAsDataUrl(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-    },
-    handleAdminError(error) {
-      if (error instanceof AdminApiError) {
-        this.showFeedback(adminUserMessage(error), "error");
-        return;
-      }
-
-      this.showFeedback(adminUserMessage(error), "error");
-    },
-    handleMediaError(error) {
-      if (error instanceof AdminApiError) {
-        this.mediaError = adminUserMessage(error, { media: true });
-        this.showFeedback(this.mediaError, "error");
-        return;
-      }
-
-      this.mediaError = adminUserMessage(error, { media: true });
-      this.showFeedback(this.mediaError, "error");
-    },
-    handleMediaEditorError(error) {
-      if (error instanceof AdminApiError) {
-        this.mediaError = adminUserMessage(error, { media: true });
-      } else if (error instanceof CloudinaryMediaEditorUnavailableError) {
-        this.mediaError = "Image editor is unavailable. Select or upload an image instead.";
-      } else {
-        this.mediaError = "Image editor is unavailable. Select or upload an image instead.";
-      }
-
-      this.showFeedback(this.mediaError, "error");
-    },
-    showFeedback(message, tone = "info") {
-      this.feedbackMessage = message;
-      this.feedbackTone = tone;
-    },
-  },
+const route = useRoute();
+const router = useRouter();
+const bodyEditor = ref(null);
+const templateRefs = { bodyEditor };
+let active = true;
+let editorRequestId = 0;
+let stopIdentityCallbacks = () => {};
+const state = reactive({
+  session: null, sessionResolved: false, articleForm: createEmptyArticleForm(), originalFormSnapshot: "", slugTouched: false,
+  errors: {}, mediaAssets: [], mediaDialogOpen: false, mediaError: "", mediaEditorConfig: null, mediaUploadFile: null,
+  availableTagOptions: [], filteredTagOptions: [], tagsLoading: false, showMediaDiagnostics: false, bodyEditorMode: "editor",
+  bodyEditorModeOptions: [{ label: "Editor", value: "editor" }, { label: "Preview", value: "preview" }],
+  articleLocaleOptions: [{ label: "PT", value: "pt-BR" }, { label: "EN", value: "en-US" }], loadedArticle: null,
+  statusMessage: "", feedbackMessage: "", feedbackTone: "info", dashboardError: "", loadingAction: "", editorLoading: false,
 });
+const canWrite = computed(() => isWriterSession(state.session));
+const showEditorSurface = computed(() => state.sessionResolved);
+const isNewArticle = computed(() => route.name === "Admin Article New");
+const hasUnsavedChanges = computed(() => state.originalFormSnapshot !== JSON.stringify(state.articleForm));
+const mediaState = computed(() => mediaLibraryState({ assets: state.mediaAssets, error: state.mediaError, isLoading: state.loadingAction === "media-list" }));
+const feedbackClass = computed(() => ({ "feedback-success": state.feedbackTone === "success", "feedback-error": state.feedbackTone === "error", "feedback-info": state.feedbackTone === "info" }));
+const canSaveArticle = computed(() => isNewArticle.value || canEditArticleAction(state.loadedArticle, state.session));
+const canSubmitArticleForReview = computed(() => canPrepareReviewAction(state.loadedArticle, state.session));
+const canRequestArticleUnpublication = computed(() => canRequestUnpublicationAction(state.loadedArticle, state.session));
+const canOwnerUnpublishArticle = computed(() => canOwnerUnpublishAction(state.loadedArticle, state.session));
+const saveButtonLabel = computed(() => ["published", "changed"].includes(state.loadedArticle?.status) ? "Save" : "Save draft");
+const articleBodyPreview = computed(() => marked.parse(state.articleForm.body || ""));
+Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel, articleBodyPreview });
+const methods = {
+bindIdentityCallbacks() {
+  const identity = globalThis.netlifyIdentity;
+  stopIdentityCallbacks = bindAdminIdentityCallbacks({
+    identity,
+    onLogin: async () => {
+      identity?.close?.();
+      const sessionAfterLogin = await getAdminSession();
+      if (!active) return;
+      state.session = sessionAfterLogin;
+      await state.loadEditor();
+    },
+  });
+},
+redirectSignedOutVisitor() {
+  if (!state.session) {
+    router.replace("/");
+  }
+},
+snapshotForm() {
+  state.originalFormSnapshot = JSON.stringify(state.articleForm);
+},
+async loadEditor() {
+  const currentRequestId = ++editorRequestId;
+  if (!state.canWrite) {
+    return;
+  }
+
+  state.editorLoading = true;
+
+  try {
+    await state.loadContentfulTags(currentRequestId);
+    if (!active || currentRequestId !== editorRequestId) return;
+
+    if (state.isNewArticle) {
+      state.articleForm = createEmptyArticleForm();
+      state.loadedArticle = null;
+      await state.applyCurrentAuthorProfile(currentRequestId);
+      if (!active || currentRequestId !== editorRequestId) return;
+      state.statusMessage = "New draft";
+      state.slugTouched = false;
+      state.snapshotForm();
+      return;
+    }
+
+    state.loadingAction = "articles";
+    state.dashboardError = "";
+
+    const response = await listAdminArticles({ session: state.session });
+    if (!active || currentRequestId !== editorRequestId) return;
+    state.applyResolvedSession(response.session);
+    const dashboard = reconcileAdminDashboardData(response);
+    const articleRouteKey = route.params.entryId;
+    const article = dashboard.articles.find((item) => item.id === articleRouteKey || item.slug === articleRouteKey);
+
+    if (!article) {
+      state.dashboardError = "Article not found or not editable by this account.";
+      return;
+    }
+
+    if (!canEditArticleAction(article, state.session)) {
+      state.loadedArticle = article;
+      state.dashboardError = "This article belongs to another author. Use owner moderation actions from the dashboard instead.";
+      return;
+    }
+
+    state.loadedArticle = article;
+    state.articleForm = articleToForm(article);
+    state.statusMessage = "Loaded";
+    state.slugTouched = true;
+    state.snapshotForm();
+  } catch (error) {
+    if (!active || currentRequestId !== editorRequestId) return;
+    state.dashboardError = adminUserMessage(error);
+  } finally {
+    if (active && currentRequestId === editorRequestId) {
+      state.loadingAction = "";
+      state.editorLoading = false;
+    }
+  }
+},
+applyResolvedSession(session = {}) {
+  if (!session.authorEntryId) {
+    return;
+  }
+
+  state.session = {
+    ...state.session,
+    authorEntryId: session.authorEntryId,
+  };
+},
+async applyCurrentAuthorProfile(currentRequestId = editorRequestId) {
+  try {
+    const response = await getAuthorProfile({ session: state.session });
+    if (!active || currentRequestId !== editorRequestId) return;
+    state.applyResolvedSession(response.session);
+    const profile = response.profile || {};
+    state.articleForm.author = profile.id || state.session?.authorEntryId || "";
+    state.articleForm.authorEntryId = profile.id || state.session?.authorEntryId || "";
+    state.articleForm.authorName = profile.name || state.session?.name || "";
+  } catch (error) {
+    if (!active || currentRequestId !== editorRequestId) return;
+    state.articleForm.author = state.session?.authorEntryId || "";
+    state.articleForm.authorEntryId = state.session?.authorEntryId || "";
+    state.articleForm.authorName = state.session?.name || "";
+    state.dashboardError = adminUserMessage(error);
+  }
+},
+normalizeTagOptions(tags = []) {
+  return normalizeEditorialTagOptions(tags);
+},
+async loadContentfulTags(currentRequestId = editorRequestId) {
+  state.tagsLoading = true;
+
+  try {
+    const response = await listContentfulTags({ session: state.session });
+    if (!active || currentRequestId !== editorRequestId) return;
+    state.availableTagOptions = state.normalizeTagOptions(response.tags);
+    state.filteredTagOptions = state.availableTagOptions;
+  } catch (error) {
+    if (!active || currentRequestId !== editorRequestId) return;
+    state.availableTagOptions = [];
+    state.filteredTagOptions = [];
+    state.dashboardError = adminUserMessage(error);
+  } finally {
+    if (active && currentRequestId === editorRequestId) state.tagsLoading = false;
+  }
+},
+filterTagOptions(value, update) {
+  const needle = String(value || "").trim().toLowerCase();
+
+  update(() => {
+    state.filteredTagOptions = needle
+      ? state.availableTagOptions.filter((tag) => `${tag.label} ${tag.id}`.toLowerCase().includes(needle))
+      : state.availableTagOptions;
+  });
+},
+async createNewContentfulTag(value, done) {
+  const name = String(value || "").trim();
+
+  if (!name) {
+    done();
+    return;
+  }
+
+  const existingTag = state.availableTagOptions.find((tag) => tag.label.toLowerCase() === name.toLowerCase() || tag.id.toLowerCase() === name.toLowerCase());
+
+  if (existingTag) {
+    done(existingTag.id, "add-unique");
+    nextTick(state.syncArticleTags);
+    return;
+  }
+
+  state.tagsLoading = true;
+
+  try {
+    const response = await createContentfulTag({ name, session: state.session });
+    const createdTag = state.normalizeTagOptions([response.tag])[0];
+
+    if (!createdTag) {
+      done();
+      state.showFeedback("The tag could not be created.", "error");
+      return;
+    }
+
+    state.availableTagOptions = [...state.availableTagOptions.filter((tag) => tag.id !== createdTag.id), createdTag].sort((left, right) =>
+      left.label.localeCompare(right.label)
+    );
+    state.filteredTagOptions = state.availableTagOptions;
+    done(createdTag.id, "add-unique");
+    nextTick(state.syncArticleTags);
+    state.showFeedback("Tag created.", "success");
+  } catch (error) {
+    done();
+    state.handleAdminError(error);
+  } finally {
+    state.tagsLoading = false;
+  }
+},
+leaveEditor() {
+  router.push("/admin");
+},
+updateArticleTitle(value) {
+  state.articleForm.title = value;
+
+  if (!state.articleForm.id && !state.slugTouched) {
+    state.articleForm.slug = slugFromTitle(value);
+  }
+},
+markSlugTouched() {
+  state.slugTouched = true;
+},
+validateArticleForm() {
+  const errors = {};
+
+  if (!state.articleForm.title.trim()) {
+    errors.title = "Title is required";
+  }
+
+  if (!/^[a-z]+(?:-[a-z]+)*$/.test(state.articleForm.slug)) {
+    errors.slug = "Use letters and hyphens only";
+  }
+
+  if (!state.articleForm.description.trim()) {
+    errors.description = "Description is required";
+  }
+
+  if (!state.articleForm.body.trim()) {
+    errors.body = "Body is required";
+  }
+
+  if (!String(state.articleForm.authorEntryId || state.articleForm.author || "").trim()) {
+    errors.author = "Author profile is required";
+  }
+
+  if (state.articleForm.thumbnailUrl && !state.articleForm.thumbnailPublicId) {
+    errors.thumbnail = "Select media again so the Cloudinary public ID is saved.";
+  }
+
+  state.errors = errors;
+  return Object.keys(errors).length === 0;
+},
+async saveDraft() {
+  if (!state.canSaveArticle) {
+    state.showFeedback("This article belongs to another author. Use moderation actions from the dashboard.", "error");
+    return;
+  }
+
+  if (!state.validateArticleForm()) {
+    state.showFeedback("Fix the highlighted fields before saving.", "error");
+    return;
+  }
+
+  state.loadingAction = "save";
+
+  try {
+    const payload = buildArticlePayload(state.articleForm);
+    await runTerminalAdminAction({
+      operation: () =>
+        state.articleForm.id
+          ? updateArticleDraft({ articleId: state.articleForm.id, article: payload, session: state.session })
+          : createArticleDraft({ article: payload, session: state.session }),
+      onSuccess: (response) => {
+        state.articleForm = applyArticleResponseToForm(state.articleForm, response);
+        const previousLifecycleStatus = state.loadedArticle?.lifecycleStatus || state.loadedArticle?.status;
+        const savedStatus = ["published", "changed"].includes(previousLifecycleStatus) ? "changed" : "draft";
+
+        state.loadedArticle = {
+          ...(state.loadedArticle || {}),
+          id: state.articleForm.id,
+          status: savedStatus,
+          lifecycleStatus: savedStatus,
+          authorEntryId: state.articleForm.authorEntryId,
+          writerSubject: state.session?.subject || state.loadedArticle?.writerSubject || "",
+        };
+        state.statusMessage = "Draft saved";
+        state.snapshotForm();
+        state.showFeedback("Draft saved.", "success");
+      },
+      router: router,
+    });
+  } catch (error) {
+    state.handleAdminError(error);
+  } finally {
+    state.loadingAction = "";
+  }
+},
+async submitReview() {
+  state.loadingAction = "review";
+
+  try {
+    await runTerminalAdminAction({
+      operation: () =>
+        submitArticleForReview({
+          articleId: state.articleForm.id,
+          version: state.articleForm.version,
+          notes: "",
+          session: state.session,
+        }),
+      onSuccess: () => {
+        state.snapshotForm();
+        state.showFeedback("Submitted for owner review.", "success");
+      },
+      router: router,
+    });
+  } catch (error) {
+    state.handleAdminError(error);
+  } finally {
+    state.loadingAction = "";
+  }
+},
+async requestUnpublication() {
+  state.loadingAction = "unpublish";
+
+  try {
+    await runTerminalAdminAction({
+      operation: () =>
+        requestArticleUnpublication({
+          articleId: state.articleForm.id,
+          version: state.articleForm.version,
+          notes: "",
+          session: state.session,
+        }),
+      onSuccess: () => {
+        state.snapshotForm();
+        state.showFeedback("Unpublication request sent.", "success");
+      },
+      router: router,
+    });
+  } catch (error) {
+    state.handleAdminError(error);
+  } finally {
+    state.loadingAction = "";
+  }
+},
+async ownerUnpublish() {
+  state.loadingAction = "owner-unpublish";
+
+  try {
+    await runTerminalAdminAction({
+      operation: () =>
+        unpublishArticle({
+          articleId: state.articleForm.id,
+          version: state.articleForm.version,
+          session: state.session,
+        }),
+      onSuccess: () => {
+        state.loadedArticle = { ...(state.loadedArticle || {}), status: "unpublished" };
+        state.snapshotForm();
+        state.showFeedback("Article unpublished.", "success");
+      },
+      router: router,
+    });
+  } catch (error) {
+    state.handleAdminError(error);
+  } finally {
+    state.loadingAction = "";
+  }
+},
+async openMediaLibrary() {
+  state.mediaDialogOpen = true;
+  state.mediaError = "";
+  state.loadingAction = "media-list";
+
+  try {
+    const response = await listMediaAssets({ session: state.session });
+    state.mediaAssets = response.assets || [];
+  } catch (error) {
+    state.handleMediaError(error);
+  } finally {
+    state.loadingAction = "";
+  }
+},
+applySelectedMedia(asset = {}) {
+  state.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || "";
+  state.articleForm.thumbnailUrl = asset.thumbnailUrl || asset.secure_url || asset.url || "";
+  state.articleForm.thumbnail = asset.asset || {
+    public_id: state.articleForm.thumbnailPublicId,
+    secure_url: state.articleForm.thumbnailUrl,
+    url: state.articleForm.thumbnailUrl,
+  };
+  state.articleForm.alt = state.articleForm.alt || asset.alt || asset.title || "";
+  state.mediaDialogOpen = false;
+  state.showMediaDiagnostics = false;
+  state.showFeedback("Image selected.", "success");
+},
+applyEditedMedia(asset = {}) {
+  const secureUrl = asset.secureUrl || asset.secure_url || asset.url || "";
+
+  if (!secureUrl) {
+    state.showFeedback("The editor did not return an image URL. Select or upload an image instead.", "error");
+    return;
+  }
+
+  state.articleForm.thumbnailPublicId = asset.publicId || asset.public_id || state.articleForm.thumbnailPublicId;
+  state.articleForm.thumbnailUrl = secureUrl;
+  state.articleForm.thumbnail = {
+    ...(state.articleForm.thumbnail || {}),
+    public_id: state.articleForm.thumbnailPublicId,
+    secure_url: secureUrl,
+    url: secureUrl,
+  };
+  state.showMediaDiagnostics = false;
+  state.showFeedback("Edited image applied. Save the draft to keep it.", "success");
+},
+async loadMediaEditorConfig() {
+  if (state.mediaEditorConfig) {
+    return state.mediaEditorConfig;
+  }
+
+  const response = await getMediaEditorConfig({ session: state.session });
+  state.mediaEditorConfig = response.mediaEditor || null;
+  return state.mediaEditorConfig;
+},
+async editThumbnailImage() {
+  if (!state.articleForm.thumbnailPublicId) {
+    state.showFeedback("Select an image before opening the editor.", "error");
+    return;
+  }
+
+  state.mediaError = "";
+  state.loadingAction = "media-editor";
+
+  try {
+    const config = await state.loadMediaEditorConfig();
+    await openCloudinaryMediaEditor({
+      cloudName: config?.cloudName,
+      publicId: state.articleForm.thumbnailPublicId,
+      onExport: state.applyEditedMedia,
+    });
+    state.showFeedback("Image editor opened. Export an image there to update the thumbnail.", "info");
+  } catch (error) {
+    state.handleMediaEditorError(error);
+  } finally {
+    state.loadingAction = "";
+  }
+},
+clearThumbnail() {
+  state.articleForm.thumbnailPublicId = "";
+  state.articleForm.thumbnailUrl = "";
+  state.articleForm.thumbnail = null;
+  state.showMediaDiagnostics = false;
+  state.showFeedback("Image cleared.", "info");
+},
+syncArticleTags() {
+  state.articleForm.tags = state.articleForm.tagList.join(", ");
+},
+removeTagFromArticleForm(tag) {
+  state.articleForm.tagList = state.articleForm.tagList.filter((item) => item !== tag);
+  state.syncArticleTags();
+},
+insertMarkdown(field, before, after = "", placeholder = "text") {
+  const editor = templateRefs[`${field}Editor`]?.value;
+  const currentValue = String(state.articleForm[field] || "");
+  const result = formatMarkdownSelection({
+    value: currentValue,
+    selectionStart: editor?.selectionStart,
+    selectionEnd: editor?.selectionEnd,
+    before,
+    after,
+    placeholder,
+  });
+
+  state.articleForm[field] = result.value;
+  nextTick(() => {
+    if (typeof editor?.focus === "function") {
+      editor.focus();
+    }
+
+    if (typeof editor?.setSelectionRange === "function") {
+      editor.setSelectionRange(result.selectionStart, result.selectionEnd);
+    }
+  });
+},
+async handleMediaFile(file) {
+  if (!file) {
+    return;
+  }
+
+  state.mediaError = "";
+  state.loadingAction = "media-upload";
+
+  try {
+    const dataUrl = await state.readFileAsDataUrl(file);
+    const response = await uploadMediaAsset({
+      file: dataUrl,
+      filename: file.name,
+      session: state.session,
+    });
+
+    state.applySelectedMedia(response.asset);
+    state.mediaUploadFile = null;
+  } catch (error) {
+    state.handleMediaError(error);
+  } finally {
+    state.loadingAction = "";
+  }
+},
+readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+},
+handleAdminError(error) {
+  if (error instanceof AdminApiError) {
+    state.showFeedback(adminUserMessage(error), "error");
+    return;
+  }
+
+  state.showFeedback(adminUserMessage(error), "error");
+},
+handleMediaError(error) {
+  if (error instanceof AdminApiError) {
+    state.mediaError = adminUserMessage(error, { media: true });
+    state.showFeedback(state.mediaError, "error");
+    return;
+  }
+
+  state.mediaError = adminUserMessage(error, { media: true });
+  state.showFeedback(state.mediaError, "error");
+},
+handleMediaEditorError(error) {
+  if (error instanceof AdminApiError) {
+    state.mediaError = adminUserMessage(error, { media: true });
+  } else if (error instanceof CloudinaryMediaEditorUnavailableError) {
+    state.mediaError = "Image editor is unavailable. Select or upload an image instead.";
+  } else {
+    state.mediaError = "Image editor is unavailable. Select or upload an image instead.";
+  }
+
+  state.showFeedback(state.mediaError, "error");
+},
+showFeedback(message, tone = "info") {
+  state.feedbackMessage = message;
+  state.feedbackTone = tone;
+}
+};
+Object.entries(methods).forEach(([name, method]) => { state[name] = method.bind(state); });
+const exposed = { ...toRefs(state), bodyEditor };
+onBeforeRouteLeave((_to, _from, next) => {
+  if (isAdminSignOutNavigation()) return next();
+  if (hasUnsavedChanges.value && !globalThis.confirm?.("Leave the article editor and discard unsaved changes?")) return next(false);
+  next();
+});
+onMounted(async () => {
+  state.bindIdentityCallbacks();
+  const initialSession = await getAdminSession();
+  if (!active) return;
+  state.session = initialSession;
+  state.sessionResolved = true;
+  state.redirectSignedOutVisitor();
+  await state.loadEditor();
+});
+onBeforeUnmount(() => {
+  active = false;
+  editorRequestId += 1;
+  stopIdentityCallbacks();
+});
+const {
+  session, sessionResolved, articleForm, originalFormSnapshot, slugTouched, errors, mediaAssets, mediaDialogOpen, mediaError,
+  mediaEditorConfig, mediaUploadFile, availableTagOptions, filteredTagOptions, tagsLoading, showMediaDiagnostics,
+  bodyEditorMode, bodyEditorModeOptions, articleLocaleOptions, loadedArticle, statusMessage, feedbackMessage, feedbackTone,
+  dashboardError, loadingAction, editorLoading, bindIdentityCallbacks, redirectSignedOutVisitor, snapshotForm, loadEditor,
+  applyResolvedSession, applyCurrentAuthorProfile, normalizeTagOptions, loadContentfulTags, filterTagOptions,
+  createNewContentfulTag, leaveEditor, updateArticleTitle, markSlugTouched, validateArticleForm, saveDraft, submitReview,
+  requestUnpublication, ownerUnpublish, openMediaLibrary, applySelectedMedia, applyEditedMedia, loadMediaEditorConfig,
+  editThumbnailImage, clearThumbnail, syncArticleTags, removeTagFromArticleForm, insertMarkdown, handleMediaFile,
+  readFileAsDataUrl, handleAdminError, handleMediaError, handleMediaEditorError, showFeedback,
+} = exposed;
 </script>
 
 <style lang="scss" scoped>

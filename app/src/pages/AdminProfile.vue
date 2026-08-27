@@ -128,10 +128,11 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { getAuthorProfile, updateAuthorProfile, adminUserMessage } from "../utils/adminApi.js";
-import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession } from "../utils/adminAuth.js";
+import { adminAccountInitials, adminSessionDisplay, bindIdentityCallbacks, getAdminSession, isWriterSession } from "../utils/adminAuth.js";
 import {
   authorProfileToForm,
   buildAuthorProfilePayload,
@@ -149,215 +150,166 @@ import {
 } from "../utils/authorPhotos.js";
 import { marked } from "marked";
 
-export default defineComponent({
-  name: "AdminProfilePage",
-  data() {
-    return {
-      session: null,
-      sessionResolved: false,
-      profileForm: createEmptyAuthorProfileForm(),
-      profilePhotoIndex: 0,
-      errors: {},
-      profileError: "",
-      feedbackMessage: "",
-      feedbackTone: "info",
-      loadingAction: "",
-      bioEditorMode: "editor",
-      bioEditorModeOptions: [
+const router = useRouter();
+let active = true;
+let profileRequestId = 0;
+let stopIdentityCallbacks = () => {};
+const session = ref(null);
+const sessionResolved = ref(false);
+const profileForm = ref(createEmptyAuthorProfileForm());
+const profilePhotoIndex = ref(0);
+const errors = ref({});
+const profileError = ref("");
+const feedbackMessage = ref("");
+const feedbackTone = ref("info");
+const loadingAction = ref("");
+const bioEditorMode = ref("editor");
+const bioEditorModeOptions = [
         { label: "Editor", value: "editor" },
         { label: "Preview", value: "preview" },
-      ],
-    };
-  },
-  computed: {
-    canWrite() {
-      return isWriterSession(this.session);
-    },
-    showProfileSurface() {
-      return this.sessionResolved;
-    },
-    sessionDisplay() {
-      return adminSessionDisplay(this.session);
-    },
-    profileInitials() {
-      return adminAccountInitials({ name: this.profileForm.name || this.sessionDisplay.name, roles: this.session?.roles || [] });
-    },
-    profilePhotoCandidates() {
-      return authorPhotoCandidates(this.profilePhotoSettings);
-    },
-    profilePhotoSettings() {
-      return {
+];
+const canWrite = computed(() => isWriterSession(session.value));
+const showProfileSurface = computed(() => sessionResolved.value);
+const sessionDisplay = computed(() => adminSessionDisplay(session.value));
+const profileInitials = computed(() => adminAccountInitials({ name: profileForm.value.name || sessionDisplay.value.name, roles: session.value?.roles || [] }));
+const profilePhotoSettings = computed(() => ({
         photo: {
-          gravatar_profile: this.profileForm.gravatarProfile,
-          gravatar_hash: this.profileForm.gravatarHash,
-          fallback_url: this.profileForm.fallbackPhotoUrl,
-          secure_url: this.profileForm.photoUrl,
+          gravatar_profile: profileForm.value.gravatarProfile,
+          gravatar_hash: profileForm.value.gravatarHash,
+          fallback_url: profileForm.value.fallbackPhotoUrl,
+          secure_url: profileForm.value.photoUrl,
         },
-      };
-    },
-    profilePhotoUrl() {
-      return this.profilePhotoCandidates[this.profilePhotoIndex] || "";
-    },
-    profilePhotoSource() {
-      return authorPhotoSource(this.profilePhotoSettings, this.profilePhotoIndex);
-    },
-    profilePhotoActionLabel() {
-      return authorPhotoResetActionLabel(this.profilePhotoSource.kind, this.profilePhotoCandidates.length);
-    },
-    feedbackClass() {
-      return {
-        "feedback-success": this.feedbackTone === "success",
-        "feedback-error": this.feedbackTone === "error",
-        "feedback-info": this.feedbackTone === "info",
-      };
-    },
-    biographyPreview() {
-      return marked.parse(this.profileForm.biography || "");
-    },
-  },
-  watch: {
-    "profileForm.gravatarProfile"() {
-      this.profilePhotoIndex = 0;
-    },
-    "profileForm.fallbackPhotoUrl"() {
-      this.profilePhotoIndex = 0;
-    },
-  },
-  async mounted() {
-    this.bindIdentityCallbacks();
-    this.session = await getAdminSession();
-    this.sessionResolved = true;
-    this.redirectSignedOutVisitor();
-    this.loadAuthorProfile();
-  },
-  methods: {
-    bindIdentityCallbacks() {
-      const identity = globalThis.netlifyIdentity;
+      }));
+const profilePhotoCandidates = computed(() => authorPhotoCandidates(profilePhotoSettings.value));
+const profilePhotoUrl = computed(() => profilePhotoCandidates.value[profilePhotoIndex.value] || "");
+const profilePhotoSource = computed(() => authorPhotoSource(profilePhotoSettings.value, profilePhotoIndex.value));
+const profilePhotoActionLabel = computed(() => authorPhotoResetActionLabel(profilePhotoSource.value.kind, profilePhotoCandidates.value.length));
+const feedbackClass = computed(() => ({
+        "feedback-success": feedbackTone.value === "success",
+        "feedback-error": feedbackTone.value === "error",
+        "feedback-info": feedbackTone.value === "info",
+      }));
+const biographyPreview = computed(() => marked.parse(profileForm.value.biography || ""));
+watch(() => profileForm.value.gravatarProfile, () => { profilePhotoIndex.value = 0; });
+watch(() => profileForm.value.fallbackPhotoUrl, () => { profilePhotoIndex.value = 0; });
 
-      if (typeof identity?.on !== "function") {
+const registerIdentityCallbacks = () => {
+  const identity = globalThis.netlifyIdentity;
+  stopIdentityCallbacks = bindIdentityCallbacks({
+    identity,
+    onLogin: async () => {
+      identity?.close?.();
+      const sessionAfterLogin = await getAdminSession();
+      if (!active) return;
+      session.value = sessionAfterLogin;
+      await loadAuthorProfile();
+    },
+  });
+};
+const redirectSignedOutVisitor = () => {
+      if (!session.value) {
+        router.replace("/");
+      }
+};
+const applyResolvedSession = (resolvedSession = {}) => {
+  if (resolvedSession.authorEntryId) session.value = { ...session.value, authorEntryId: resolvedSession.authorEntryId };
+};
+const loadAuthorProfile = async () => {
+      const currentRequestId = ++profileRequestId;
+      if (!canWrite.value) {
         return;
       }
 
-      identity.on("login", async () => {
-        if (typeof identity.close === "function") {
-          identity.close();
-        }
-
-        this.session = await getAdminSession();
-        this.loadAuthorProfile();
-      });
-    },
-    redirectSignedOutVisitor() {
-      if (!this.session) {
-        this.$router.replace("/");
-      }
-    },
-    async loadAuthorProfile() {
-      if (!this.canWrite) {
-        return;
-      }
-
-      this.profileError = "";
-      this.loadingAction = "profile-load";
+      profileError.value = "";
+      loadingAction.value = "profile-load";
 
       try {
-        const response = await getAuthorProfile({ session: this.session });
-        this.applyResolvedSession(response.session);
-        this.profileForm = authorProfileToForm(response.profile);
-        this.profilePhotoIndex = 0;
+        const response = await getAuthorProfile({ session: session.value });
+        if (!active || currentRequestId !== profileRequestId) return;
+        applyResolvedSession(response.session);
+        profileForm.value = authorProfileToForm(response.profile);
+        profilePhotoIndex.value = 0;
       } catch (error) {
-        this.profileForm = createEmptyAuthorProfileForm();
-        this.profileError = adminUserMessage(error);
+        if (!active || currentRequestId !== profileRequestId) return;
+        profileForm.value = createEmptyAuthorProfileForm();
+        profileError.value = adminUserMessage(error);
       } finally {
-        this.loadingAction = "";
+        if (active && currentRequestId === profileRequestId) loadingAction.value = "";
       }
-    },
-    applyResolvedSession(session = {}) {
-      if (!session.authorEntryId) {
+};
+const validateProfileForm = () => {
+      const validationErrors = {};
+
+      if (!profileForm.value.name.trim()) {
+        validationErrors.name = "Name is required";
+      }
+
+      if (profileForm.value.slug && !/^[a-z]+(?:-[a-z]+)*$/.test(profileForm.value.slug)) {
+        validationErrors.slug = "Use letters and hyphens only";
+      }
+
+      if (!profileForm.value.slug && profileForm.value.name) {
+        profileForm.value.slug = slugFromTitle(profileForm.value.name);
+      }
+
+      if (profileForm.value.gravatarProfile && !normalizeGravatarProfileInput(profileForm.value.gravatarProfile)) {
+        validationErrors.gravatarProfile = "Use a public Gravatar profile slug or URL";
+      }
+
+      if (!isAllowedFallbackPhotoUrl(profileForm.value.fallbackPhotoUrl)) {
+        validationErrors.fallbackPhotoUrl = "Use an approved HTTPS image URL";
+      }
+
+      errors.value = validationErrors;
+      return Object.keys(validationErrors).length === 0;
+};
+const showFeedback = (message, tone = "info") => { feedbackMessage.value = message; feedbackTone.value = tone; };
+const saveProfile = async () => {
+      if (!validateProfileForm()) {
+        showFeedback("Fix the highlighted fields before saving.", "error");
         return;
       }
 
-      this.session = {
-        ...this.session,
-        authorEntryId: session.authorEntryId,
-      };
-    },
-    validateProfileForm() {
-      const errors = {};
-
-      if (!this.profileForm.name.trim()) {
-        errors.name = "Name is required";
-      }
-
-      if (this.profileForm.slug && !/^[a-z]+(?:-[a-z]+)*$/.test(this.profileForm.slug)) {
-        errors.slug = "Use letters and hyphens only";
-      }
-
-      if (!this.profileForm.slug && this.profileForm.name) {
-        this.profileForm.slug = slugFromTitle(this.profileForm.name);
-      }
-
-      if (this.profileForm.gravatarProfile && !normalizeGravatarProfileInput(this.profileForm.gravatarProfile)) {
-        errors.gravatarProfile = "Use a public Gravatar profile slug or URL";
-      }
-
-      if (!isAllowedFallbackPhotoUrl(this.profileForm.fallbackPhotoUrl)) {
-        errors.fallbackPhotoUrl = "Use an approved HTTPS image URL";
-      }
-
-      this.errors = errors;
-      return Object.keys(errors).length === 0;
-    },
-    async saveProfile() {
-      if (!this.validateProfileForm()) {
-        this.showFeedback("Fix the highlighted fields before saving.", "error");
-        return;
-      }
-
-      this.loadingAction = "profile-save";
+      loadingAction.value = "profile-save";
 
       try {
         const response = await updateAuthorProfile({
-          profile: buildAuthorProfilePayload(this.profileForm),
-          session: this.session,
+          profile: buildAuthorProfilePayload(profileForm.value),
+          session: session.value,
         });
-        this.profileForm.version = response.sys?.version || this.profileForm.version;
-        await this.loadAuthorProfile();
-        this.showFeedback("Author profile saved.", "success");
+        profileForm.value.version = response.sys?.version || profileForm.value.version;
+        await loadAuthorProfile();
+        showFeedback("Author profile saved.", "success");
       } catch (error) {
-        this.showFeedback(adminUserMessage(error), "error");
+        showFeedback(adminUserMessage(error), "error");
       } finally {
-        this.loadingAction = "";
+        loadingAction.value = "";
       }
-    },
-    insertBiographyMarkdown(before, after = "", placeholder = "text") {
-      const value = String(this.profileForm.biography || "");
+};
+const insertBiographyMarkdown = (before, after = "", placeholder = "text") => {
+      const value = String(profileForm.value.biography || "");
       const insertion = `${before}${placeholder}${after}`;
-      this.profileForm.biography = value ? `${value}${value.endsWith("\n") ? "" : "\n"}${insertion}` : insertion;
-    },
-    advanceProfilePhoto() {
-      this.profilePhotoIndex = nextAuthorPhotoIndex(this.profilePhotoCandidates, this.profilePhotoIndex);
-    },
-    markPhotoSettingsChanged() {
-      this.profileForm.photoSettingsChanged = true;
-      this.profilePhotoIndex = 0;
-    },
-    updateGravatarProfile(value) {
-      this.profileForm = updateAuthorGravatarDraft(this.profileForm, value);
-      this.profilePhotoIndex = 0;
-    },
-    useProfileInitials() {
-      this.profileForm.gravatarProfile = "";
-      this.profileForm.gravatarHash = "";
-      this.profileForm.fallbackPhotoUrl = "";
-      this.profileForm.photoUrl = "";
-      this.markPhotoSettingsChanged();
-    },
-    showFeedback(message, tone = "info") {
-      this.feedbackMessage = message;
-      this.feedbackTone = tone;
-    },
-  },
+      profileForm.value.biography = value ? `${value}${value.endsWith("\n") ? "" : "\n"}${insertion}` : insertion;
+};
+const advanceProfilePhoto = () => { profilePhotoIndex.value = nextAuthorPhotoIndex(profilePhotoCandidates.value, profilePhotoIndex.value); };
+const markPhotoSettingsChanged = () => { profileForm.value.photoSettingsChanged = true; profilePhotoIndex.value = 0; };
+const updateGravatarProfile = (value) => { profileForm.value = updateAuthorGravatarDraft(profileForm.value, value); profilePhotoIndex.value = 0; };
+const useProfileInitials = () => {
+  profileForm.value.gravatarProfile = ""; profileForm.value.gravatarHash = ""; profileForm.value.fallbackPhotoUrl = ""; profileForm.value.photoUrl = ""; markPhotoSettingsChanged();
+};
+onMounted(async () => {
+  registerIdentityCallbacks();
+  const initialSession = await getAdminSession();
+  if (!active) return;
+  session.value = initialSession;
+  sessionResolved.value = true;
+  redirectSignedOutVisitor();
+  loadAuthorProfile();
+});
+onBeforeUnmount(() => {
+  active = false;
+  profileRequestId += 1;
+  stopIdentityCallbacks();
 });
 </script>
 

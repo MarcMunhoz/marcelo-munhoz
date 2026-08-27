@@ -99,116 +99,98 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
+<script setup>
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { AdminApiError, adminUserMessage, createContentfulTag, deleteContentfulTag, listManagedContentfulTags } from "../utils/adminApi.js";
 import { getAdminSession, isOwnerSession } from "../utils/adminAuth.js";
 import { canDeleteManagedTag, normalizeEditorialTagOptions } from "../utils/adminTags.js";
 
-export default defineComponent({
-  name: "AdminTagsPage",
-  data() {
-    return {
-      session: null,
-      sessionResolved: false,
-      tags: [],
-      newTagName: "",
-      feedbackMessage: "",
-      feedbackTone: "info",
-      tagDeleteDialogOpen: false,
-      tagPendingDeletion: null,
-      tagDeletionPending: false,
-      loadingAction: "",
-      columns: [
+const session = ref(null);
+const sessionResolved = ref(false);
+const tags = ref([]);
+const newTagName = ref("");
+const feedbackMessage = ref("");
+const feedbackTone = ref("info");
+const tagDeleteDialogOpen = ref(false);
+const tagPendingDeletion = ref(null);
+const tagDeletionPending = ref(false);
+const loadingAction = ref("");
+const router = useRouter();
+const columns = [
         { name: "label", label: "Tag name", field: "label", align: "left", sortable: true },
         { name: "id", label: "Tag ID", field: "id", align: "left", sortable: true },
         { name: "visibility", label: "Visibility", field: "visibility", align: "center", sortable: true },
         { name: "articleCount", label: "Articles", field: "articleCount", align: "center", sortable: true },
         { name: "actions", label: "Actions", field: "actions", align: "right" },
-      ],
-    };
-  },
-  computed: {
-    isOwner() {
-      return isOwnerSession(this.session);
-    },
-  },
-  async mounted() {
-    this.session = await getAdminSession();
-    this.sessionResolved = true;
+];
+const isOwner = computed(() => isOwnerSession(session.value));
 
-    if (!this.isOwner) {
-      await this.$router.replace(this.session ? "/admin" : "/");
+const showError = (error) => {
+  feedbackMessage.value = error instanceof AdminApiError && error.message ? error.message : adminUserMessage(error);
+  feedbackTone.value = "error";
+};
+const loadTags = async () => {
+  loadingAction.value = "list";
+  try {
+    const response = await listManagedContentfulTags({ session: session.value });
+    tags.value = normalizeEditorialTagOptions(response.tags);
+  } catch (error) {
+    tags.value = [];
+    showError(error);
+  } finally {
+    loadingAction.value = "";
+  }
+};
+const createTag = async () => {
+  const name = newTagName.value.trim();
+  if (!name) return;
+  loadingAction.value = "create";
+  try {
+    await createContentfulTag({ name, session: session.value });
+    newTagName.value = "";
+    await loadTags();
+    feedbackMessage.value = "Tag created.";
+    feedbackTone.value = "success";
+  } catch (error) {
+    showError(error);
+  } finally {
+    loadingAction.value = "";
+  }
+};
+const openTagDeleteConfirmation = (tag) => {
+  if (!canDeleteManagedTag(tag)) return;
+  tagPendingDeletion.value = tag;
+  tagDeleteDialogOpen.value = true;
+};
+const resetTagDeleteConfirmation = () => { tagPendingDeletion.value = null; };
+const confirmPermanentTagDeletion = async () => {
+  const tag = tagPendingDeletion.value;
+  if (!tag || tagDeletionPending.value) return;
+  tagDeletionPending.value = true;
+  loadingAction.value = `delete-${tag.id}`;
+  try {
+    await deleteContentfulTag({ tagId: tag.id, session: session.value });
+    tagDeleteDialogOpen.value = false;
+    await loadTags();
+  } catch (error) {
+    showError(error);
+  } finally {
+    tagDeletionPending.value = false;
+    loadingAction.value = "";
+  }
+};
+
+onMounted(async () => {
+  session.value = await getAdminSession();
+  sessionResolved.value = true;
+
+  if (!isOwner.value) {
+    await router.replace(session.value ? "/admin" : "/");
       return;
-    }
+  }
 
-    await this.loadTags();
-  },
-  methods: {
-    canDeleteManagedTag,
-    async loadTags() {
-      this.loadingAction = "list";
-
-      try {
-        const response = await listManagedContentfulTags({ session: this.session });
-        this.tags = normalizeEditorialTagOptions(response.tags);
-      } catch (error) {
-        this.tags = [];
-        this.showError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    async createTag() {
-      const name = this.newTagName.trim();
-      if (!name) return;
-
-      this.loadingAction = "create";
-      try {
-        await createContentfulTag({ name, session: this.session });
-        this.newTagName = "";
-        await this.loadTags();
-        this.feedbackMessage = "Tag created.";
-        this.feedbackTone = "success";
-      } catch (error) {
-        this.showError(error);
-      } finally {
-        this.loadingAction = "";
-      }
-    },
-    openTagDeleteConfirmation(tag) {
-      if (!canDeleteManagedTag(tag)) return;
-
-      this.tagPendingDeletion = tag;
-      this.tagDeleteDialogOpen = true;
-    },
-    resetTagDeleteConfirmation() {
-      this.tagPendingDeletion = null;
-    },
-    async confirmPermanentTagDeletion() {
-      const tag = this.tagPendingDeletion;
-
-      if (!tag) return;
-      if (this.tagDeletionPending) return;
-
-      this.tagDeletionPending = true;
-      try {
-        this.loadingAction = `delete-${tag.id}`;
-        await deleteContentfulTag({ tagId: tag.id, session: this.session });
-        this.tagDeleteDialogOpen = false;
-        await this.loadTags();
-      } catch (error) {
-        this.showError(error);
-      } finally {
-        this.tagDeletionPending = false;
-        this.loadingAction = "";
-      }
-    },
-    showError(error) {
-      this.feedbackMessage = error instanceof AdminApiError && error.message ? error.message : adminUserMessage(error);
-      this.feedbackTone = "error";
-    },
-  },
+  await loadTags();
 });
 </script>
 
