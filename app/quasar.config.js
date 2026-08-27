@@ -53,7 +53,7 @@ export default defineConfig(function (ctx) {
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#build
     build: {
       target: {
-        browser: ["es2019", "edge88", "firefox78", "chrome87", "safari13.1"],
+        browser: ["es2022", "edge111", "firefox128", "chrome111", "safari16.4"],
         node: "node22",
       },
 
