@@ -81,6 +81,7 @@ Initial RED verification intentionally targets only wave 1. Later arrays are alr
 - Replaced the v3 `@tailwind` directives with `@import "tailwindcss" important` to preserve the project's existing global utility precedence. Removed the empty legacy JavaScript configuration because v4 discovers application sources automatically and the only non-default setting moved into CSS.
 - The production build generates standard, arbitrary-value, and responsive utilities used by representative public pages, including the article width and embedded-video aspect ratio rules. Public and administrative templates and component styles were not otherwise changed by this group.
 - Compatibility impact: browsers older than the accepted minimum are no longer supported. Route smoke checks pass, but representative public/admin desktop and mobile visual inspection remains pending because generated utility presence does not detect every Preflight or layout change.
+- Mobile staging inspection found the home hero's `72vw` height produced an overly narrow crop. The compact breakpoint now uses a panoramic `clamp(160px, 43.75vw, 240px)` height while preserving `object-fit: cover` and the centered focal point; final visual confirmation remains pending.
 
 ## Final Validation And Review
 

@@ -51,7 +51,7 @@ describe("public responsive layout", () => {
     assert.match(home, /class="home-facts"/);
     assert.match(home, /yearCount\("2004-06-04"\)/);
     assert.match(home, /@media \(max-width:\s*700px\)/);
-    assert.match(home, /\.home-hero\s*\{[^}]*height:\s*72vw;[^}]*max-height:\s*390px;/);
+    assert.match(home, /\.home-hero\s*\{[^}]*height:\s*clamp\(160px,\s*43\.75vw,\s*240px\);/);
     assert.match(home, /\.knowledge-list\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
     assert.match(about, /about-introduction/);
     assert.match(about, /@media \(max-width:\s*700px\)/);

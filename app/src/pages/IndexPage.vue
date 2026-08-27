@@ -120,7 +120,7 @@ const yearCount = (initialDate) => {
 .project-copy { display: flex; flex: 1; flex-direction: column; gap: 0.25rem; min-width: 0; }
 .project-copy small { color: #52758a; line-height: 1.3; }
 @media (max-width: 700px) {
-  .home-hero { height: 72vw; max-height: 390px; }
+  .home-hero { height: clamp(160px, 43.75vw, 240px); }
   .home-intro, .home-section { padding: 2.75rem 1.25rem; }
   .home-intro h1 { font-size: clamp(2.75rem, 14vw, 5rem); }
   .home-lede, .home-note { font-size: 1.2rem; }
