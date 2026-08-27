@@ -1,9 +1,9 @@
 ## 1. Security Baseline And Threat Model
 
-- [ ] 1.1 Inventory public and administrative components, protected assets, identities, privileged operations, third-party services, data flows, and trust boundaries without reading prohibited environment or credential files.
-- [ ] 1.2 Define or update `SECURITY.md` with the review scope, required security properties, safe testing rules, disclosure boundaries, and explicit exclusions.
-- [ ] 1.3 Persist a sanitized repository threat model covering attacker capabilities, abuse cases, server-side authorization boundaries, and deployment assumptions.
-- [ ] 1.4 Capture the current container-based dependency audit, lint, test, build, and runtime-smoke baseline without installing or changing dependencies unless separately authorized.
+- [x] 1.1 Inventory public and administrative components, protected assets, identities, privileged operations, third-party services, data flows, and trust boundaries without reading prohibited environment or credential files.
+- [x] 1.2 Define or update `SECURITY.md` with the review scope, required security properties, safe testing rules, disclosure boundaries, and explicit exclusions.
+- [x] 1.3 Persist a sanitized repository threat model covering attacker capabilities, abuse cases, server-side authorization boundaries, and deployment assumptions.
+- [x] 1.4 Capture the current container-based dependency audit, lint, test, build, and runtime-smoke baseline without installing or changing dependencies unless separately authorized.
 
 ## 2. Deep Repository Security Scan
 
