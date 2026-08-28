@@ -126,9 +126,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { Marked } from "marked";
-import { mangle } from "marked-mangle";
-import { gfmHeadingId } from "marked-gfm-heading-id";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { useMeta } from "quasar";
 import { buildApiUrl } from "../utils/apiBase.js";
@@ -144,7 +141,6 @@ import {
 } from "../utils/blogArchive.js";
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
-const articleMarkdown = new Marked(mangle(), gfmHeadingId({ prefix: "marked-" }));
 const route = useRoute();
 const article = ref({});
 const articleImg = ref("");
@@ -293,22 +289,14 @@ const loadArticle = async (slug = route.params.slug) => {
     articleAuthorSlug.value = author.slug;
     articleImg.value = articleHeroImageUrl(loadedArticle.fields);
 
-    const parsedArticleBody = articleMarkdown.parse(loadedArticle.fields.body);
-    const linkToIframe = parsedArticleBody.replace(
-      /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:youtube\.com|youtu\.be|vimeo\.com).*?)\1[^>]*>(.*?)<\/a>/gi,
-      `<div id="video-container" class="relative pb-[56.25%] h-0">
-        <iframe src="$2" allowfullscreen class="absolute top-0 left-0 h-full w-full"></iframe>
-      </div>`
-    );
-
-    document.querySelector(".rendered-text").innerHTML = linkToIframe;
+    document.querySelector(".rendered-text").textContent = loadedArticle.fields.body || "";
 
     const hashtags = loadedArticle.metadata?.tags || [];
     articleTags.value = hashtags.map((tag) => tag.sys.id).filter((tag) => !isArticleLanguageTag(tag));
 
     const headerArticleName = document.querySelector(".header-title");
     if (headerArticleName) {
-      headerArticleName.innerHTML = article.value.title;
+      headerArticleName.textContent = article.value.title || "";
     }
 
     document.title = `Marcelo Munhoz - ${article.value.title}`;
