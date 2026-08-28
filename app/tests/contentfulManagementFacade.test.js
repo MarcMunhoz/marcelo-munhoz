@@ -378,6 +378,47 @@ describe("contentful management facade", () => {
     assert.equal(new URL(calls[1].url).pathname, "/spaces/space-id/environments/staging/entries/article-1");
   });
 
+  it("replaces security-sensitive fields in alternate article payloads", async () => {
+    const calls = [];
+    const facade = createContentfulManagementFacade({
+      env: createEnv(),
+      async fetchImpl(url, options) {
+        calls.push({ url: url.toString(), options });
+
+        if (options.method === "GET") {
+          return createResponse(200, {
+            sys: { id: "article-1", version: 7 },
+            fields: {
+              author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+            },
+          });
+        }
+
+        return createResponse(200, { sys: { id: "article-1", version: 8 } });
+      },
+    });
+
+    await facade.updateArticleDraft({
+      articleId: "article-1",
+      data: {
+        version: 7,
+        fields: {
+          title: { "en-US": "Updated title" },
+          author: { "en-US": { sys: { type: "Link", linkType: "Entry", id: "other-author" } } },
+          writerSubject: { "en-US": "other-writer" },
+        },
+      },
+      session: { subject: "writer-1", authorEntryId: "author-1" },
+    });
+
+    const body = JSON.parse(calls[1].options.body);
+    assert.deepEqual(body.fields.author["en-US"], {
+      sys: { type: "Link", linkType: "Entry", id: "author-1" },
+    });
+    assert.equal(body.fields.writerSubject, undefined);
+    assert.equal(body.fields.title["en-US"], "Updated title");
+  });
+
   it("writes article fields to the configured locale and the Contentful default locale", async () => {
     const calls = [];
     const facade = createContentfulManagementFacade({

@@ -489,6 +489,22 @@ describe("contentful admin handler", () => {
     assert.equal(operationRan, false);
   });
 
+  it("returns a stable client error for malformed encoded article paths", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession: () => createSession(["writer"]),
+      operations: {
+        updateArticleDraft: async () => {
+          throw new Error("operation should not run");
+        },
+      },
+    });
+
+    const response = await handler({ method: "PUT", path: "/articles/%E0%A4%A", body: "{}" });
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(parse(response), { error: "Invalid path encoding" });
+  });
+
   it("allows writer sessions to reach writer article draft routes", async () => {
     const handler = createContentfulAdminHandler({
       getSession() {

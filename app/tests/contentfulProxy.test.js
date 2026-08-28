@@ -78,6 +78,23 @@ describe("contentful proxy handler", () => {
     ]);
   });
 
+  it("bounds page values on legacy article routes", async () => {
+    const calls = [];
+    const handler = createContentfulHandler({
+      client: createClient({
+        async getEntries(query) {
+          calls.push(query);
+          return { items: [], total: 0 };
+        },
+      }),
+    });
+
+    const response = await handler({ path: "/entries", query: { page: "9999999999999999" } });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(calls[0].skip, 0);
+  });
+
   it("caps blog-index search and omits invalid allowlisted values", async () => {
     const calls = [];
     const handler = createContentfulHandler({
