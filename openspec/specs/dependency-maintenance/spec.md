@@ -59,8 +59,8 @@ The implementation MUST verify the application can start in the container contex
 - **WHEN** the updated application fails to start because of a dependency change
 - **THEN** the implementation fixes the compatibility issue or documents the unresolved blocker before completion
 
-### Requirement: Dependabot alerts are reconciled with local audit output
-Each dependency remediation pass MUST track open GitHub Dependabot security alerts and reconcile them with the containerized local audit result before completion.
+### Requirement: Each Maintenance Pass Produces Reconciled Security Evidence
+Each dependency maintenance pass MUST record the current npm audit result and open GitHub Dependabot alerts, reconcile alert-level and package-level findings, map remediated advisories to package changes and validation evidence, and document any alert that remains unresolved.
 
 #### Scenario: Dependabot and npm audit use different counts
 - **WHEN** Dependabot reports open alerts and `npm audit` groups the same dependency state into a different number of vulnerable packages

@@ -96,3 +96,10 @@ The implementation MUST include deterministic validation for the migrated proxy 
 #### Scenario: Live smoke check is documented
 - **WHEN** a live Contentful or deployed Netlify smoke check is useful
 - **THEN** it is documented as an optional manual validation step rather than a requirement for routine automated tests
+
+### Requirement: Public Legacy Queries Are Bounded
+Legacy public article list and tag routes MUST apply safe-integer, maximum-page, and bounded filter rules before constructing Contentful Delivery queries.
+
+#### Scenario: Legacy route receives an excessive page value
+- **WHEN** a public `/entries` or `/tagged` request contains a page value beyond the approved maximum
+- **THEN** the server clamps or rejects it deterministically before calculating an upstream skip value

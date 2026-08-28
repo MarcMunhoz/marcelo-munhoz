@@ -29,6 +29,13 @@ export default [
     rules: {
       "prefer-promise-reject-errors": "off",
       "no-debugger": process.env.NODE_ENV === "production" ? "error" : "off",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Identifier[name='$q']",
+          message: "Use declarative Quasar components or native browser APIs instead of the $q injection.",
+        },
+      ],
     },
   },
 ];

@@ -2,7 +2,7 @@
 FROM node:22.22-alpine AS base
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
-  version="2.1.6" \
+  version="2.2.0" \
   date_created="2023-0-20" \
   modified="2025-19-05"
 
@@ -18,7 +18,7 @@ COPY ./app .
 
 # Develop stage
 FROM base AS develop
-EXPOSE 4242 3000
+EXPOSE 1991 3000
 CMD [ "npm", "run", "dev" ]
 
 # Production stage
