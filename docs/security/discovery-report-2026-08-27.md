@@ -11,8 +11,30 @@ This document records discovery candidates only. It does not classify any item a
 - Explicit exclusions: `.env`, `.env.*`, credentials, private keys, secret-bearing files, staging, production, remote mutations, and external publication.
 - Evidence in this report uses repository-relative paths and omits environment-specific identifiers and secret values.
 - The Codex Security Deep Scan coordinator could not start its bundled Python helper. The fallback review uses isolated Python static checks plus independent specialist reviews; it does not claim that the unavailable coordinator completed successfully.
-- The helper failure occurred in the current WSL-hosted Codex runtime even though an isolated Python container worked. It is treated as an environment limitation, not repository evidence. A native Suse environment may provide the plugin and Python runtime in the same process context; the Deep Scan SHALL be retried there before relying on the fallback review.
-- At the safe-stop checkpoint, the focused authorization, Function, integration, browser-content, and supply-chain reviews were completed; one independent full-repository review was completed, and two additional independent full-repository passes were intentionally stopped before completion. Tasks remain pending until the required discovery coverage is completed and consolidated.
+- On 2026-08-27, the helper failure occurred in the WSL-hosted Codex runtime even though an isolated Python container worked. It is treated as an environment limitation, not repository evidence.
+- On 2026-08-28, the retry in native openSUSE was blocked before scan execution because the `codex_security_access` connector was not available or connectable under the active plan. This is an external environment or service limitation and provides no evidence about the repository.
+- Codex Security SHALL NOT be retried in the current session. The authorized fallback remains isolated secret-safe Python static checks, independent specialist reviews, and independent complete repository reviews; this report SHALL NOT claim that the Codex Security Deep Scan completed.
+- At the 2026-08-27 safe-stop checkpoint, the focused authorization, Function, integration, browser-content, and supply-chain reviews and one independent full-repository review were complete; two additional independent full-repository passes had been stopped before completion.
+
+## Fallback coverage completion — 2026-08-28
+
+The authorized fallback completed the pending discovery coverage without using Codex Security:
+
+- Two new independent, complete, read-only repository reviews covered all tracked application source, Functions, frontend rendering and navigation, deployment configuration, dependency metadata, tests, scripts, and security documentation. Together with the complete pass retained from 2026-08-27, the fallback now contains three complete independent repository reviews.
+- A separate focused specialist review mapped tasks 2.2 through 2.6 to concrete repository evidence and checked the prior candidate register for coverage gaps.
+- A dependency-free Python static check enumerated tracked files, rejected prohibited filenames before reading, reviewed 180 text files, skipped one prohibited path, and found no secret-signature indicators, dynamic-code sinks, missing lockfile integrity for resolved non-link packages, or unexpected package registry hosts.
+- The static check confirmed the already catalogued DOM HTML sinks, Identity metadata trust points, route decoding points, outbound request surfaces, and Markdown rendering boundaries. Static surface matches are inventory evidence, not validated vulnerabilities.
+- No dependency installation, external access, remote mutation, generated coordinator artifact, or destructive probe occurred.
+
+| Focused task | Completed discovery coverage |
+| --- | --- |
+| 2.2 | Netlify Identity session derivation, role and ownership checks, frontend guards and lifecycle, preview isolation, and the shared fail-closed gate across every administrative route. |
+| 2.3 | Public and administrative routing, parsing, methods, local CORS, production headers, stable errors and logging, upstream deadlines, pagination, and repository-visible abuse limits. |
+| 2.4 | Contentful and Cloudinary hosts, identifiers, payload variants, uploads, media URLs, lifecycle authorization, versions, replay, duplicate workflow requests, and concurrent updates. |
+| 2.5 | CMS and Markdown renderers, direct HTML sinks, image and navigation URL construction, redirects, Identity display data, third-party scripts, and browser policy. |
+| 2.6 | Tracked source, deployment and container configuration, manifests and lockfile, build credential scanner, tests, documentation, diagnostic isolation, and the absence of tracked generated browser bundles. |
+
+The Codex Security Deep Scan remains incomplete because of the recorded external limitations. The fallback establishes completed group 2 discovery coverage only; candidate validation, severity, prioritization, and remediation remain explicitly out of scope until group 3 is authorized.
 
 ## Candidate register
 
@@ -77,6 +99,15 @@ This document records discovery candidates only. It does not classify any item a
 - Plausible impact: persistence of an unapproved remote URL into public or administrative image surfaces.
 - Existing controls: the normal frontend payload uses the constrained path; browser CSP limits image origins.
 - Validation needed: prove the alternate API shape is accepted and trace the persisted value into every browser sink.
+- Taxonomy: CWE-20, CWE-939 (provisional).
+
+### SEC-URL-02 — Article media payloads may bypass the configured media boundary
+
+- Instance: `media-validation:app/netlify/functions/contentfulAdminCore.js:356`
+- Evidence: writer-controlled article payloads may supply `thumbnail` or `cloudinary` metadata that is localized and persisted without an application-owned validation of URL host, account scope, public identifier, type, or length (`app/netlify/functions/contentfulAdminCore.js:356-365`, `app/netlify/functions/contentfulAdminCore.js:444-466`, `app/netlify/functions/contentfulAdminCore.js:1422-1433`, `app/netlify/functions/contentfulAdminCore.js:1535-1560`). Public image helpers later use the stored `public_id`, `secure_url`, or `url` (`app/src/utils/contentfulImages.js:4-17`, `app/src/components/BlogArticle.vue:11`).
+- Plausible impact: persistence of media references outside the configured application library, unsafe or unexpected image navigation, or inconsistent asset ownership.
+- Existing controls: writer authorization, normal UI selection and upload workflows, fixed Cloudinary URL construction for cards, and CSP image-origin restrictions.
+- Validation needed: exercise direct API payload variants and trace each stored media shape through Contentful normalization and browser behavior. Keep this separate from `SEC-URL-01` unless validation proves a shared implementation root cause rather than only a shared invariant.
 - Taxonomy: CWE-20, CWE-939 (provisional).
 
 ### SEC-AVAIL-01 — Outbound requests do not use uniform deadlines
@@ -151,6 +182,7 @@ These items are not promoted to vulnerability candidates without additional depl
 - The built-asset credential scanner omits the Contentful Delivery credential name, so a future browser-bundle leak of that server-side value may evade its current indicators (`app/scripts/scan-built-assets.js:5-24`, `app/netlify/functions/contentfulProxyCore.js:300`). No actual leak was identified.
 - The container build installs unpinned global CLIs and uses `npm install` in the shared production base (`Dockerfile:13-15`); the base image is tag-pinned but not digest-pinned.
 - The local development compose command runs dependency installation on each container start (`docker-compose.yaml:16`).
+- The frontend API base accepts an absolute build-time value, and administrative bearer requests use the resulting URL (`app/src/utils/apiBase.js:14-23`, `app/src/utils/adminApi.js:59-80`). The normal deployment documents a same-origin base, so this remains a build-integrity hardening observation unless a user-controlled or untrusted configuration path is established.
 
 ## Confirmed controls and negative results
 
@@ -163,6 +195,8 @@ These items are not promoted to vulnerability candidates without additional depl
 - No tracked `.env` file, private-key marker, known token pattern, or dependency resolved outside the expected package registries was identified by the secret-safe static checks.
 - The current dependency audit baseline reports zero known vulnerabilities, and the existing build-credential test scans generated browser assets for configured credential names and secret-value indicators.
 
-## Next phase
+## Validation complete — 2026-08-28
 
-The validation group must trace each candidate from source to sink, test counterevidence, reject unsupported claims, group only genuinely shared root causes, and calibrate severity before any remediation is designed or implemented.
+The source-to-sink validation, counterevidence review, severity calibration, and sanitized prioritized register are recorded in `docs/security/validation-report-2026-08-28.md`. Four reportable low/medium-priority groups survived; deferred and suppressed rows retain explicit proof gaps or counterevidence. No candidate met the calibrated critical or high-severity threshold.
+
+Focused delta requirements were added under `openspec/changes/audit-and-harden-application-security/specs/` for server-owned article fields, bounded media uploads, stable malformed-path errors, safe public CMS rendering, and bounded legacy public queries. Remediation may proceed against those contracts.
