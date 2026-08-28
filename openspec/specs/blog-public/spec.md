@@ -201,3 +201,10 @@ The system SHALL expose `GET /api/contentful/blog-years` as an independent, comp
 - **WHEN** Contentful reports more than 1000 matching articles or returns an incomplete or malformed collection
 - **THEN** the endpoint returns a sanitized public error instead of an incomplete year list
 - **AND** it does not expose upstream diagnostics or article data
+
+### Requirement: Public CMS Content Uses Safe Browser Boundaries
+Public article and author content MUST render untrusted CMS Markdown and title data through a sanitization or text-only boundary that excludes executable markup and unsafe navigation.
+
+#### Scenario: Public article contains active HTML in Markdown or title
+- **WHEN** a public response contains CMS-controlled Markdown or title data
+- **THEN** the browser renders only the supported safe content and does not assign the raw value to an executable HTML sink
