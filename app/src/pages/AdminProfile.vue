@@ -53,7 +53,7 @@
                   rows="10"
                   aria-label="Biography"
                 ></textarea>
-                <div v-show="bioEditorMode === 'preview'" class="markdown-editor-preview" v-html="biographyPreview"></div>
+                <pre v-show="bioEditorMode === 'preview'" class="markdown-editor-preview">{{ biographyPreview }}</pre>
               </div>
             </q-card-section>
 
@@ -148,7 +148,6 @@ import {
   nextAuthorPhotoIndex,
   normalizeGravatarProfileInput,
 } from "../utils/authorPhotos.js";
-import { marked } from "marked";
 
 const router = useRouter();
 let active = true;
@@ -189,7 +188,7 @@ const feedbackClass = computed(() => ({
         "feedback-error": feedbackTone.value === "error",
         "feedback-info": feedbackTone.value === "info",
       }));
-const biographyPreview = computed(() => marked.parse(profileForm.value.biography || ""));
+const biographyPreview = computed(() => profileForm.value.biography || "");
 watch(() => profileForm.value.gravatarProfile, () => { profilePhotoIndex.value = 0; });
 watch(() => profileForm.value.fallbackPhotoUrl, () => { profilePhotoIndex.value = 0; });
 

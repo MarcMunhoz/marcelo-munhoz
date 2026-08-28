@@ -81,7 +81,7 @@ Initial RED verification intentionally targets only wave 1. Later arrays are alr
 - Replaced the v3 `@tailwind` directives with `@import "tailwindcss" important` to preserve the project's existing global utility precedence. Removed the empty legacy JavaScript configuration because v4 discovers application sources automatically and the only non-default setting moved into CSS.
 - The production build generates standard, arbitrary-value, and responsive utilities used by representative public pages, including the article width and embedded-video aspect ratio rules. Public and administrative templates and component styles were not otherwise changed by this group.
 - Compatibility impact: browsers older than the accepted minimum are no longer supported. Route smoke checks pass, but representative public/admin desktop and mobile visual inspection remains pending because generated utility presence does not detect every Preflight or layout change.
-- Mobile staging inspection found the home hero's `72vw` height produced an overly narrow crop. The compact breakpoint now uses a panoramic `clamp(160px, 43.75vw, 240px)` height while preserving `object-fit: cover` and the centered focal point; final visual confirmation remains pending.
+- Mobile staging inspection found the home hero's `72vw` height produced an overly narrow crop. The compact breakpoint now uses a panoramic `clamp(160px, 43.75vw, 240px)` height while preserving `object-fit: cover` and the centered focal point; the corrected mobile layout was visually accepted in staging.
 
 ## Final Validation And Review
 
@@ -90,4 +90,4 @@ Initial RED verification intentionally targets only wave 1. Later arrays are alr
 - Independent review found and resolved two Composition regressions: the article editor now dereferences its textarea template ref before reading selection/focus APIs, and administrative Identity callbacks now unsubscribe or become inert on unmount with latest-request guards for asynchronous page loads.
 - Upgraded majors: Quasar CLI/Vite 3, Quasar extras 2, Vue Router 5, ESLint 10, Vue ESLint plugin/parser 10, and Tailwind CSS/PostCSS 4.
 - Deferred majors: none. Reverted majors: none.
-- Remaining acceptance evidence: desktop and mobile visual inspection of representative public/admin pages in staging is still required for Tailwind task 5.3.
+- Representative public/admin desktop and mobile layouts were accepted in staging after correcting the home hero crop.

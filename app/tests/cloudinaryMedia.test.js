@@ -341,6 +341,20 @@ describe("cloudinary media facade", () => {
     });
   });
 
+  it("rejects non-image data before calling Cloudinary", async () => {
+    let calls = 0;
+    const facade = createCloudinaryMediaFacade({
+      env: createEnv(),
+      async fetchImpl() {
+        calls += 1;
+        return createResponse(200, { public_id: "unexpected" });
+      },
+    });
+
+    await assert.rejects(() => facade.uploadMedia({ data: { file: "data:text/plain;base64,QQ==" } }), CloudinaryMediaRequestError);
+    assert.equal(calls, 0);
+  });
+
   it("rejects missing media configuration before calling Cloudinary", async () => {
     let called = false;
     const facade = createCloudinaryMediaFacade({

@@ -29,7 +29,7 @@
 
 - [x] 5.1 Review and decide whether the Tailwind v4 browser baseline is acceptable for this project.
 - [x] 5.2 If accepted, migrate Tailwind/PostCSS integration and configuration using the v4-compatible plugin path.
-- [ ] 5.3 Compare representative public/admin layouts and document any browser-support or styling changes.
+- [x] 5.3 Compare representative public/admin layouts and document any browser-support or styling changes.
 
 ## 6. Final Validation
 

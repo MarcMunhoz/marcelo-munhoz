@@ -1748,13 +1748,15 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /q-btn-dropdown[\s\S]*Headings/);
     assert.match(editor, /q-btn-dropdown[\s\S]*More actions/);
     assert.match(editor, /:disable="bodyEditorMode === 'preview'"/);
-    assert.match(editor, /marked\.parse/);
+    assert.match(editor, /\{\{ articleBodyPreview \}\}/);
+    assert.doesNotMatch(editor, /v-html/);
     assert.doesNotMatch(editor, /label="Body"[\s\S]*type="textarea"/);
 
     assert.match(profile, /markdown-editor/);
     assert.match(profile, /bioEditorMode/);
     assert.match(profile, /insertBiographyMarkdown/);
-    assert.match(profile, /marked\.parse/);
+    assert.match(profile, /\{\{ biographyPreview \}\}/);
+    assert.doesNotMatch(profile, /v-html/);
   });
 
   it("keeps every editor command reachable in responsive Markdown, media, dialog, and workflow controls", () => {

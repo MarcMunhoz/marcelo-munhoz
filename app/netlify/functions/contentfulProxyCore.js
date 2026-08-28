@@ -25,8 +25,9 @@ const normalizePath = (path = "") => {
 const firstQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
 
 const pageFromQuery = (query = {}) => {
-  const page = Number.parseInt(firstQueryValue(query.page), 10);
-  return Number.isFinite(page) && page > 0 ? page : 1;
+  const pageValue = String(firstQueryValue(query.page) ?? "").trim();
+  const page = Number(pageValue);
+  return /^\d+$/.test(pageValue) && Number.isSafeInteger(page) && page > 0 && page <= BLOG_MAX_PAGE ? page : 1;
 };
 
 const skipFromPage = (page) => (page - 1) * ARTICLE_LIMIT;
@@ -572,9 +573,14 @@ export const createContentfulHandler = ({ client, env = process.env, fetchImpl =
     }
 
     if (routePath === "/tagged") {
+      const tag = String(firstQueryValue(query.tag) ?? "").trim();
+
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(tag)) {
+        return jsonResponse(400, { error: "Invalid tag" });
+      }
+
       return runWithClient(async (contentfulClient) => {
         const page = pageFromQuery(query);
-        const tag = firstQueryValue(query.tag);
 
         return contentfulClient.getEntries({
           "metadata.tags.sys.id[all]": tag,

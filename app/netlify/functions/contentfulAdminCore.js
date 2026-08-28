@@ -15,6 +15,8 @@ const GRAVATAR_API_HOST = "https://api.gravatar.com/v3";
 const DEFAULT_CONTENTFUL_ENVIRONMENT = "master";
 const DEFAULT_CONTENTFUL_LOCALE = "en-US";
 const DEFAULT_CLOUDINARY_FOLDER = "marcelo-munhoz-website";
+const MAX_MEDIA_UPLOAD_BYTES = 750 * 1024;
+const MEDIA_UPLOAD_PATTERN = /^data:(image\/(?:jpeg|png|gif|webp|avif));base64,([A-Za-z0-9+/]+={0,2})$/;
 
 const normalizePath = (path = "") => {
   const cleanPath = path.split("?")[0] || "/";
@@ -34,6 +36,17 @@ const parseBody = (body) => {
   }
 
   return JSON.parse(body);
+};
+
+const isBoundedImageDataUri = (value) => {
+  const match = MEDIA_UPLOAD_PATTERN.exec(String(value || ""));
+
+  if (!match) {
+    return false;
+  }
+
+  const bytes = Buffer.from(match[2], "base64");
+  return bytes.length > 0 && bytes.length <= MAX_MEDIA_UPLOAD_BYTES;
 };
 
 const rolesFromUser = (user = {}) => {
@@ -127,6 +140,8 @@ export class ContentfulAdminNotImplementedError extends Error {
     this.publicError = "Admin operation not implemented";
   }
 }
+
+class ContentfulAdminPathEncodingError extends Error {}
 
 export class ContentfulAdminAuthorizationError extends Error {
   constructor(message = "Your account cannot perform this action.") {
@@ -474,10 +489,28 @@ const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
   }
 
   if (data.fields) {
-    return {
-      fields: data.fields,
-      ...(data.metadata ? { metadata: data.metadata } : {}),
+    const rawFields = data.fields;
+    const rawMetadata = data.metadata;
+    const safeData = {
+      ...data,
+      fields: undefined,
+      metadata: undefined,
+      title: firstLocalizedValue(rawFields, "title", locale),
+      slug: firstLocalizedValue(rawFields, "slug", locale),
+      description: firstLocalizedValue(rawFields, "description", locale),
+      body: firstLocalizedValue(rawFields, "body", locale),
+      createAt: firstLocalizedValue(rawFields, "createAt", locale),
+      updatedAt: firstLocalizedValue(rawFields, "updatedAt", locale),
+      locale: data.locale || firstLocalizedValue(rawFields, "locale", locale),
+      alt: firstLocalizedValue(rawFields, "alt", locale),
+      thumbnail: firstLocalizedValue(rawFields, "thumbnail", locale),
+      cloudinary: firstLocalizedValue(rawFields, "cloudinary", locale),
+      tags: Array.isArray(rawMetadata?.tags)
+        ? rawMetadata.tags.map((tag) => tag?.sys?.id).filter(Boolean)
+        : data.tags,
     };
+
+    return articlePayloadFromData(safeData, locale, { request: undefined });
   }
 
   const hasEditorialLocale = Boolean(editorialLocale);
@@ -1143,7 +1176,7 @@ export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = glo
     async uploadMedia({ data = {} } = {}) {
       const config = cloudinaryConfigFromEnv(env, fetchImpl);
 
-      if (!data.file || !String(data.file).startsWith("data:")) {
+      if (!isBoundedImageDataUri(data.file)) {
         throw new CloudinaryMediaRequestError(422);
       }
 
@@ -1731,7 +1764,16 @@ export const createContentfulManagementFacade = ({
   };
 };
 
-const articleIdFromPath = (routePath, suffix = "") => decodeURIComponent(routePath.replace(/^\/articles\//, "").replace(suffix, ""));
+const decodeAdminPathSegment = (value) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new ContentfulAdminPathEncodingError();
+  }
+};
+
+const articleIdFromPath = (routePath, suffix = "") =>
+  decodeAdminPathSegment(routePath.replace(/^\/articles\//, "").replace(suffix, ""));
 
 export const createContentfulAdminHandler = ({
   getSession = () => null,
@@ -1780,6 +1822,7 @@ export const createContentfulAdminHandler = ({
   };
 
   return async ({ method = "GET", path, query = {}, headers = {}, body, context } = {}) => {
+    try {
     const routePath = normalizePath(path);
     const requestMethod = method.toUpperCase();
     const session = await getSession({ method: requestMethod, path: routePath, query, headers, context });
@@ -1843,7 +1886,7 @@ export const createContentfulAdminHandler = ({
         session,
         role: "owner",
         operation: adminOperations.deleteTag,
-        payload: { tagId: decodeURIComponent(routePath.replace(/^\/tags\//, "").replace(/\/delete$/, "")) },
+        payload: { tagId: decodeAdminPathSegment(routePath.replace(/^\/tags\//, "").replace(/\/delete$/, "")) },
       });
     }
 
@@ -1965,6 +2008,13 @@ export const createContentfulAdminHandler = ({
     }
 
     return jsonResponse(404, { error: "Not found" });
+    } catch (error) {
+      if (error instanceof ContentfulAdminPathEncodingError) {
+        return jsonResponse(400, { error: "Invalid path encoding" });
+      }
+
+      throw error;
+    }
   };
 };
 

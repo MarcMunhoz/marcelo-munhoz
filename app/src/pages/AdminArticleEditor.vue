@@ -109,7 +109,7 @@
               rows="14"
               aria-label="Body"
             ></textarea>
-            <div v-show="bodyEditorMode === 'preview'" class="markdown-editor-preview article-markdown-preview" v-html="articleBodyPreview"></div>
+            <pre v-show="bodyEditorMode === 'preview'" class="markdown-editor-preview article-markdown-preview">{{ articleBodyPreview }}</pre>
             <p v-if="errors.body" class="markdown-editor-error">{{ errors.body }}</p>
           </div>
 
@@ -350,7 +350,6 @@ import {
 import { bindIdentityCallbacks as bindAdminIdentityCallbacks, getAdminSession, isAdminSignOutNavigation, isWriterSession } from "../utils/adminAuth.js";
 import { normalizeEditorialTagOptions } from "../utils/adminTags.js";
 import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
-import { marked } from "marked";
 const route = useRoute();
 const router = useRouter();
 const bodyEditor = ref(null);
@@ -377,7 +376,7 @@ const canSubmitArticleForReview = computed(() => canPrepareReviewAction(state.lo
 const canRequestArticleUnpublication = computed(() => canRequestUnpublicationAction(state.loadedArticle, state.session));
 const canOwnerUnpublishArticle = computed(() => canOwnerUnpublishAction(state.loadedArticle, state.session));
 const saveButtonLabel = computed(() => ["published", "changed"].includes(state.loadedArticle?.status) ? "Save" : "Save draft");
-const articleBodyPreview = computed(() => marked.parse(state.articleForm.body || ""));
+const articleBodyPreview = computed(() => state.articleForm.body || "");
 Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel, articleBodyPreview });
 const methods = {
 bindIdentityCallbacks() {
