@@ -6,13 +6,13 @@
 // Configuration for your app
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-js
 
-import { configure } from "quasar/wrappers";
+import { defineConfig } from "#q-app";
 import dotenv from "dotenv";
 import os from "os";
 
 const isWSL = os.release().toLowerCase().includes("microsoft");
 
-export default configure(function (ctx) {
+export default defineConfig(function (ctx) {
   dotenv.config();
 
   return {
@@ -40,7 +40,7 @@ export default configure(function (ctx) {
     extras: [
       // 'ionicons-v4',
       // 'mdi-v5',
-      "fontawesome-v6",
+      "fontawesome-v7",
       // 'eva-icons',
       // 'themify',
       // 'line-awesome',
@@ -53,7 +53,7 @@ export default configure(function (ctx) {
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#build
     build: {
       target: {
-        browser: ["es2019", "edge88", "firefox78", "chrome87", "safari13.1"],
+        browser: ["es2022", "edge111", "firefox128", "chrome111", "safari16.4"],
         node: "node22",
       },
 
@@ -84,8 +84,12 @@ export default configure(function (ctx) {
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-js#devServer
     devServer: {
       // https: true
-      port: 4242,
+      port: 1991,
       proxy: {
+        "/api/admin/contentful": {
+          target: "http://localhost:3000",
+          changeOrigin: true,
+        },
         "/api": {
           target: "http://localhost:3000",
           changeOrigin: true,

@@ -1,0 +1,2025 @@
+import { createHash } from "node:crypto";
+
+const jsonResponse = (statusCode, payload) => ({
+  statusCode,
+  headers: {
+    "content-type": "application/json; charset=utf-8",
+  },
+  body: JSON.stringify(payload),
+});
+
+const CONTENTFUL_MANAGEMENT_HOST = "https://api.contentful.com";
+const CONTENTFUL_MANAGEMENT_CONTENT_TYPE = "application/vnd.contentful.management.v1+json";
+const CLOUDINARY_API_HOST = "https://api.cloudinary.com";
+const GRAVATAR_API_HOST = "https://api.gravatar.com/v3";
+const DEFAULT_CONTENTFUL_ENVIRONMENT = "master";
+const DEFAULT_CONTENTFUL_LOCALE = "en-US";
+const DEFAULT_CLOUDINARY_FOLDER = "marcelo-munhoz-website";
+const MAX_MEDIA_UPLOAD_BYTES = 750 * 1024;
+const MEDIA_UPLOAD_PATTERN = /^data:(image\/(?:jpeg|png|gif|webp|avif));base64,([A-Za-z0-9+/]+={0,2})$/;
+
+const normalizePath = (path = "") => {
+  const cleanPath = path.split("?")[0] || "/";
+  return cleanPath
+    .replace(/^\/api\/admin\/contentful\/?/, "/")
+    .replace(/^\/\.netlify\/functions\/contentful-admin\/?/, "/")
+    .replace(/\/+/g, "/");
+};
+
+const parseBody = (body) => {
+  if (!body) {
+    return {};
+  }
+
+  if (typeof body === "object") {
+    return body;
+  }
+
+  return JSON.parse(body);
+};
+
+const isBoundedImageDataUri = (value) => {
+  const match = MEDIA_UPLOAD_PATTERN.exec(String(value || ""));
+
+  if (!match) {
+    return false;
+  }
+
+  const bytes = Buffer.from(match[2], "base64");
+  return bytes.length > 0 && bytes.length <= MAX_MEDIA_UPLOAD_BYTES;
+};
+
+const rolesFromUser = (user = {}) => {
+  const roles = user.app_metadata?.roles || user.app_metadata?.role || user.user_metadata?.roles || [];
+  return (Array.isArray(roles) ? roles : [roles]).map((role) => String(role || "").trim().toLowerCase()).filter(Boolean);
+};
+
+const authorEntryIdFromUser = (user = {}) =>
+  user.app_metadata?.authorEntryId || user.app_metadata?.author_entry_id || user.user_metadata?.authorEntryId || user.user_metadata?.author_entry_id || "";
+
+export const sessionFromNetlifyUser = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  const authorEntryId = authorEntryIdFromUser(user);
+
+  return {
+    subject: user.sub || user.id,
+    name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Authenticated user",
+    roles: rolesFromUser(user).filter(Boolean),
+    ...(authorEntryId ? { authorEntryId } : {}),
+  };
+};
+
+export const sessionFromNetlifyContext = (event = {}, context = {}) => {
+  const user = context.clientContext?.user || event.clientContext?.user;
+  return sessionFromNetlifyUser(user);
+};
+
+export const hasRole = (session, role) => Boolean(session?.roles?.includes(role));
+
+export const canWriteDrafts = (session) => hasRole(session, "writer") || hasRole(session, "owner");
+
+export const isOwner = (session) => hasRole(session, "owner");
+
+export const devPreviewSessionFromHeaders = (headers = {}, { nodeEnv = process.env.NODE_ENV } = {}) => {
+  if (nodeEnv !== "development") {
+    return null;
+  }
+
+  const role = headers["x-admin-preview-role"] || headers["X-Admin-Preview-Role"];
+
+  if (role !== "writer" && role !== "owner") {
+    return null;
+  }
+
+  return {
+    subject: `local-preview-${role}`,
+    name: `${role === "owner" ? "Owner" : "Writer"} preview`,
+    roles: [role],
+    preview: true,
+  };
+};
+
+export class ContentfulAdminConfigurationError extends Error {
+  constructor() {
+    super("Contentful admin runtime configuration is missing");
+    this.name = "ContentfulAdminConfigurationError";
+    this.statusCode = 500;
+    this.publicError = "Server configuration error";
+  }
+}
+
+export class ContentfulVersionConflictError extends Error {
+  constructor() {
+    super("Contentful version conflict");
+    this.name = "ContentfulVersionConflictError";
+    this.statusCode = 409;
+    this.publicError = "Article changed. Reload before saving.";
+  }
+}
+
+export class ContentfulManagementRequestError extends Error {
+  constructor(statusCode, payload = {}) {
+    super(`Contentful Management API returned ${statusCode}`);
+    this.name = "ContentfulManagementRequestError";
+    this.upstreamStatusCode = statusCode;
+    this.upstreamErrorId = typeof payload?.sys?.id === "string" ? payload.sys.id.slice(0, 80) : undefined;
+    this.upstreamMessage = typeof payload?.message === "string" ? payload.message.slice(0, 240) : undefined;
+    this.statusCode = 500;
+    this.publicError = "Admin request failed";
+  }
+}
+
+export class ContentfulAdminNotImplementedError extends Error {
+  constructor(operation) {
+    super(`Admin operation not implemented: ${operation}`);
+    this.name = "ContentfulAdminNotImplementedError";
+    this.statusCode = 501;
+    this.publicError = "Admin operation not implemented";
+  }
+}
+
+class ContentfulAdminPathEncodingError extends Error {}
+
+export class ContentfulAdminAuthorizationError extends Error {
+  constructor(message = "Your account cannot perform this action.") {
+    super(message);
+    this.name = "ContentfulAdminAuthorizationError";
+    this.statusCode = 403;
+    this.publicError = message;
+  }
+}
+
+export class ContentfulAdminLifecycleError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ContentfulAdminLifecycleError";
+    this.statusCode = 400;
+    this.publicError = message;
+  }
+}
+
+export class ContentfulTagConflictError extends Error {
+  constructor() {
+    super("Remove this tag from all content before deleting it.");
+    this.name = "ContentfulTagConflictError";
+    this.statusCode = 409;
+    this.publicError = "Remove this tag from all content before deleting it.";
+  }
+}
+
+export class ContentfulTagUsageUnavailableError extends Error {
+  constructor() {
+    super("Tag usage could not be verified.");
+    this.name = "ContentfulTagUsageUnavailableError";
+    this.statusCode = 502;
+    this.publicError = "Tag usage could not be verified.";
+  }
+}
+
+export class ContentfulRateLimitError extends Error {
+  constructor() {
+    super("Content service is busy. Try again.");
+    this.name = "ContentfulRateLimitError";
+    this.statusCode = 503;
+    this.publicError = "Content service is busy. Try again.";
+  }
+}
+
+export class ContentfulAuthorProfileResolutionError extends Error {
+  constructor() {
+    super("Author profile could not be resolved for the authenticated user");
+    this.name = "ContentfulAuthorProfileResolutionError";
+    this.statusCode = 404;
+    this.publicError = "Author profile not resolved";
+  }
+}
+
+export class GravatarProfileError extends Error {
+  constructor(message = "Gravatar profile could not be resolved.", statusCode = 400) {
+    super(message);
+    this.name = "GravatarProfileError";
+    this.statusCode = statusCode;
+    this.publicError = message;
+  }
+}
+
+export class CloudinaryMediaConfigurationError extends Error {
+  constructor() {
+    super("Cloudinary media runtime configuration is missing");
+    this.name = "CloudinaryMediaConfigurationError";
+    this.statusCode = 500;
+    this.publicError = "Media configuration error";
+  }
+}
+
+export class CloudinaryMediaRequestError extends Error {
+  constructor(statusCode) {
+    super(`Cloudinary API returned ${statusCode}`);
+    this.name = "CloudinaryMediaRequestError";
+    this.statusCode = 500;
+    this.upstreamStatusCode = statusCode;
+    this.publicError = "Media request failed";
+  }
+}
+
+const logAdminError = (logger, message) => {
+  logger?.error?.(message);
+};
+
+const localErrorDetails = (error, env = {}) => {
+  if (env.NODE_ENV === "production") {
+    return {};
+  }
+
+  if (error?.name === "ContentfulManagementRequestError" && error.upstreamStatusCode) {
+    return {
+      details: {
+        upstream: "contentful",
+        upstreamStatus: error.upstreamStatusCode,
+        ...(error.upstreamErrorId ? { id: error.upstreamErrorId } : {}),
+        ...(error.upstreamMessage ? { message: error.upstreamMessage } : {}),
+      },
+    };
+  }
+
+  return {};
+};
+
+const notImplementedOperation = (operation) => async () => {
+  throw new ContentfulAdminNotImplementedError(operation);
+};
+
+const contentfulLink = (linkType, id) => ({
+  sys: {
+    type: "Link",
+    linkType,
+    id,
+  },
+});
+
+const localized = (value, locale) => (value === undefined ? undefined : { [locale]: value });
+
+const uniqueLocales = (locales = []) => [...new Set(locales.filter(Boolean))];
+
+const replaceLocalizedValues = (values = {}, value, locales) =>
+  Object.fromEntries(uniqueLocales([...Object.keys(values || {}), ...[locales].flat()]).map((key) => [key, value]));
+
+const localizedForLocales = (value, locales = []) =>
+  value === undefined ? undefined : Object.fromEntries(uniqueLocales(locales).map((locale) => [locale, value]));
+
+const definedEntries = (entries) => Object.fromEntries(entries.filter(([, value]) => value !== undefined));
+
+const normalizedTagIds = (tags = []) =>
+  (Array.isArray(tags) ? tags : [])
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+
+const tagsFromIds = (tags = []) => normalizedTagIds(tags).map((id) => contentfulLink("Tag", id));
+
+const isArticleLanguageTag = (tagId = "") => ["article-lang-en-us", "article-lang-pt-br"].includes(tagId);
+
+const TAG_USAGE_LIMIT = 1000;
+
+const completeBoundedItems = (payload = {}, { limit = TAG_USAGE_LIMIT } = {}) => {
+  const total = payload.total;
+  const skip = payload.skip;
+  const items = payload.items;
+
+  if (
+    typeof total !== "number" ||
+    !Number.isInteger(total) ||
+    total < 0 ||
+    total > limit ||
+    typeof skip !== "number" ||
+    !Number.isInteger(skip) ||
+    skip !== 0 ||
+    !Array.isArray(items) ||
+    items.length !== total
+  ) {
+    throw new ContentfulTagUsageUnavailableError();
+  }
+
+  return items;
+};
+
+const boundedUsageTotal = (payload = {}, { limit = 1 } = {}) => {
+  const total = payload.total;
+  const skip = payload.skip;
+  const items = payload.items;
+
+  if (
+    typeof total !== "number" ||
+    !Number.isInteger(total) ||
+    total < 0 ||
+    typeof skip !== "number" ||
+    !Number.isInteger(skip) ||
+    skip !== 0 ||
+    !Array.isArray(items) ||
+    items.length !== Math.min(total, limit)
+  ) {
+    throw new ContentfulTagUsageUnavailableError();
+  }
+
+  return total;
+};
+
+const articleTagCounts = (entries = []) => {
+  const counts = new Map();
+
+  for (const entry of entries) {
+    for (const tagId of allNormalizedTags(entry.metadata)) {
+      counts.set(tagId, (counts.get(tagId) || 0) + 1);
+    }
+  }
+
+  return counts;
+};
+
+const existingTagIds = async ({ request }) => {
+  const payload = await request({ method: "GET", path: "/tags?limit=1000" });
+  return new Set((payload.items || []).map((tag) => tag?.sys?.id).filter(Boolean));
+};
+
+const normalizedContentfulTag = (tag = {}) => ({
+  id: tag?.sys?.id || "",
+  label: tag?.name || tag?.sys?.id || "",
+  visibility: tag?.sys?.visibility || "",
+});
+
+const tagIdFromName = (name = "") =>
+  String(name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const filterExistingTagIds = async ({ tags, request }) => {
+  const ids = normalizedTagIds(tags);
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const existingIds = await existingTagIds({ request });
+  return ids.filter((id) => existingIds.has(id));
+};
+
+const thumbnailFromData = (data = {}) => data.thumbnail || (Array.isArray(data.cloudinary) ? data.cloudinary[0] : undefined);
+
+const cloudinaryMediaFromData = (data = {}) => {
+  if (Array.isArray(data.cloudinary)) {
+    return data.cloudinary;
+  }
+
+  const thumbnail = thumbnailFromData(data);
+  return thumbnail ? [thumbnail] : undefined;
+};
+
+const firstLocalizedValue = (fields = {}, fieldId, locale) => {
+  const value = fields[fieldId];
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, locale)) {
+    return value[locale];
+  }
+
+  return Object.values(value)[0];
+};
+
+const contentfulEnvironmentLocales = async ({ request }) => {
+  const payload = await request({ method: "GET", path: "/locales" });
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return {
+    codes: items.map((locale) => locale?.code).filter(Boolean),
+    defaultCode: items.find((locale) => locale?.default)?.code || "",
+  };
+};
+
+const articleWriteLocales = async ({ locale, request, environmentLocales }) => {
+  if (typeof request !== "function") {
+    return uniqueLocales([locale]);
+  }
+
+  try {
+    const { codes, defaultCode } = environmentLocales || (await contentfulEnvironmentLocales({ request }));
+    const requestedLocales = uniqueLocales([locale, defaultCode]);
+    const availableRequestedLocales = requestedLocales.filter((requestedLocale) => codes.includes(requestedLocale));
+
+    return availableRequestedLocales.length > 0 ? availableRequestedLocales : uniqueLocales([locale]);
+  } catch {
+    return uniqueLocales([locale]);
+  }
+};
+
+const contentTypeFields = async ({ contentTypeId, request, required = false }) => {
+  if (typeof request !== "function") {
+    return null;
+  }
+
+  try {
+    const payload = await request({ method: "GET", path: `/content_types/${encodeURIComponent(contentTypeId)}` });
+    const fields = Array.isArray(payload.fields) ? payload.fields : [];
+
+    return new Map(fields.filter((field) => field?.id).map((field) => [field.id, field]));
+  } catch (error) {
+    if (required) {
+      throw error;
+    }
+
+    return null;
+  }
+};
+
+const optionalContentTypeSupportsField = (fields, fieldId) => Boolean(fields && fields.has(fieldId));
+
+const articleDateTimeValue = (value) => {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return undefined;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return `${text}T12:00:00.000Z`;
+  }
+
+  const date = new Date(text);
+
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
+const articleFieldsFromData = (data = {}, writeLocales, { supportedFields = null, editorialLocaleWriteLocales = writeLocales } = {}) => {
+  const locales = uniqueLocales(writeLocales);
+  const createAt = articleDateTimeValue(data.createAt);
+  const updatedAt = articleDateTimeValue(data.updatedAt);
+  const editorialLocale = ["pt-BR", "en-US"].includes(String(data.locale || "").trim()) ? String(data.locale).trim() : undefined;
+
+  return definedEntries([
+    ["title", localizedForLocales(data.title, locales)],
+    ["slug", localizedForLocales(data.slug, locales)],
+    ["description", localizedForLocales(data.description, locales)],
+    ["body", localizedForLocales(data.body, locales)],
+    ["createAt", localizedForLocales(createAt, locales)],
+    ["updatedAt", updatedAt && optionalContentTypeSupportsField(supportedFields, "updatedAt") ? localizedForLocales(updatedAt, locales) : undefined],
+    [
+      "locale",
+      editorialLocale && optionalContentTypeSupportsField(supportedFields, "locale")
+        ? localizedForLocales(editorialLocale, editorialLocaleWriteLocales)
+        : undefined,
+    ],
+    ["alt", localizedForLocales(data.alt, locales)],
+    ["author", data.author ? localizedForLocales(contentfulLink("Entry", data.author), locales) : undefined],
+    ["cloudinary", localizedForLocales(cloudinaryMediaFromData(data), locales)],
+  ]);
+};
+
+const articlePayloadFromData = async (data = {}, locale, { request } = {}) => {
+  const editorialLocale = String(data.locale || "").trim();
+
+  if (editorialLocale && !["pt-BR", "en-US"].includes(editorialLocale)) {
+    throw new ContentfulAdminConfigurationError();
+  }
+
+  if (data.fields) {
+    const rawFields = data.fields;
+    const rawMetadata = data.metadata;
+    const safeData = {
+      ...data,
+      fields: undefined,
+      metadata: undefined,
+      title: firstLocalizedValue(rawFields, "title", locale),
+      slug: firstLocalizedValue(rawFields, "slug", locale),
+      description: firstLocalizedValue(rawFields, "description", locale),
+      body: firstLocalizedValue(rawFields, "body", locale),
+      createAt: firstLocalizedValue(rawFields, "createAt", locale),
+      updatedAt: firstLocalizedValue(rawFields, "updatedAt", locale),
+      locale: data.locale || firstLocalizedValue(rawFields, "locale", locale),
+      alt: firstLocalizedValue(rawFields, "alt", locale),
+      thumbnail: firstLocalizedValue(rawFields, "thumbnail", locale),
+      cloudinary: firstLocalizedValue(rawFields, "cloudinary", locale),
+      tags: Array.isArray(rawMetadata?.tags)
+        ? rawMetadata.tags.map((tag) => tag?.sys?.id).filter(Boolean)
+        : data.tags,
+    };
+
+    return articlePayloadFromData(safeData, locale, { request: undefined });
+  }
+
+  const hasEditorialLocale = Boolean(editorialLocale);
+  const supportedFields =
+    data.updatedAt || hasEditorialLocale
+      ? await contentTypeFields({ contentTypeId: "article", request, required: hasEditorialLocale })
+      : null;
+
+  if (hasEditorialLocale && !optionalContentTypeSupportsField(supportedFields, "locale")) {
+    throw new ContentfulAdminConfigurationError();
+  }
+  const tagIds =
+    request && Array.isArray(data.tags)
+      ? await filterExistingTagIds({ tags: data.tags, request })
+      : normalizedTagIds(data.tags);
+  let environmentLocales;
+
+  try {
+    environmentLocales = await contentfulEnvironmentLocales({ request });
+  } catch (error) {
+    if (hasEditorialLocale) {
+      throw error;
+    }
+
+    environmentLocales = { codes: [locale], defaultCode: locale };
+  }
+
+  const writeLocales = await articleWriteLocales({ locale, request, environmentLocales });
+  const localeField = supportedFields?.get("locale");
+  const editorialLocaleWriteLocales = localeField?.localized
+    ? environmentLocales.codes
+    : uniqueLocales([environmentLocales.defaultCode || locale]);
+
+  return {
+    fields: articleFieldsFromData(data, writeLocales, { supportedFields, editorialLocaleWriteLocales }),
+    ...(tagIds.length > 0 ? { metadata: { tags: tagsFromIds(tagIds) } } : {}),
+  };
+};
+
+const editorialRequestPayloadFromData = ({ requestType, articleId, articleVersion, session = {}, now, locale }) => ({
+  fields: definedEntries([
+    ["requestType", localized(requestType, locale)],
+    ["status", localized("readyForReview", locale)],
+    ["article", localized(contentfulLink("Entry", articleId), locale)],
+    ["articleVersion", localized(articleVersion, locale)],
+    ["writerSubject", localized(session.subject, locale)],
+    ["writerName", localized(session.name || "Writer", locale)],
+    ["createdAt", localized(now, locale)],
+    ["updatedAt", localized(now, locale)],
+  ]),
+});
+
+const managementTokenFromEnv = (env) => env.CONTENTFUL_MANAGEMENT_KEY || env.CONTENTFUL_MANAGEMENT_TOKEN;
+
+const cloudinaryFolderFromEnv = (env = {}) => env.CLOUDINARY_UPLOAD_FOLDER || env.CLOUDINARY_FOLDER || DEFAULT_CLOUDINARY_FOLDER;
+
+const cloudinaryConfigFromEnv = (env = {}, fetchImpl) => {
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET || typeof fetchImpl !== "function") {
+    throw new CloudinaryMediaConfigurationError();
+  }
+
+  return {
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    apiSecret: env.CLOUDINARY_API_SECRET,
+    folder: cloudinaryFolderFromEnv(env),
+  };
+};
+
+const cloudinaryEditorConfigFromEnv = (env = {}) => {
+  if (!env.CLOUDINARY_CLOUD_NAME) {
+    throw new CloudinaryMediaConfigurationError();
+  }
+
+  return {
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+  };
+};
+
+const managementConfigFromEnv = (env = {}, fetchImpl) => {
+  const token = managementTokenFromEnv(env);
+
+  if (!env.CONTENTFUL_SPACE_ID || !token || typeof fetchImpl !== "function") {
+    throw new ContentfulAdminConfigurationError();
+  }
+
+  return {
+    spaceId: env.CONTENTFUL_SPACE_ID,
+    environmentId: env.CONTENTFUL_ENVIRONMENT_ID || DEFAULT_CONTENTFUL_ENVIRONMENT,
+    locale: env.CONTENTFUL_DEFAULT_LOCALE || DEFAULT_CONTENTFUL_LOCALE,
+    token,
+  };
+};
+
+const requiredVersion = (data = {}) => {
+  const version = data.version;
+
+  if (!Number.isInteger(Number(version)) || Number(version) <= 0) {
+    throw new ContentfulVersionConflictError();
+  }
+
+  return String(version);
+};
+
+const readJson = async (response) => {
+  if (response.status === 204) {
+    return {};
+  }
+
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+};
+
+const safeMaxResults = (value) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : 24;
+};
+
+const basicAuth = (apiKey, apiSecret) => `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`;
+
+const uniqueMediaPrefixes = (...prefixes) => [...new Set(prefixes.map((prefix) => String(prefix || "").trim()).filter(Boolean))];
+
+const signedParams = (params = {}, apiSecret) => {
+  const signatureBase = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  return createHash("sha1").update(`${signatureBase}${apiSecret}`).digest("hex");
+};
+
+const normalizeCloudinaryAsset = (asset = {}) => {
+  const normalized = {
+    public_id: asset.public_id,
+    secure_url: asset.secure_url || asset.url,
+    url: asset.secure_url || asset.url,
+    width: asset.width,
+    height: asset.height,
+    format: asset.format,
+    resource_type: asset.resource_type,
+    type: asset.type,
+    version: asset.version,
+    bytes: asset.bytes,
+    created_at: asset.created_at,
+    display_name: asset.display_name,
+    asset_id: asset.asset_id,
+    asset_folder: asset.asset_folder,
+    folder: asset.folder,
+  };
+
+  ["context", "metadata", "tags"].forEach((key) => {
+    if (asset[key] !== undefined && asset[key] !== null) {
+      normalized[key] = asset[key];
+    }
+  });
+
+  return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== undefined && value !== null && value !== ""));
+};
+
+const allNormalizedTags = (metadata = {}) => (metadata.tags || []).map((tag) => tag?.sys?.id).filter(Boolean);
+
+const normalizedTags = (metadata = {}) => allNormalizedTags(metadata).filter((tagId) => !isArticleLanguageTag(tagId));
+
+const contentTypeIdFromEntry = (entry = {}) => entry.sys?.contentType?.sys?.id || "";
+
+const normalizedEntryStatus = (sys = {}) => {
+  if (sys.archivedVersion) {
+    return "archived";
+  }
+
+  if (sys.publishedVersion) {
+    if (Number(sys.version) > Number(sys.publishedVersion) + 1) {
+      return "changed";
+    }
+
+    return "published";
+  }
+
+  return "draft";
+};
+
+const entryId = (entry = {}) => entry.sys?.id || "";
+
+const contentfulLinkId = (value = {}) => (value?.sys?.type === "Link" && value?.sys?.linkType === "Entry" ? value.sys.id : "");
+
+const entriesById = (entries = []) => new Map(entries.map((entry) => [entryId(entry), entry]).filter(([id]) => id));
+
+const resolvedEntry = (value, entryMap = new Map()) => entryMap.get(contentfulLinkId(value)) || value;
+
+const linkedAuthorIdFromArticle = (entry = {}, locale) => contentfulLinkId(firstLocalizedValue(entry.fields || {}, "author", locale));
+
+const normalizedAuthor = (author, locale) => {
+  const fields = author?.fields || {};
+  const name = firstLocalizedValue(fields, "name", locale);
+
+  return {
+    author: name || author?.sys?.id || "",
+    authorEntryId: author?.sys?.id || "",
+  };
+};
+
+const textFromRichTextNode = (node = {}) => {
+  if (typeof node === "string") {
+    return node;
+  }
+
+  const ownValue = typeof node.value === "string" ? node.value : "";
+  const childValue = Array.isArray(node.content) ? node.content.map(textFromRichTextNode).join("") : "";
+  return `${ownValue}${childValue}`;
+};
+
+const richTextDocumentFromPlainText = (value = "") => ({
+  nodeType: "document",
+  data: {},
+  content: [
+    {
+      nodeType: "paragraph",
+      data: {},
+      content: [
+        {
+          nodeType: "text",
+          value: String(value || ""),
+          marks: [],
+          data: {},
+        },
+      ],
+    },
+  ],
+});
+
+const firstAvailableLocalizedValue = (fields = {}, locale, fieldIds = []) => {
+  for (const fieldId of fieldIds) {
+    const value = firstLocalizedValue(fields, fieldId, locale);
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return undefined;
+};
+
+const urlFromMediaValue = (value = {}) => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  const candidate = value.secure_url || value.secureUrl || value.url || value.fields?.file?.url || "";
+
+  if (candidate.startsWith("//")) {
+    return `https:${candidate}`;
+  }
+
+  return candidate;
+};
+
+const GRAVATAR_HASH_PATTERN = /^[a-f0-9]{64}$/i;
+const GRAVATAR_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$/i;
+const GRAVATAR_PROFILE_HOSTS = new Set(["gravatar.com", "www.gravatar.com"]);
+const FALLBACK_PHOTO_HOSTS = new Set([
+  "en.gravatar.com",
+  "gravatar.com",
+  "images.ctfassets.net",
+  "res.cloudinary.com",
+  "secure.gravatar.com",
+  "www.gravatar.com",
+]);
+
+const normalizeGravatarProfile = (value = "") => {
+  const candidate = String(value || "").trim();
+  if (!candidate || candidate.includes("@")) return "";
+  if (GRAVATAR_HASH_PATTERN.test(candidate)) return candidate.toLowerCase();
+
+  if (/^https:\/\//i.test(candidate)) {
+    try {
+      const url = new URL(candidate);
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (url.username || url.password || !GRAVATAR_PROFILE_HOSTS.has(url.hostname.toLowerCase()) || parts.length !== 1) return "";
+      return GRAVATAR_SLUG_PATTERN.test(parts[0]) ? parts[0].toLowerCase() : "";
+    } catch {
+      return "";
+    }
+  }
+
+  return GRAVATAR_SLUG_PATTERN.test(candidate) ? candidate.toLowerCase() : "";
+};
+
+const gravatarAvatarUrl = (hash = "") => `https://gravatar.com/avatar/${hash}?s=192&r=g&d=404`;
+
+const normalizedFallbackPhotoUrl = (value = "") => {
+  const candidate = String(value || "").trim();
+  if (!candidate) return "";
+
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "https:" || url.username || url.password || !FALLBACK_PHOTO_HOSTS.has(url.hostname.toLowerCase())) {
+      throw new Error("unsafe");
+    }
+    return url.toString();
+  } catch {
+    throw new GravatarProfileError("Use an approved HTTPS fallback photo URL.");
+  }
+};
+
+const resolvedAuthorPhoto = async ({ data = {}, fetchImpl, timeoutMs = 5000 }) => {
+  const hasPhotoInput = Object.prototype.hasOwnProperty.call(data, "gravatarProfile") || Object.prototype.hasOwnProperty.call(data, "fallbackPhotoUrl");
+  if (!hasPhotoInput) return { provided: false };
+
+  const rawProfile = String(data.gravatarProfile || "").trim();
+  const profile = normalizeGravatarProfile(rawProfile);
+  const fallback = normalizedFallbackPhotoUrl(data.fallbackPhotoUrl);
+
+  if (rawProfile && !profile) {
+    throw new GravatarProfileError("Use a valid public Gravatar profile slug or URL.");
+  }
+
+  if (!profile) {
+    return {
+      provided: true,
+      photo: fallback ? { source: "fallback", fallback_url: fallback, secure_url: fallback } : null,
+    };
+  }
+
+  let hash = GRAVATAR_HASH_PATTERN.test(profile) ? profile : "";
+  if (!hash) {
+    const controller = new AbortController();
+    const boundedTimeoutMs = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0 ? Number(timeoutMs) : 5000;
+    const timeout = setTimeout(() => controller.abort(), boundedTimeoutMs);
+    let response;
+
+    try {
+      response = await fetchImpl(`${GRAVATAR_API_HOST}/profiles/${encodeURIComponent(profile)}`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+        signal: controller.signal,
+      });
+    } catch {
+      throw new GravatarProfileError("Gravatar profile could not be resolved.", 502);
+    } finally {
+      clearTimeout(timeout);
+    }
+    const payload = await readJson(response);
+
+    if (!response.ok || !GRAVATAR_HASH_PATTERN.test(payload.hash || "")) {
+      throw new GravatarProfileError(response.status === 404 ? "Gravatar profile not found." : "Gravatar profile could not be resolved.", response.status === 404 ? 400 : 502);
+    }
+
+    hash = payload.hash.toLowerCase();
+  }
+
+  return {
+    provided: true,
+    photo: {
+      source: "gravatar",
+      gravatar_profile: profile,
+      gravatar_hash: hash,
+      fallback_url: fallback,
+      secure_url: gravatarAvatarUrl(hash),
+    },
+  };
+};
+
+const normalizedAuthorProfile = (entry = {}, locale) => {
+  const fields = entry.fields || {};
+  const biography = firstAvailableLocalizedValue(fields, locale, ["biography", "bio", "description"]);
+  const photo = firstAvailableLocalizedValue(fields, locale, ["photo", "avatar", "image", "picture"]);
+  const photoUrl = urlFromMediaValue(photo) || "";
+
+  return {
+    id: entry.sys?.id || "",
+    version: entry.sys?.version || null,
+    name: firstLocalizedValue(fields, "name", locale) || "",
+    slug: firstLocalizedValue(fields, "slug", locale) || "",
+    biography: typeof biography === "string" ? biography : textFromRichTextNode(biography).trim(),
+    ...(photo ? { photo } : {}),
+    photoUrl,
+  };
+};
+
+const publicAuthorProfileFieldsFromData = ({ data = {}, existingFields = {}, locale }) => {
+  const nextFields = { ...existingFields };
+  const setLocalized = (fieldId, value) => {
+    if (value !== undefined) {
+      nextFields[fieldId] = localized(value, locale);
+    }
+  };
+  const existingBiography = firstLocalizedValue(existingFields, "biography", locale);
+
+  setLocalized("name", data.name);
+  setLocalized("slug", data.slug);
+
+  if (data.biography !== undefined) {
+    setLocalized("biography", typeof existingBiography === "object" && existingBiography?.nodeType === "document" ? richTextDocumentFromPlainText(data.biography) : data.biography);
+  }
+
+  if (data.photo === null) {
+    delete nextFields.photo;
+  } else if (data.photo !== undefined) {
+    setLocalized("photo", data.photo);
+  } else if (data.photoPublicId || data.photoUrl) {
+    setLocalized("photo", {
+      public_id: String(data.photoPublicId || "").trim(),
+      secure_url: String(data.photoUrl || "").trim(),
+    });
+  }
+
+  return nextFields;
+};
+
+const ensureSessionAuthorEntryId = (session = {}) => {
+  if (!session.authorEntryId) {
+    throw new ContentfulAuthorProfileResolutionError();
+  }
+
+  return session.authorEntryId;
+};
+
+const publicSessionAuthor = (profile = {}) => ({
+  authorEntryId: profile.id || "",
+  authorName: profile.name || "",
+  authorSlug: profile.slug || "",
+});
+
+const articleDataForSession = (data = {}, session = {}) => ({
+  ...data,
+  author: ensureSessionAuthorEntryId(session),
+  writerSubject: session.subject || data.writerSubject || "",
+});
+
+const normalizedArticle = (entry = {}, locale, entryMap = new Map(), editorialLocale = locale) => {
+  const fields = entry.fields || {};
+  const authorData = normalizedAuthor(resolvedEntry(firstLocalizedValue(fields, "author", locale), entryMap), locale);
+  const lifecycleStatus = normalizedEntryStatus(entry.sys);
+  const articleLocale = firstLocalizedValue(fields, "locale", editorialLocale);
+
+  return {
+    id: entry.sys?.id || "",
+    title: firstLocalizedValue(fields, "title", locale) || "",
+    slug: firstLocalizedValue(fields, "slug", locale) || "",
+    description: firstLocalizedValue(fields, "description", locale) || "",
+    body: firstLocalizedValue(fields, "body", locale) || "",
+    ...(articleLocale ? { locale: articleLocale } : {}),
+    createAt: firstLocalizedValue(fields, "createAt", locale) || entry.sys?.createdAt || "",
+    thumbnail: firstLocalizedValue(fields, "thumbnail", locale) || firstLocalizedValue(fields, "cloudinary", locale)?.[0],
+    alt: firstLocalizedValue(fields, "alt", locale) || "",
+    ...authorData,
+    writerSubject: firstLocalizedValue(fields, "writerSubject", locale) || "",
+    tags: normalizedTags(entry.metadata),
+    status: lifecycleStatus,
+    lifecycleStatus,
+    version: entry.sys?.version || null,
+    updatedAt: entry.sys?.updatedAt || "",
+  };
+};
+
+const sessionOwnsArticle = (article = {}, session = {}) =>
+  Boolean(
+    (article.writerSubject && session.subject && article.writerSubject === session.subject) ||
+      (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
+  );
+
+const ensureCanEditArticle = (article = {}, session = {}) => {
+  if (!sessionOwnsArticle(article, session)) {
+    throw new ContentfulAdminAuthorizationError("Your account cannot edit this article.");
+  }
+};
+
+const normalizedEditorialRequest = (entry = {}, locale) => {
+  const fields = entry.fields || {};
+
+  return {
+    id: entry.sys?.id || "",
+    articleId: firstLocalizedValue(fields, "article", locale)?.sys?.id || "",
+    requestType: firstLocalizedValue(fields, "requestType", locale) || "",
+    status: firstLocalizedValue(fields, "status", locale) || "",
+    articleVersion: Number(firstLocalizedValue(fields, "articleVersion", locale)) || null,
+    writerSubject: firstLocalizedValue(fields, "writerSubject", locale) || "",
+    writerName: firstLocalizedValue(fields, "writerName", locale) || "",
+    createdAt: firstLocalizedValue(fields, "createdAt", locale) || entry.sys?.createdAt || "",
+    version: entry.sys?.version || null,
+  };
+};
+
+const openReviewRequest = (request = {}) => request.status === "readyForReview";
+
+const statusFromRequest = (request = {}) => {
+  if (!openReviewRequest(request)) {
+    return null;
+  }
+
+  if (request.requestType === "publication") {
+    return "review";
+  }
+
+  if (request.requestType === "unpublication") {
+    return "unpublicationRequested";
+  }
+
+  return null;
+};
+
+const summarizeAdminArticles = (articles = []) =>
+  articles.reduce(
+    (summary, article) => {
+      if (article.status === "published") {
+        summary.published += 1;
+      } else if (article.status === "draft" || article.status === "changed" || article.status === "unpublished" || article.status === "unpublicationRequested") {
+        summary.drafts += 1;
+      } else if (article.status === "review") {
+        summary.review += 1;
+      } else if (article.status === "archived") {
+        summary.archived += 1;
+      }
+
+      summary.total += 1;
+      return summary;
+    },
+    { published: 0, drafts: 0, review: 0, archived: 0, total: 0 }
+  );
+
+const requestByArticleId = (requests = []) => {
+  const index = new Map();
+
+  for (const request of requests) {
+    if (!request.articleId || !openReviewRequest(request)) {
+      continue;
+    }
+
+    if (!index.has(request.articleId)) {
+      index.set(request.articleId, request);
+    }
+  }
+
+  return index;
+};
+
+export const createCloudinaryMediaFacade = ({ env = process.env, fetchImpl = globalThis.fetch, nowTimestamp = () => Math.floor(Date.now() / 1000) } = {}) => {
+  const readCloudinaryJson = async (response) => {
+    const payload = await readJson(response);
+
+    if (!response.ok) {
+      throw new CloudinaryMediaRequestError(response.status);
+    }
+
+    return payload;
+  };
+
+  const fetchMediaResources = async ({ config, maxResults, prefix, nextCursor }) => {
+    const url = new URL(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/resources/image/upload`);
+
+    if (prefix) {
+      url.searchParams.set("prefix", prefix);
+    }
+
+    if (nextCursor) {
+      url.searchParams.set("next_cursor", nextCursor);
+    }
+
+    url.searchParams.set("max_results", String(maxResults));
+
+    const payload = await readCloudinaryJson(
+      await fetchImpl(url, {
+        method: "GET",
+        headers: {
+          authorization: basicAuth(config.apiKey, config.apiSecret),
+        },
+      })
+    );
+
+    return {
+      assets: Array.isArray(payload.resources) ? payload.resources.map(normalizeCloudinaryAsset) : [],
+      ...(payload.next_cursor ? { next_cursor: payload.next_cursor } : {}),
+    };
+  };
+
+  const fetchMediaResourcesByAssetFolder = async ({ config, maxResults, assetFolder, nextCursor }) => {
+    const url = new URL(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/resources/by_asset_folder`);
+
+    url.searchParams.set("asset_folder", assetFolder);
+    url.searchParams.set("max_results", String(maxResults));
+
+    if (nextCursor) {
+      url.searchParams.set("next_cursor", nextCursor);
+    }
+
+    const payload = await readCloudinaryJson(
+      await fetchImpl(url, {
+        method: "GET",
+        headers: {
+          authorization: basicAuth(config.apiKey, config.apiSecret),
+        },
+      })
+    );
+
+    return {
+      assets: Array.isArray(payload.resources) ? payload.resources.map(normalizeCloudinaryAsset) : [],
+      ...(payload.next_cursor ? { next_cursor: payload.next_cursor } : {}),
+    };
+  };
+
+  const fetchMediaResourcesByAssetFolderIfSupported = async (params) => {
+    try {
+      return await fetchMediaResourcesByAssetFolder(params);
+    } catch (error) {
+      if (error instanceof CloudinaryMediaRequestError && [400, 404].includes(error.upstreamStatusCode)) {
+        return { assets: [] };
+      }
+
+      throw error;
+    }
+  };
+
+  const collectMediaPages = async (fetchPage, params) => {
+    let result = await fetchPage(params);
+    const assets = [...result.assets];
+    let pageCount = 1;
+
+    while (result.next_cursor && pageCount < 5) {
+      result = await fetchPage({ ...params, nextCursor: result.next_cursor });
+      assets.push(...result.assets);
+      pageCount += 1;
+    }
+
+    return {
+      assets,
+      ...(result.next_cursor ? { next_cursor: result.next_cursor } : {}),
+    };
+  };
+
+  return {
+    async getMediaEditorConfig() {
+      return {
+        mediaEditor: cloudinaryEditorConfigFromEnv(env),
+      };
+    },
+    async listMedia({ query = {} } = {}) {
+      const config = cloudinaryConfigFromEnv(env, fetchImpl);
+      const maxResults = safeMaxResults(query.max_results);
+      const prefixes = uniqueMediaPrefixes(config.folder, DEFAULT_CLOUDINARY_FOLDER);
+
+      for (const assetFolder of prefixes) {
+        const result = await collectMediaPages(fetchMediaResourcesByAssetFolderIfSupported, { config, maxResults, assetFolder });
+
+        if (result.assets.length > 0) {
+          return result;
+        }
+      }
+
+      for (const prefix of prefixes) {
+        const result = await collectMediaPages(fetchMediaResources, { config, maxResults, prefix });
+
+        if (result.assets.length > 0) {
+          return result;
+        }
+      }
+
+      return collectMediaPages(fetchMediaResources, { config, maxResults });
+    },
+    async uploadMedia({ data = {} } = {}) {
+      const config = cloudinaryConfigFromEnv(env, fetchImpl);
+
+      if (!isBoundedImageDataUri(data.file)) {
+        throw new CloudinaryMediaRequestError(422);
+      }
+
+      const timestamp = String(nowTimestamp());
+      const uploadParams = {
+        folder: config.folder,
+        timestamp,
+        unique_filename: "true",
+        use_filename: "true",
+      };
+      const form = new FormData();
+      form.set("file", data.file);
+      form.set("folder", uploadParams.folder);
+      form.set("timestamp", uploadParams.timestamp);
+      form.set("unique_filename", uploadParams.unique_filename);
+      form.set("use_filename", uploadParams.use_filename);
+      form.set("api_key", config.apiKey);
+      form.set("signature", signedParams(uploadParams, config.apiSecret));
+
+      const payload = await readCloudinaryJson(
+        await fetchImpl(`${CLOUDINARY_API_HOST}/v1_1/${config.cloudName}/image/upload`, {
+          method: "POST",
+          body: form,
+        })
+      );
+
+      return {
+        asset: normalizeCloudinaryAsset(payload),
+      };
+    },
+  };
+};
+
+export const createContentfulManagementFacade = ({
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  now = () => new Date().toISOString(),
+  gravatarTimeoutMs = 5000,
+  sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+} = {}) => {
+  const request = async ({ method, path, body, headers = {} }) => {
+    const config = managementConfigFromEnv(env, fetchImpl);
+    const url = new URL(`${CONTENTFUL_MANAGEMENT_HOST}/spaces/${config.spaceId}/environments/${config.environmentId}${path}`);
+
+    let response;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      response = await fetchImpl(url, {
+        method,
+        headers: {
+          authorization: `Bearer ${config.token}`,
+          "content-type": CONTENTFUL_MANAGEMENT_CONTENT_TYPE,
+          ...headers,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+      if (response.status !== 429 || attempt === 1) break;
+
+      const resetHeader = response.headers?.get?.("x-contentful-ratelimit-reset");
+      if (resetHeader === null || resetHeader === undefined || resetHeader === "") break;
+      const resetSeconds = Number(resetHeader);
+      if (!Number.isFinite(resetSeconds) || resetSeconds < 0 || resetSeconds > 2) break;
+      await sleep(Math.max(1, resetSeconds) * 1000);
+    }
+
+    const payload = await readJson(response);
+
+    if (response.status === 409) {
+      throw new ContentfulVersionConflictError();
+    }
+
+    if (response.status === 429) {
+      throw new ContentfulRateLimitError();
+    }
+
+    if (!response.ok) {
+      throw new ContentfulManagementRequestError(response.status, payload);
+    }
+
+    return payload;
+  };
+
+  const articlePath = (articleId) => `/entries/${encodeURIComponent(articleId)}`;
+
+  const resolveSessionAuthorProfile = async ({ session = {}, config, requireProfile = false } = {}) => {
+    if (session.authorEntryId) {
+      if (!requireProfile) {
+        return {
+          profile: null,
+          session,
+        };
+      }
+
+      const entry = await request({ method: "GET", path: articlePath(session.authorEntryId) });
+      const profile = normalizedAuthorProfile(entry, config.locale);
+
+      return {
+        profile,
+        session: {
+          ...session,
+          authorEntryId: profile.id,
+        },
+      };
+    }
+
+    if (!isOwner(session)) {
+      throw new ContentfulAuthorProfileResolutionError();
+    }
+
+    const params = new URLSearchParams({
+      content_type: "author",
+      limit: "2",
+    });
+    const payload = await request({ method: "GET", path: `/entries?${params}` });
+    const authors = payload.items || [];
+
+    if (authors.length !== 1) {
+      throw new ContentfulAuthorProfileResolutionError();
+    }
+
+    const profile = normalizedAuthorProfile(authors[0], config.locale);
+
+    return {
+      profile,
+      session: {
+        ...session,
+        authorEntryId: profile.id,
+      },
+    };
+  };
+
+  const resolveSessionAuthorProfileFromEntries = ({ session = {}, entries = [], config } = {}) => {
+    if (session.authorEntryId || !isOwner(session)) {
+      return {
+        profile: null,
+        session,
+      };
+    }
+
+    const authors = entries.filter((entry) => contentTypeIdFromEntry(entry) === "author");
+
+    if (authors.length !== 1) {
+      return {
+        profile: null,
+        session,
+      };
+    }
+
+    const profile = normalizedAuthorProfile(authors[0], config.locale);
+
+    return {
+      profile,
+      session: {
+        ...session,
+        authorEntryId: profile.id,
+      },
+    };
+  };
+
+  const validatedEditorialArticle = async ({ articleId, data, session, config, allowedStatuses }) => {
+    const authorResolution = await resolveSessionAuthorProfile({ session, config });
+    const articleEntry = await request({ method: "GET", path: articlePath(articleId) });
+    const article = normalizedArticle(articleEntry, config.locale);
+    const version = requiredVersion(data);
+
+    ensureCanEditArticle(article, authorResolution.session);
+
+    if (Number(article.version) !== Number(version)) {
+      throw new ContentfulVersionConflictError();
+    }
+
+    if (!allowedStatuses.includes(article.lifecycleStatus)) {
+      throw new ContentfulAdminLifecycleError("This article is not eligible for the requested editorial action.");
+    }
+
+    return version;
+  };
+
+  return {
+    async listTags() {
+      const payload = await request({ method: "GET", path: "/tags?limit=1000" });
+
+      return {
+        tags: (payload.items || []).map(normalizedContentfulTag).filter((tag) => tag.id && !isArticleLanguageTag(tag.id)),
+      };
+    },
+    async listManagedTags() {
+      const tagsPayload = await request({ method: "GET", path: "/tags?limit=1000" });
+      const tags = completeBoundedItems(tagsPayload);
+      const params = new URLSearchParams({
+        content_type: "article",
+        limit: String(TAG_USAGE_LIMIT),
+        skip: "0",
+      });
+      const entriesPayload = await request({ method: "GET", path: `/entries?${params}` });
+      const counts = articleTagCounts(completeBoundedItems(entriesPayload));
+
+      return {
+        tags: tags
+          .map(normalizedContentfulTag)
+          .filter((tag) => tag.id && !isArticleLanguageTag(tag.id))
+          .map((tag) => ({ ...tag, articleCount: counts.get(tag.id) || 0 })),
+      };
+    },
+    async createTag({ data = {} } = {}) {
+      const name = String(data.name || "").trim();
+      const tagId = tagIdFromName(name);
+
+      if (!name || !tagId) {
+        throw new ContentfulAdminLifecycleError("Tag name is required.");
+      }
+
+      const payload = await request({
+        method: "PUT",
+        path: `/tags/${encodeURIComponent(tagId)}`,
+        headers: {
+          "x-contentful-tag-visibility": "public",
+        },
+        body: {
+          name,
+          sys: {
+            id: tagId,
+            type: "Tag",
+            visibility: "public",
+          },
+        },
+      });
+
+      return {
+        tag: normalizedContentfulTag(payload),
+      };
+    },
+    async deleteTag({ tagId } = {}) {
+      const normalizedTagId = String(tagId || "").trim();
+
+      if (!normalizedTagId || isArticleLanguageTag(normalizedTagId)) {
+        throw new ContentfulAdminLifecycleError("A valid tag is required.");
+      }
+
+      for (const resource of ["entries", "assets"]) {
+        const usageParams = new URLSearchParams({
+          "metadata.tags.sys.id[all]": normalizedTagId,
+          limit: "1",
+          skip: "0",
+        });
+        const usagePayload = await request({ method: "GET", path: `/${resource}?${usageParams}` });
+
+        if (boundedUsageTotal(usagePayload) > 0) {
+          throw new ContentfulTagConflictError();
+        }
+      }
+
+      const tagPath = `/tags/${encodeURIComponent(normalizedTagId)}`;
+      const tag = await request({ method: "GET", path: tagPath });
+      const version = Number(tag?.sys?.version);
+
+      if (!Number.isInteger(version) || version < 1) {
+        throw new ContentfulTagUsageUnavailableError();
+      }
+
+      try {
+        await request({ method: "DELETE", path: tagPath, headers: { "x-contentful-version": version } });
+      } catch (error) {
+        if (
+          error instanceof ContentfulVersionConflictError ||
+          (error instanceof ContentfulManagementRequestError && [400, 409, 422].includes(error.upstreamStatusCode))
+        ) {
+          throw new ContentfulTagConflictError();
+        }
+
+        throw error;
+      }
+
+      return { deletedTagId: normalizedTagId };
+    },
+    async createArticleDraft({ data, session }) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const authorResolution = await resolveSessionAuthorProfile({ session, config });
+
+      return request({
+        method: "POST",
+        path: "/entries",
+        headers: {
+          "x-contentful-content-type": "article",
+        },
+        body: await articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale, { request }),
+      });
+    },
+    async listAdminArticles({ session } = {}) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const entryParams = new URLSearchParams({
+        limit: "100",
+      });
+      const entryPayload = await request({ method: "GET", path: `/entries?${entryParams}` });
+      const entries = entryPayload.items || [];
+      const authorResolution = resolveSessionAuthorProfileFromEntries({ session, entries, config });
+      const resolvedSession = authorResolution.session;
+      const entryMap = entriesById(entries);
+      const articleEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "article");
+      let editorialLocale = config.locale;
+
+      if (articleEntries.some((entry) => entry.fields?.locale)) {
+        try {
+          const environmentLocales = await contentfulEnvironmentLocales({ request });
+          editorialLocale = environmentLocales.defaultCode || editorialLocale;
+        } catch {
+          // Keep the configured content locale when locale metadata is unavailable.
+        }
+      }
+
+      const missingAuthorIds = [
+        ...new Set(articleEntries.map((entry) => linkedAuthorIdFromArticle(entry, config.locale)).filter((authorId) => authorId && !entryMap.has(authorId))),
+      ];
+
+      const linkedAuthors = await Promise.all(missingAuthorIds.map((authorId) => request({ method: "GET", path: articlePath(authorId) })));
+      linkedAuthors.forEach((entry) => {
+        if (entryId(entry)) {
+          entryMap.set(entryId(entry), entry);
+        }
+      });
+      const workflowEntries = entries.filter((entry) => contentTypeIdFromEntry(entry) === "blogEditorialRequest");
+      const allReviewRequests = workflowEntries.map((entry) => normalizedEditorialRequest(entry, config.locale));
+      const normalizedArticles = articleEntries.map((entry) => normalizedArticle(entry, config.locale, entryMap, editorialLocale));
+      const articlesById = new Map(normalizedArticles.map((article) => [article.id, article]));
+      const reviewRequests = allReviewRequests.filter((request) => {
+        const article = articlesById.get(request.articleId);
+        const belongsToSession = isOwner(resolvedSession) || request.writerSubject === resolvedSession?.subject;
+
+        return belongsToSession && openReviewRequest(request) && request.articleVersion === article?.version;
+      });
+      const requestsByArticle = requestByArticleId(reviewRequests);
+      const articles = normalizedArticles
+        .map((article) => {
+          const request = requestsByArticle.get(article.id);
+          const requestStatus = statusFromRequest(request);
+
+          return {
+            ...article,
+            ...(requestStatus ? { status: requestStatus } : {}),
+            ...(requestStatus ? { reviewStatus: request.status } : {}),
+            ...(request?.id ? { requestId: request.id } : {}),
+            ...(request?.version ? { requestVersion: request.version } : {}),
+            ...(request?.writerSubject ? { writerSubject: request.writerSubject } : {}),
+            ...(request?.writerName ? { writerName: request.writerName } : {}),
+          };
+        })
+        .filter((article) => isOwner(resolvedSession) || article.status === "published" || sessionOwnsArticle(article, resolvedSession));
+
+      return {
+        articles,
+        summary: summarizeAdminArticles(articles),
+        reviewRequests,
+        ...(authorResolution.profile ? { session: publicSessionAuthor(authorResolution.profile) } : {}),
+      };
+    },
+    async getAuthorProfile({ session } = {}) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const authorResolution = await resolveSessionAuthorProfile({ session, config, requireProfile: true });
+
+      return {
+        profile: authorResolution.profile,
+        session: publicSessionAuthor(authorResolution.profile),
+      };
+    },
+    async updateAuthorProfile({ data, session } = {}) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const authorResolution = await resolveSessionAuthorProfile({ session, config });
+      const authorEntryId = ensureSessionAuthorEntryId(authorResolution.session);
+      const version = requiredVersion(data);
+      const existingEntry = await request({ method: "GET", path: articlePath(authorEntryId) });
+      const photoResolution = await resolvedAuthorPhoto({ data, fetchImpl, timeoutMs: gravatarTimeoutMs });
+      const profileData = photoResolution.provided ? { ...data, photo: photoResolution.photo } : data;
+
+      return request({
+        method: "PUT",
+        path: articlePath(authorEntryId),
+        headers: {
+          "x-contentful-version": version,
+        },
+        body: {
+          fields: publicAuthorProfileFieldsFromData({
+            data: profileData,
+            existingFields: existingEntry.fields || {},
+            locale: config.locale,
+          }),
+        },
+      });
+    },
+    async updateArticleDraft({ articleId, data, session }) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const version = requiredVersion(data);
+      const existingEntry = await request({ method: "GET", path: articlePath(articleId) });
+      let authorResolution;
+
+      try {
+        authorResolution = await resolveSessionAuthorProfile({ session, config });
+      } catch (error) {
+        if (error instanceof ContentfulAuthorProfileResolutionError) {
+          throw new ContentfulAdminAuthorizationError("Your account cannot edit this article.");
+        }
+
+        throw error;
+      }
+
+      ensureCanEditArticle(normalizedArticle(existingEntry, config.locale), authorResolution.session);
+
+      return request({
+        method: "PUT",
+        path: articlePath(articleId),
+        headers: {
+          "x-contentful-version": version,
+        },
+        body: await articlePayloadFromData(articleDataForSession(data, authorResolution.session), config.locale, { request }),
+      });
+    },
+    async publishArticle({ articleId, data }) {
+      const version = requiredVersion(data);
+      let editorialRequest;
+
+      if (data?.requestId) {
+        const requestEntry = await request({ method: "GET", path: articlePath(data.requestId) });
+        const normalizedRequest = normalizedEditorialRequest(requestEntry, managementConfigFromEnv(env, fetchImpl).locale);
+        const requestVersion = requiredVersion({ version: data.requestVersion });
+
+        if (
+          normalizedRequest.articleId !== articleId ||
+          normalizedRequest.requestType !== "publication" ||
+          !openReviewRequest(normalizedRequest) ||
+          normalizedRequest.articleVersion !== Number(version) ||
+          Number(requestEntry.sys?.version) !== Number(requestVersion)
+        ) {
+          throw new ContentfulAdminLifecycleError("The editorial review no longer matches this article version.");
+        }
+
+        editorialRequest = { entry: requestEntry, version: requestVersion };
+      }
+
+      const publishedArticle = await request({
+        method: "PUT",
+        path: `${articlePath(articleId)}/published`,
+        headers: {
+          "x-contentful-version": version,
+        },
+      });
+
+      if (editorialRequest) {
+        const locale = managementConfigFromEnv(env, fetchImpl).locale;
+        const fields = editorialRequest.entry.fields || {};
+
+        try {
+          await request({
+            method: "PUT",
+            path: articlePath(data.requestId),
+            headers: {
+              "x-contentful-version": editorialRequest.version,
+            },
+            body: {
+              fields: {
+                ...fields,
+                status: replaceLocalizedValues(fields.status, "closed", Object.keys(fields.status || {}).length ? [] : [locale]),
+                updatedAt: replaceLocalizedValues(fields.updatedAt, now(), Object.keys(fields.status || {}).length ? Object.keys(fields.status) : [locale]),
+              },
+            },
+          });
+        } catch {
+          return { ...publishedArticle, editorialRequestClosurePending: true };
+        }
+      }
+
+      return publishedArticle;
+    },
+    async unpublishArticle({ articleId, data }) {
+      return request({
+        method: "DELETE",
+        path: `${articlePath(articleId)}/published`,
+        headers: {
+          "x-contentful-version": requiredVersion(data),
+        },
+      });
+    },
+    async archiveArticle({ articleId, data }) {
+      const existingEntry = await request({ method: "GET", path: articlePath(articleId) });
+      const currentStatus = normalizedEntryStatus(existingEntry.sys);
+
+      if (currentStatus === "published" || currentStatus === "changed") {
+        throw new ContentfulAdminLifecycleError("Published articles must be unpublished before archiving.");
+      }
+
+      return request({
+        method: "PUT",
+        path: `${articlePath(articleId)}/archived`,
+        headers: {
+          "x-contentful-version": requiredVersion(data),
+        },
+      });
+    },
+    async unarchiveArticle({ articleId, data }) {
+      return request({
+        method: "DELETE",
+        path: `${articlePath(articleId)}/archived`,
+        headers: {
+          "x-contentful-version": requiredVersion(data),
+        },
+      });
+    },
+    async deleteArticle({ articleId, data }) {
+      return request({
+        method: "DELETE",
+        path: articlePath(articleId),
+        headers: {
+          "x-contentful-version": requiredVersion(data),
+        },
+      });
+    },
+    async submitArticleForReview({ articleId, data, session }) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const articleVersion = await validatedEditorialArticle({
+        articleId,
+        data,
+        session,
+        config,
+        allowedStatuses: ["draft", "changed"],
+      });
+      const requestFields = await contentTypeFields({ contentTypeId: "blogEditorialRequest", request });
+      const articleVersionField = requestFields?.get("articleVersion");
+
+      if (articleVersionField?.type !== "Integer" || articleVersionField.localized !== false) {
+        throw new ContentfulAdminConfigurationError();
+      }
+
+      const environmentLocales = await contentfulEnvironmentLocales({ request });
+      const requestLocale = environmentLocales.defaultCode || config.locale;
+
+      return request({
+        method: "POST",
+        path: "/entries",
+        headers: {
+          "x-contentful-content-type": "blogEditorialRequest",
+        },
+        body: editorialRequestPayloadFromData({
+          requestType: "publication",
+          articleId,
+          articleVersion: Number(articleVersion),
+          session,
+          now: now(),
+          locale: requestLocale,
+        }),
+      });
+    },
+    async requestUnpublication({ articleId, data, session }) {
+      const config = managementConfigFromEnv(env, fetchImpl);
+      const articleVersion = await validatedEditorialArticle({
+        articleId,
+        data,
+        session,
+        config,
+        allowedStatuses: ["published", "changed"],
+      });
+      const requestFields = await contentTypeFields({ contentTypeId: "blogEditorialRequest", request });
+      const articleVersionField = requestFields?.get("articleVersion");
+
+      if (articleVersionField?.type !== "Integer" || articleVersionField.localized !== false) {
+        throw new ContentfulAdminConfigurationError();
+      }
+
+      const environmentLocales = await contentfulEnvironmentLocales({ request });
+      const requestLocale = environmentLocales.defaultCode || config.locale;
+
+      return request({
+        method: "POST",
+        path: "/entries",
+        headers: {
+          "x-contentful-content-type": "blogEditorialRequest",
+        },
+        body: editorialRequestPayloadFromData({
+          requestType: "unpublication",
+          articleId,
+          articleVersion: Number(articleVersion),
+          session,
+          now: now(),
+          locale: requestLocale,
+        }),
+      });
+    },
+  };
+};
+
+const decodeAdminPathSegment = (value) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new ContentfulAdminPathEncodingError();
+  }
+};
+
+const articleIdFromPath = (routePath, suffix = "") =>
+  decodeAdminPathSegment(routePath.replace(/^\/articles\//, "").replace(suffix, ""));
+
+export const createContentfulAdminHandler = ({
+  getSession = () => null,
+  operations = {},
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  logger = console,
+} = {}) => {
+  const adminOperations = {
+    submitArticleForReview: notImplementedOperation("submitArticleForReview"),
+    requestUnpublication: notImplementedOperation("requestUnpublication"),
+    ...createContentfulManagementFacade({ env, fetchImpl }),
+    ...createCloudinaryMediaFacade({ env, fetchImpl }),
+    ...operations,
+  };
+
+  const runAdminOperation = async ({ session, role, operation, payload }) => {
+    if (!session) {
+      return jsonResponse(401, { error: "Authentication required" });
+    }
+
+    if (role === "owner" && !isOwner(session)) {
+      return jsonResponse(403, { error: "Owner role required" });
+    }
+
+    if (role === "writer" && !canWriteDrafts(session)) {
+      return jsonResponse(403, { error: "Writer role required" });
+    }
+
+    try {
+      return jsonResponse(200, await operation({ ...payload, session }));
+    } catch (error) {
+      if (error?.publicError && error?.statusCode) {
+        if (error instanceof ContentfulAdminConfigurationError || error instanceof CloudinaryMediaConfigurationError) {
+          logAdminError(logger, "Admin runtime configuration is missing");
+        } else if (!(error instanceof ContentfulVersionConflictError) && !(error instanceof ContentfulAdminNotImplementedError)) {
+          logAdminError(logger, "Contentful admin request failed");
+        }
+
+        return jsonResponse(error.statusCode, { error: error.publicError, ...localErrorDetails(error, env) });
+      }
+
+      logAdminError(logger, "Contentful admin request failed");
+      return jsonResponse(500, { error: "Admin request failed" });
+    }
+  };
+
+  return async ({ method = "GET", path, query = {}, headers = {}, body, context } = {}) => {
+    try {
+    const routePath = normalizePath(path);
+    const requestMethod = method.toUpperCase();
+    const session = await getSession({ method: requestMethod, path: routePath, query, headers, context });
+
+    let data;
+    try {
+      data = parseBody(body);
+    } catch {
+      return jsonResponse(400, { error: "Invalid JSON body" });
+    }
+
+    if (requestMethod === "POST" && routePath === "/articles") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.createArticleDraft,
+        payload: { data },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/articles") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.listAdminArticles,
+        payload: { query },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/tags") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.listTags,
+        payload: {},
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/tags/manage") {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.listManagedTags,
+        payload: {},
+      });
+    }
+
+    if (requestMethod === "POST" && routePath === "/tags") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.createTag,
+        payload: { data },
+      });
+    }
+
+    const isTagDeleteCommand = requestMethod === "POST" && /^\/tags\/[^/]+\/delete$/.test(routePath);
+    const isLegacyTagDelete = requestMethod === "DELETE" && /^\/tags\/[^/]+$/.test(routePath);
+    if (isTagDeleteCommand || isLegacyTagDelete) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.deleteTag,
+        payload: { tagId: decodeAdminPathSegment(routePath.replace(/^\/tags\//, "").replace(/\/delete$/, "")) },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/author-profile") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.getAuthorProfile,
+        payload: {},
+      });
+    }
+
+    if ((requestMethod === "PUT" || requestMethod === "PATCH") && routePath === "/author-profile") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.updateAuthorProfile,
+        payload: { data },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/media/assets") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.listMedia,
+        payload: { query },
+      });
+    }
+
+    if (requestMethod === "GET" && routePath === "/media/editor-config") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.getMediaEditorConfig,
+        payload: {},
+      });
+    }
+
+    if (requestMethod === "POST" && routePath === "/media/upload") {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.uploadMedia,
+        payload: { data },
+      });
+    }
+
+    if ((requestMethod === "PUT" || requestMethod === "PATCH") && routePath.startsWith("/articles/")) {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.updateArticleDraft,
+        payload: { articleId: articleIdFromPath(routePath), data },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath.endsWith("/submit")) {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.submitArticleForReview,
+        payload: { articleId: articleIdFromPath(routePath, "/submit"), data },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath.endsWith("/unpublication-requests")) {
+      return runAdminOperation({
+        session,
+        role: "writer",
+        operation: adminOperations.requestUnpublication,
+        payload: { articleId: articleIdFromPath(routePath, "/unpublication-requests"), data },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath.endsWith("/publish")) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.publishArticle,
+        payload: { articleId: articleIdFromPath(routePath, "/publish"), data },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath.endsWith("/unpublish")) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.unpublishArticle,
+        payload: { articleId: articleIdFromPath(routePath, "/unpublish"), data },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath.endsWith("/unarchive")) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.unarchiveArticle,
+        payload: { articleId: articleIdFromPath(routePath, "/unarchive"), data },
+      });
+    }
+
+    if (requestMethod === "POST" && routePath.endsWith("/archive")) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.archiveArticle,
+        payload: { articleId: articleIdFromPath(routePath, "/archive"), data },
+      });
+    }
+
+    if (requestMethod === "DELETE" && routePath.startsWith("/articles/")) {
+      return runAdminOperation({
+        session,
+        role: "owner",
+        operation: adminOperations.deleteArticle,
+        payload: { articleId: articleIdFromPath(routePath), data },
+      });
+    }
+
+    return jsonResponse(404, { error: "Not found" });
+    } catch (error) {
+      if (error instanceof ContentfulAdminPathEncodingError) {
+        return jsonResponse(400, { error: "Invalid path encoding" });
+      }
+
+      throw error;
+    }
+  };
+};
+
+export const contentfulAdminHandler = createContentfulAdminHandler({
+  getSession({ context }) {
+    return context?.session || null;
+  },
+});
