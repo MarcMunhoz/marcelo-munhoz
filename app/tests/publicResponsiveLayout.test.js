@@ -35,6 +35,22 @@ describe("public responsive layout", () => {
     assert.match(app, /overflow-y:\s*auto/);
   });
 
+  it("delivers the complete home hero responsively without destructive cropping", () => {
+    const home = read("../src/pages/IndexPage.vue");
+    const heroImage = home.match(/<img\s+class="home-hero-image"[\s\S]*?\/>/)?.[0] || "";
+    const heroStyles = home.match(/\.home-hero-image\s*\{([^}]*)\}/)?.[1] || "";
+
+    assert.match(heroImage, /src="[^"]*\/f_auto,q_auto,c_scale,w_1731\//);
+    assert.match(heroImage, /srcset="[\s\S]*w_480[\s\S]*480w[\s\S]*w_960[\s\S]*960w[\s\S]*w_1280[\s\S]*1280w[\s\S]*w_1731[\s\S]*1731w[\s\S]*w_1920[\s\S]*1920w/);
+    assert.match(heroImage, /sizes="100vw"/);
+    assert.match(heroImage, /width="1731"/);
+    assert.match(heroImage, /height="909"/);
+    assert.match(heroStyles, /height:\s*auto/);
+    assert.match(heroStyles, /width:\s*100%/);
+    assert.doesNotMatch(home, /\.home-hero\s*\{[^}]*height:/);
+    assert.doesNotMatch(heroStyles, /object-fit:\s*cover/);
+  });
+
   it("bounds public page content at the compact breakpoint", () => {
     const home = read("../src/pages/IndexPage.vue");
     const about = read("../src/pages/About.vue");
@@ -51,7 +67,6 @@ describe("public responsive layout", () => {
     assert.match(home, /class="home-facts"/);
     assert.match(home, /yearCount\("2004-06-04"\)/);
     assert.match(home, /@media \(max-width:\s*700px\)/);
-    assert.match(home, /\.home-hero\s*\{[^}]*height:\s*clamp\(160px,\s*43\.75vw,\s*240px\);/);
     assert.match(home, /\.knowledge-list\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
     assert.match(about, /about-introduction/);
     assert.match(about, /@media \(max-width:\s*700px\)/);

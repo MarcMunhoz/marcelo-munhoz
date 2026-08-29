@@ -3,7 +3,19 @@
     <section class="home-hero" aria-labelledby="home-title">
       <img
         class="home-hero-image"
-        src="https://res.cloudinary.com/marcelo-munhoz/image/upload/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png"
+        src="https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_1731/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png"
+        srcset="
+          https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_480/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png 480w,
+          https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_960/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png 960w,
+          https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_1280/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png 1280w,
+          https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_1731/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png 1731w,
+          https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_1920/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png 1920w
+        "
+        sizes="100vw"
+        width="1731"
+        height="909"
+        fetchpriority="high"
+        decoding="async"
         alt="Marcelo Munhoz"
       />
     </section>
@@ -96,8 +108,8 @@ const yearCount = (initialDate) => {
 
 <style lang="scss" scoped>
 .home-page { color: #173042; width: 100%; }
-.home-hero { box-shadow: 0 14px 30px rgba(23, 48, 66, 0.2); height: min(500px, 52vw); margin-top: 1px; overflow: hidden; position: relative; width: 100%; z-index: 0; }
-.home-hero-image { display: block; height: 100%; object-fit: cover; object-position: center; width: 100%; }
+.home-hero { box-shadow: 0 14px 30px rgba(23, 48, 66, 0.2); margin-top: 1px; overflow: hidden; position: relative; width: 100%; z-index: 0; }
+.home-hero-image { display: block; height: auto; width: 100%; }
 .home-intro, .home-section { margin-inline: auto; max-width: 1280px; padding: 4rem clamp(1.25rem, 5vw, 5rem); }
 .home-intro { max-width: 900px; text-align: left; }
 .home-eyebrow { color: #52758a; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.12em; margin: 0 0 0.75rem; text-transform: uppercase; }
@@ -120,7 +132,6 @@ const yearCount = (initialDate) => {
 .project-copy { display: flex; flex: 1; flex-direction: column; gap: 0.25rem; min-width: 0; }
 .project-copy small { color: #52758a; line-height: 1.3; }
 @media (max-width: 700px) {
-  .home-hero { height: clamp(160px, 43.75vw, 240px); }
   .home-intro, .home-section { padding: 2.75rem 1.25rem; }
   .home-intro h1 { font-size: clamp(2.75rem, 14vw, 5rem); }
   .home-lede, .home-note { font-size: 1.2rem; }
