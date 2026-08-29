@@ -11,7 +11,7 @@
           https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_1731/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png 1731w,
           https://res.cloudinary.com/marcelo-munhoz/image/upload/f_auto,q_auto,c_scale,w_1920/v1787690105/marcelo-munhoz-website/marcelomunhoz_hero.png 1920w
         "
-        sizes="100vw"
+        sizes="min(100vw, 1295px, max(305px, calc(190.43svh - 22.85rem)))"
         width="1731"
         height="909"
         fetchpriority="high"
@@ -108,8 +108,8 @@ const yearCount = (initialDate) => {
 
 <style lang="scss" scoped>
 .home-page { color: #173042; width: 100%; }
-.home-hero { box-shadow: 0 14px 30px rgba(23, 48, 66, 0.2); margin-top: 1px; overflow: hidden; position: relative; width: 100%; z-index: 0; }
-.home-hero-image { display: block; height: auto; width: 100%; }
+.home-hero { background: #07141c; box-shadow: 0 14px 30px rgba(23, 48, 66, 0.2); display: flex; justify-content: center; margin-top: 1px; max-height: clamp(160px, calc(100svh - 12rem), 680px); overflow: hidden; position: relative; width: 100%; z-index: 0; }
+.home-hero-image { display: block; height: auto; max-height: inherit; max-width: 100%; width: auto; }
 .home-intro, .home-section { margin-inline: auto; max-width: 1280px; padding: 4rem clamp(1.25rem, 5vw, 5rem); }
 .home-intro { max-width: 900px; text-align: left; }
 .home-eyebrow { color: #52758a; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.12em; margin: 0 0 0.75rem; text-transform: uppercase; }

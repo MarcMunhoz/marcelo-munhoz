@@ -35,20 +35,25 @@ describe("public responsive layout", () => {
     assert.match(app, /overflow-y:\s*auto/);
   });
 
-  it("delivers the complete home hero responsively without destructive cropping", () => {
+  it("keeps the complete home hero within a viewport-aware height budget", () => {
     const home = read("../src/pages/IndexPage.vue");
     const heroImage = home.match(/<img\s+class="home-hero-image"[\s\S]*?\/>/)?.[0] || "";
-    const heroStyles = home.match(/\.home-hero-image\s*\{([^}]*)\}/)?.[1] || "";
+    const heroStyles = home.match(/\.home-hero\s*\{([^}]*)\}/)?.[1] || "";
+    const heroImageStyles = home.match(/\.home-hero-image\s*\{([^}]*)\}/)?.[1] || "";
 
     assert.match(heroImage, /src="[^"]*\/f_auto,q_auto,c_scale,w_1731\//);
     assert.match(heroImage, /srcset="[\s\S]*w_480[\s\S]*480w[\s\S]*w_960[\s\S]*960w[\s\S]*w_1280[\s\S]*1280w[\s\S]*w_1731[\s\S]*1731w[\s\S]*w_1920[\s\S]*1920w/);
-    assert.match(heroImage, /sizes="100vw"/);
     assert.match(heroImage, /width="1731"/);
     assert.match(heroImage, /height="909"/);
-    assert.match(heroStyles, /height:\s*auto/);
-    assert.match(heroStyles, /width:\s*100%/);
-    assert.doesNotMatch(home, /\.home-hero\s*\{[^}]*height:/);
-    assert.doesNotMatch(heroStyles, /object-fit:\s*cover/);
+    assert.match(heroStyles, /max-height:\s*clamp\(160px,\s*calc\(100svh - 12rem\),\s*680px\)/);
+    assert.match(heroStyles, /display:\s*flex/);
+    assert.match(heroStyles, /justify-content:\s*center/);
+    assert.match(heroImage, /sizes="min\(100vw,\s*1295px,\s*max\(305px,\s*calc\(190\.43svh - 22\.85rem\)\)\)"/);
+    assert.match(heroImageStyles, /height:\s*auto/);
+    assert.match(heroImageStyles, /max-height:\s*inherit/);
+    assert.match(heroImageStyles, /max-width:\s*100%/);
+    assert.match(heroImageStyles, /width:\s*auto/);
+    assert.doesNotMatch(heroImageStyles, /object-fit:\s*cover/);
   });
 
   it("bounds public page content at the compact breakpoint", () => {
