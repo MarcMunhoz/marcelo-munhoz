@@ -24,6 +24,7 @@ The repository threat model is maintained in `docs/security/threat-model.md`.
 - CMS/Markdown content and URLs cannot become executable or unsafe browser content.
 - Secrets, tokens, private identifiers, diagnostics, and local environment details stay isolated.
 - Destructive and lifecycle mutations reject stale, repeated, conflicting, or unauthorized requests.
+- Production administrative browser sessions require both provider identity and a matching ephemeral marker, warn after 14 minutes of inactivity, and expire after 15 minutes unless explicitly continued.
 - Public, administrative, upload, and third-party operations have deterministic abuse limits.
 - Findings require reachable source-to-sink evidence and independent verification.
 
@@ -49,5 +50,7 @@ Accepted or deferred risks must include sanitized impact, mitigation, rationale,
 Local preview role headers are development-only and must never authorize production requests.
 
 Deployment-specific rate limits, Identity configuration, provider scopes, and browser-policy behavior require separate read-only staging verification when repository evidence is insufficient.
+
+Browser session restoration is browser-controlled and may restore session cookies in some configurations. The 15-minute inactivity limit and Function-side authorization are compensating controls; stricter universal browser-close invalidation requires provider- or server-managed session policy.
 
 The current baseline records a frontend smoke limitation caused by the existing development container environment; it is not a validated security finding.
