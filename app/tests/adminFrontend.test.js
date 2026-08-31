@@ -205,8 +205,16 @@ describe("admin frontend writer workflow", () => {
     assert.match(layout, /completeAdminIdentityLogin/);
     assert.match(layout, /adminSessionLifecycle\.start/);
     assert.match(layout, /adminSessionLifecycle\.observeActivity/);
-    assert.match(layout, /const finishAdminSignOut = async \(\) => \{\s*adminSessionLifecycle\.clearLocalSession\(\);/);
+    assert.match(
+      layout,
+      /const finishAdminSignOut = async \(\) => \{\s*adminSessionCountdown\.stop\(\);\s*adminSessionLifecycle\.clearLocalSession\(\);/
+    );
     assert.match(layout, /adminSessionWarning/);
+    assert.match(layout, /createAdminSessionCountdown/);
+    assert.match(layout, /Session expires in/);
+    assert.match(layout, /role="timer"/);
+    assert.match(layout, /adminSessionCountdown\.start\(snapshot\)/);
+    assert.match(layout, /adminSessionCountdown\.stop\(\)/);
     assert.match(layout, /continueAdminSession/);
     for (const page of pages) {
       assert.match(page, /getAdminSession/);

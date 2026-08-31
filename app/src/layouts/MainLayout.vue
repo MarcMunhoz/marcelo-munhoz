@@ -149,10 +149,23 @@
     </q-dialog>
 
     <q-dialog v-model="adminSessionWarning" persistent>
-      <q-card class="admin-session-warning-card" role="alertdialog" aria-live="assertive" aria-labelledby="admin-session-warning-title">
+      <q-card
+        class="admin-session-warning-card"
+        role="alertdialog"
+        aria-labelledby="admin-session-warning-title"
+        aria-describedby="admin-session-warning-copy admin-session-countdown-copy"
+      >
         <q-card-section>
           <h2 id="admin-session-warning-title" class="admin-access-title">Admin session expiring</h2>
-          <p class="admin-access-copy">Your administrative session will end in less than one minute due to inactivity.</p>
+          <p id="admin-session-warning-copy" class="admin-access-copy" role="alert">
+            Your administrative session will end due to inactivity.
+          </p>
+          <p id="admin-session-countdown-copy" class="admin-session-countdown">
+            <span>Session expires in</span>
+            <strong class="admin-session-countdown-value" role="timer" aria-live="off">
+              {{ adminSessionCountdownLabel }}
+            </strong>
+          </p>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps label="Sign out" @click="signOutFromWarning" />
@@ -191,7 +204,7 @@ import {
   rejectAdminAccess,
   signOutAdmin,
 } from "../utils/adminAuth.js";
-import { adminSessionLifecycle } from "../utils/adminSessionLifecycle.js";
+import { adminSessionLifecycle, createAdminSessionCountdown } from "../utils/adminSessionLifecycle.js";
 import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
 
 const route = useRoute();
@@ -208,6 +221,7 @@ const adminLoginRequested = ref(false);
 const adminAccessNotice = ref("");
 const adminAccessNoticeTimer = ref(null);
 const adminSessionWarning = ref(false);
+const adminSessionCountdownLabel = ref("01:00");
 const adminDisplay = computed(() => adminSessionDisplay(adminSession.value));
 const adminNavLabel = computed(() => (adminSession.value ? adminDisplay.value.name : "Admin"));
 const adminNavCaption = computed(() =>
@@ -220,6 +234,16 @@ const adminProfilePhotoUrl = computed(
 let stopIdentityCallbacks = () => {};
 let stopAdminActivity = () => {};
 let unmounted = false;
+
+const adminSessionCountdown = createAdminSessionCountdown({
+  lifecycle: adminSessionLifecycle,
+  onTick: ({ label }) => {
+    adminSessionCountdownLabel.value = label;
+  },
+  onDismiss: () => {
+    adminSessionWarning.value = false;
+  },
+});
 
 const profileLoader = createAdminProfileLoader({
   getAuthorProfileImpl: getAuthorProfile,
@@ -239,6 +263,7 @@ const advanceAdminProfilePhoto = () => {
 };
 
 const finishAdminSignOut = async () => {
+  adminSessionCountdown.stop();
   adminSessionLifecycle.clearLocalSession();
   adminSessionLifecycle.stop();
   stopAdminActivity();
@@ -258,10 +283,14 @@ const signOut = async () => {
 const signOutFromWarning = () => signOutAdmin({ confirmImpl: () => true, onLocalSignOut: finishAdminSignOut });
 
 const continueAdminSession = () => {
-  if (adminSessionLifecycle.continueSession()) adminSessionWarning.value = false;
+  if (adminSessionLifecycle.continueSession()) {
+    adminSessionCountdown.stop();
+    adminSessionWarning.value = false;
+  }
 };
 
 const startAdminSessionLifecycle = (session) => {
+  adminSessionCountdown.stop();
   adminSessionLifecycle.stop();
   stopAdminActivity();
   stopAdminActivity = () => {};
@@ -271,8 +300,9 @@ const startAdminSessionLifecycle = (session) => {
 
   adminSessionLifecycle.start({
     identity: globalThis.netlifyIdentity,
-    onWarning: () => {
+    onWarning: (snapshot) => {
       adminSessionWarning.value = true;
+      adminSessionCountdown.start(snapshot);
     },
     onExpire: () => finishAdminSignOut(),
   });
@@ -368,6 +398,7 @@ onBeforeUnmount(() => {
   clearTimeout(nameNavigationTimer.value);
   clearTimeout(adminAccessNoticeTimer.value);
   stopIdentityCallbacks();
+  adminSessionCountdown.stop();
   adminSessionLifecycle.stop();
   stopAdminActivity();
 });
@@ -408,6 +439,20 @@ onBeforeUnmount(() => {
 .admin-session-warning-card {
   max-width: calc(100vw - 24px);
   width: 440px;
+}
+
+.admin-session-countdown {
+  align-items: baseline;
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+
+.admin-session-countdown-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .admin-access-title {

@@ -61,6 +61,52 @@ const writeState = (storage, state) => {
   }
 };
 
+const countdownValue = (remainingMs) => {
+  const remainingSeconds = Number.isFinite(remainingMs) ? Math.max(0, Math.ceil(remainingMs / 1_000)) : 0;
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  return {
+    remainingSeconds,
+    label: `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+  };
+};
+
+export const createAdminSessionCountdown = ({
+  lifecycle,
+  onTick,
+  onDismiss,
+  setIntervalImpl = globalThis.setInterval,
+  clearIntervalImpl = globalThis.clearInterval,
+} = {}) => {
+  let intervalId = null;
+
+  const stop = () => {
+    if (intervalId !== null) clearIntervalImpl?.(intervalId);
+    intervalId = null;
+  };
+
+  const sync = (providedSnapshot) => {
+    const snapshot = providedSnapshot || lifecycle?.snapshot?.() || {};
+    if (!snapshot.warning) {
+      stop();
+      onDismiss?.();
+      return false;
+    }
+
+    onTick?.(countdownValue(snapshot.remainingMs));
+    return true;
+  };
+
+  const start = (initialSnapshot) => {
+    stop();
+    if (!sync(initialSnapshot)) return stop;
+    intervalId = setIntervalImpl?.(() => sync(), 1_000) ?? null;
+    return stop;
+  };
+
+  return { start, stop, sync };
+};
+
 export const createAdminSessionLifecycle = ({
   documentRef = globalThis.document,
   storage = globalThis.localStorage,
