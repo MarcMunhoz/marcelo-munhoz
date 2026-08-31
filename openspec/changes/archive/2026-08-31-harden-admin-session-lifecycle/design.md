@@ -46,7 +46,7 @@ The controller will clear local admin profile/session state before awaiting remo
 
 While an accepted production session is on an administrative route, bounded listeners will observe keyboard input, pointer activation, and touch activation. High-frequency events will be throttled and will not write on every browser event. Passive pointer movement and activity on public routes will not extend the administrative session.
 
-Before the warning threshold, qualifying activity renews the shared last-activity time. Once the one-minute warning is visible, only the explicit continue-session action renews the session; incidental input cannot hide the warning or silently extend access. The sign-out action remains immediately available.
+Before the warning threshold, qualifying activity renews the shared last-activity time. Once the one-minute warning is visible, only the explicit continue-session action renews the session; incidental input cannot hide the warning or silently extend access. The sign-out action remains immediately available. The warning displays an `MM:SS` countdown recalculated from the controller's remaining-time snapshot every second rather than decrementing an independent UI clock, so delayed timers and cross-tab continuation converge on the authoritative lifecycle state.
 
 ### 4. Coordinate tabs with non-sensitive browser messages
 

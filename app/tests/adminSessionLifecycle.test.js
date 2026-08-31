@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import * as adminAuth from "../src/utils/adminAuth.js";
+import * as sessionLifecycle from "../src/utils/adminSessionLifecycle.js";
 import { AdminApiError, adminRequest } from "../src/utils/adminApi.js";
 import {
   createChannelHub,
@@ -227,6 +228,41 @@ const deferred = () => {
   });
   return { promise, reject, resolve };
 };
+
+describe("administrative session warning countdown", () => {
+  it("derives exact display values from lifecycle snapshots and stops after continuation", () => {
+    assert.equal(typeof sessionLifecycle.createAdminSessionCountdown, "function");
+
+    let currentSnapshot = { warning: true, remainingMs: 60_000 };
+    let intervalCallback = null;
+    const clearedIntervals = [];
+    const ticks = [];
+    const dismissals = [];
+    const countdown = sessionLifecycle.createAdminSessionCountdown({
+      lifecycle: { snapshot: () => currentSnapshot },
+      onTick: (value) => ticks.push(value),
+      onDismiss: () => dismissals.push("dismiss"),
+      setIntervalImpl(callback, delay) {
+        assert.equal(delay, 1_000);
+        intervalCallback = callback;
+        return 42;
+      },
+      clearIntervalImpl: (intervalId) => clearedIntervals.push(intervalId),
+    });
+
+    countdown.start(currentSnapshot);
+    assert.deepEqual(ticks, [{ remainingSeconds: 60, label: "01:00" }]);
+
+    currentSnapshot = { warning: true, remainingMs: 58_001 };
+    intervalCallback();
+    assert.deepEqual(ticks.at(-1), { remainingSeconds: 59, label: "00:59" });
+
+    currentSnapshot = { warning: false, remainingMs: 15 * 60 * 1_000 };
+    intervalCallback();
+    assert.deepEqual(dismissals, ["dismiss"]);
+    assert.deepEqual(clearedIntervals, [42]);
+  });
+});
 
 describe("administrative browser-session acceptance", () => {
   it("rejects and logs out a provider-restored user when the browser-session marker is absent", async () => {

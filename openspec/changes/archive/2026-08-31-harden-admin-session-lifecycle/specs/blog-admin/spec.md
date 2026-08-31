@@ -36,6 +36,7 @@ The system MUST end an accepted production administrative session after 15 conse
 #### Scenario: Administrator reaches the warning period
 - **WHEN** 14 consecutive minutes of inactivity have elapsed
 - **THEN** the system displays a visible one-minute expiration warning with actions to continue the session or sign out
+- **AND** the warning displays a countdown derived from the authoritative remaining inactivity time
 
 #### Scenario: Administrator intentionally continues the warned session
 - **WHEN** the administrator activates the warning's continue-session action before the inactivity limit expires
@@ -76,4 +77,3 @@ The system MUST keep production authorization server-side and MUST keep developm
 - **WHEN** the application creates a development-only preview session
 - **THEN** the preview workflow remains available for local testing
 - **AND** it is not represented as a production authenticated session or persisted as production session proof
-

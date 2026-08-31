@@ -17,6 +17,7 @@
 - [x] 3.2 Implement throttled qualifying-activity tracking only on authenticated administrative surfaces
 - [x] 3.3 Recalculate inactivity safely on page visibility, focus, timer delay, and invalid or discontinuous timestamps
 - [x] 3.4 Add the one-minute expiration warning with explicit continue-session and sign-out actions, ensuring incidental input cannot silently renew a warned session
+- [x] 3.5 Display a drift-resistant countdown in the warning and stop it on continuation, logout, expiration, cross-tab dismissal, or teardown
 
 ## 4. Cross-Tab Consistency
 
