@@ -1,3 +1,5 @@
+import { adminSessionLifecycle, createAdminSessionLifecycle } from "./adminSessionLifecycle.js";
+
 const PREVIEW_ROLE_STORAGE_KEY = "admin.previewRole";
 const PREVIEW_ROLES = new Set(["writer", "owner"]);
 const ADMIN_ACCESS_CLICK_WINDOW_MS = 600;
@@ -83,16 +85,40 @@ const sessionFromUser = async (user) => {
   };
 };
 
-export const getAdminSession = async () => {
-  const identity = globalThis.netlifyIdentity;
+export { createAdminSessionLifecycle };
+
+export const getAdminSession = async ({
+  identity = globalThis.netlifyIdentity,
+  lifecycle = adminSessionLifecycle,
+  allowPreview = import.meta.env?.DEV,
+  retryOnLifecycleChange = true,
+} = {}) => {
   const user = typeof identity?.currentUser === "function" ? identity.currentUser() : null;
+  const acceptedAtStart = lifecycle.acceptedSessionId();
+
+  if (user && !lifecycle.canUseSession(acceptedAtStart)) {
+    await lifecycle.logout(identity);
+    return allowPreview ? createPreviewSession({ role: selectedPreviewRole() }) : null;
+  }
+
   const session = await sessionFromUser(user);
 
   if (session) {
-    return session;
+    const lifecycleId = lifecycle.acceptedSessionId();
+    if (lifecycleId !== acceptedAtStart) {
+      if (retryOnLifecycleChange) {
+        return getAdminSession({ identity, lifecycle, allowPreview, retryOnLifecycleChange: false });
+      }
+      return allowPreview ? createPreviewSession({ role: selectedPreviewRole() }) : null;
+    }
+    if (!lifecycle.canUseSession(lifecycleId)) {
+      await lifecycle.logout(identity);
+      return allowPreview ? createPreviewSession({ role: selectedPreviewRole() }) : null;
+    }
+    return { ...session, lifecycleId };
   }
 
-  return import.meta.env?.DEV ? createPreviewSession({ role: selectedPreviewRole() }) : null;
+  return allowPreview ? createPreviewSession({ role: selectedPreviewRole() }) : null;
 };
 
 export const openAdminLogin = ({ identity = globalThis.netlifyIdentity, location = globalThis.location } = {}) => {
@@ -161,6 +187,7 @@ export const createAdminProfileLoader = ({ getAuthorProfileImpl, applyProfile } 
 
 export const completeAdminIdentityLogin = async ({
   identity = globalThis.netlifyIdentity,
+  lifecycle = adminSessionLifecycle,
   getSessionImpl = getAdminSession,
   setSession,
   loadProfile,
@@ -174,7 +201,20 @@ export const completeAdminIdentityLogin = async ({
     identity.close();
   }
 
-  const session = await getSessionImpl();
+  const loginRequested = Boolean(isLoginRequested());
+  if (loginRequested) {
+    lifecycle.establishSession();
+  }
+
+  let session;
+  try {
+    session = await getSessionImpl();
+  } catch (error) {
+    if (loginRequested) lifecycle.clearLocalSession();
+    throw error;
+  }
+
+  if (loginRequested && (!session || session.preview)) lifecycle.clearLocalSession();
 
   if (!isActive()) return { navigated: false, session: null };
   setSession?.(session);
@@ -184,7 +224,7 @@ export const completeAdminIdentityLogin = async ({
     return { navigated: false, session };
   }
 
-  if (isLoginRequested() && session && typeof router?.push === "function") {
+  if (loginRequested && session && typeof router?.push === "function") {
     clearLoginRequest?.();
     await router.push("/admin");
     return { navigated: true, session };
@@ -247,14 +287,19 @@ export const adminAccountInitials = (session) => {
     .toUpperCase();
 };
 
-export const signOutAdmin = async ({ identity = globalThis.netlifyIdentity, confirmImpl = globalThis.confirm } = {}) => {
+export const signOutAdmin = async ({
+  identity = globalThis.netlifyIdentity,
+  lifecycle = adminSessionLifecycle,
+  confirmImpl = globalThis.confirm,
+  onLocalSignOut,
+} = {}) => {
   if (typeof confirmImpl === "function" && !confirmImpl("Sign out of the admin area?")) {
     return false;
   }
 
-  if (typeof identity?.logout === "function") {
-    await identity.logout();
-  }
+  const providerLogout = lifecycle.logout(identity);
+  await onLocalSignOut?.();
+  await providerLogout;
 
   return true;
 };

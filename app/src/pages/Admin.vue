@@ -281,13 +281,12 @@ import {
   updateArticleStatusById,
 } from "../utils/adminDashboard.js";
 import { toggleArticleTagFilter } from "../utils/adminTags.js";
-import { bindIdentityCallbacks, getAdminSession, isOwnerSession, isWriterSession, signOutAdmin } from "../utils/adminAuth.js";
+import { getAdminSession, isOwnerSession, isWriterSession } from "../utils/adminAuth.js";
 import { observeMediaQuery } from "../utils/responsiveMedia.js";
 
 const router = useRouter();
 let active = true;
 let dashboardRequestId = 0;
-let stopIdentityCallbacks = () => {};
 const state = reactive({
       session: null,
       sessionResolved: false,
@@ -354,19 +353,6 @@ const feedbackClass = computed(() => ({
   "feedback-error": state.feedbackTone === "error",
   "feedback-info": state.feedbackTone === "info",
 }));
-const registerIdentityCallbacks = () => {
-  const identity = globalThis.netlifyIdentity;
-  stopIdentityCallbacks = bindIdentityCallbacks({
-    identity,
-    onLogin: async () => {
-      identity?.close?.();
-      const sessionAfterLogin = await getAdminSession();
-      if (!active) return;
-      state.session = sessionAfterLogin;
-      await loadArticleDashboard();
-    },
-  });
-};
 const redirectSignedOutVisitor = () => {
       if (!state.session) {
         router.replace("/");
@@ -427,13 +413,6 @@ const statusLabel = (status) => {
         review: "In review",
         archived: "Archived",
       }[status] || "Draft";
-};
-const signOut = async () => {
-      const signedOut = await signOutAdmin();
-
-      if (signedOut) {
-        state.session = null; state.articles = []; state.adminSummary = summarizeArticleStatuses([]); state.reviewRequests = [];
-      }
 };
 const requestUnpublicationFromRow = async (article) => {
       state.loadingAction = `request-unpublication-${article.id}`;
@@ -516,7 +495,6 @@ const confirmPermanentDeletion = async () => {
 };
 onMounted(async () => {
   state.stopCompactArticleGridObserver = observeMediaQuery("(max-width: 720px)", (matches) => { state.compactArticleGrid = matches; });
-  registerIdentityCallbacks();
   const initialSession = await getAdminSession();
   if (!active) return;
   state.session = initialSession; state.sessionResolved = true; redirectSignedOutVisitor(); loadArticleDashboard();
@@ -524,7 +502,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   active = false;
   dashboardRequestId += 1;
-  stopIdentityCallbacks();
   state.stopCompactArticleGridObserver?.();
   if (state.feedbackTimer) clearTimeout(state.feedbackTimer);
 });

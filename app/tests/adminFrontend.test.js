@@ -195,17 +195,31 @@ describe("admin frontend writer workflow", () => {
     assert.doesNotMatch(page, /openAdminLogin/);
   });
 
-  it("closes the Netlify Identity modal and reloads admin data after login", () => {
-    const page = read("../src/pages/Admin.vue");
+  it("centralizes Identity login and session-expiration ownership in the persistent layout", () => {
+    const layout = read("../src/layouts/MainLayout.vue");
+    const pages = ["Admin.vue", "AdminArticleEditor.vue", "AdminProfile.vue", "AdminTags.vue"].map((name) =>
+      read(`../src/pages/${name}`)
+    );
 
-    assert.match(page, /bindIdentityCallbacks/);
-    assert.match(page, /stopIdentityCallbacks\s*=\s*bindIdentityCallbacks/);
-    assert.match(page, /identity\?\.close\?\.\(\)/);
-    assert.match(page, /const sessionAfterLogin\s*=\s*await getAdminSession\(\)/);
-    assert.match(page, /if \(!active\) return/);
-    assert.match(page, /state\.session\s*=\s*sessionAfterLogin/);
-    assert.match(page, /loadArticleDashboard\(\)/);
-    assert.match(page, /stopIdentityCallbacks\(\)/);
+    assert.match(layout, /bindIdentityCallbacks/);
+    assert.match(layout, /completeAdminIdentityLogin/);
+    assert.match(layout, /adminSessionLifecycle\.start/);
+    assert.match(layout, /adminSessionLifecycle\.observeActivity/);
+    assert.match(
+      layout,
+      /const finishAdminSignOut = async \(\) => \{\s*adminSessionCountdown\.stop\(\);\s*adminSessionLifecycle\.clearLocalSession\(\);/
+    );
+    assert.match(layout, /adminSessionWarning/);
+    assert.match(layout, /createAdminSessionCountdown/);
+    assert.match(layout, /Session expires in/);
+    assert.match(layout, /role="timer"/);
+    assert.match(layout, /adminSessionCountdown\.start\(snapshot\)/);
+    assert.match(layout, /adminSessionCountdown\.stop\(\)/);
+    assert.match(layout, /continueAdminSession/);
+    for (const page of pages) {
+      assert.match(page, /getAdminSession/);
+      assert.doesNotMatch(page, /bindIdentityCallbacks/);
+    }
   });
 
   it("loads the Netlify Identity widget and allows it through CSP", () => {
@@ -1368,7 +1382,7 @@ describe("admin frontend writer workflow", () => {
     assert.doesNotMatch(page, /sessionDisplay\.name/);
     assert.doesNotMatch(page, /sessionDisplay\.role\s*\}\}/);
     assert.doesNotMatch(page, /sessionDisplay\.context\s*\}\}/);
-    assert.match(page, /signOut/);
+    assert.doesNotMatch(page, /const signOut/);
     assert.doesNotMatch(page, /verified_user/);
     assert.doesNotMatch(page, /Owner preview"\s*:\s*"Writer preview/);
 

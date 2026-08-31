@@ -7,7 +7,7 @@ The repository contains a public Vue/Quasar single-page site and Netlify Functio
 | Component or workflow | Boundary and security-relevant responsibility | Evidence |
 | --- | --- | --- |
 | Public SPA | Renders home, about, blog, article, tag, and author routes; consumes public proxy data | `app/src/router/routes.js:3-32`, `app/netlify/functions/contentful.js:1-14` |
-| Administrative SPA | Presents owner/writer workflows and sends Identity-backed requests; route metadata is not authorization | `app/src/router/routes.js:34-77`, `app/src/utils/adminApi.js:16-43` |
+| Administrative SPA | Applies the local browser-session acceptance and inactivity policy, presents owner/writer workflows, and sends Identity-backed requests; route metadata and the local gate are not server authorization | `app/src/layouts/MainLayout.vue`, `app/src/utils/adminAuth.js`, `app/src/utils/adminSessionLifecycle.js`, `app/src/utils/adminApi.js` |
 | Public Contentful Function | Normalizes public route/query input, calls Contentful Delivery, and returns bounded public payloads | `app/netlify/functions/contentfulProxyCore.js:17-35`, `app/netlify/functions/contentfulProxyCore.js:428-445` |
 | Administrative Contentful Function | Derives the Netlify Identity session, checks role/ownership, validates lifecycle state/version, and calls Contentful Management or Cloudinary facades | `app/netlify/functions/contentfulAdminCore.js:47-90`, `app/netlify/functions/contentfulAdminCore.js:1306-1322` |
 | Local middleware | Runs development proxy routes and loopback CORS policy; developer preview role headers are development-only | `app/middleware/server.js:1-32`, `app/middleware/corsPolicy.js:1-18` |
@@ -21,6 +21,7 @@ The repository contains a public Vue/Quasar single-page site and Netlify Functio
 | Production administrative mutation | Contentful Management API | Function runtime configuration is consumed server-side | Fixed Contentful Management host and server-side credential references | Administrative Function only; safe public error to browser | Identity session, role/ownership checks, version and lifecycle validation | `app/netlify/functions/contentfulAdminCore.js:1020-1078`, `app/netlify/functions/contentfulAdminCore.js:1306-1322`; deployment token scope remains an operational question |
 | Production media workflow | Cloudinary API/editor | Function runtime configuration and public editor configuration are separate | Fixed Cloudinary API host; browser receives only explicitly public editor configuration | Administrative Function and approved browser editor | Authenticated admin routes and media facade boundary | `app/netlify/functions/contentfulAdminCore.js:1040-1198`; upload limits and provider policy require review |
 | Production browser policy | CSP and related response headers | Netlify headers apply to `/*` | Header policy in `app/netlify.toml` | Browser enforces policy for all public/admin routes | CSP, HSTS, MIME, frame, and referrer headers | `app/netlify.toml:1-9`; least-privilege compatibility remains a review item |
+| Production administrative browser session | Netlify Identity provider state plus an application-owned ephemeral marker and bounded local activity record | Provider state is necessary but is not accepted by the SPA without the matching browser-session marker | Session cookie contains only an opaque identifier; local coordination contains only lifecycle metadata | Administrative SPA tabs on the same origin; bearer token remains outside lifecycle storage and messages | Marker match, 14-minute warning, 15-minute inactivity expiry, explicit continuation, cross-tab propagation, and pre-fetch rejection | `app/src/utils/adminSessionLifecycle.js`, `app/src/utils/adminAuth.js`, `app/src/utils/adminApi.js`; browser session restoration behavior remains browser-controlled |
 | Local development preview | Preview identity role | `NODE_ENV=development` gates a non-production header | Synthetic writer/owner session only in local development | Local middleware and local tests | Environment check plus exact role allowlist | `app/netlify/functions/contentfulAdminCore.js:73-90`; local startup configuration is intentionally not recorded here |
 
 ```mermaid
@@ -47,6 +48,7 @@ flowchart LR
 - Confidentiality of management credentials, delivery credentials, Cloudinary write credentials, Identity claims, private identifiers, and server diagnostics.
 - Correct ownership and role separation between writers and owners.
 - Browser safety when CMS, Markdown, URLs, media metadata, and Identity display data reach rendering or navigation sinks.
+- Bounded administrative browser-session lifetime despite durable or provider-restored Identity state.
 - Availability and cost bounds for public proxies, authenticated mutations, uploads, and third-party API calls.
 
 ### Actors and starting capabilities
@@ -55,6 +57,7 @@ flowchart LR
 - Authenticated writer controls their browser and their own submitted article/profile data, but must not gain owner-only lifecycle or tag-management authority.
 - Authenticated owner controls an authorized Identity session and owner workflows, but does not control server configuration or provider credentials.
 - Contentful, Cloudinary, and Netlify Identity are external service authorities whose responses and availability are not fully controlled by the application.
+- A person with access to an unattended or shared browser may inherit provider-restored Identity state; the application must not treat that state alone as an accepted administrative browser session.
 - A local developer may use the development-only preview role header; this capability must not be accepted in production.
 
 ### Trust boundaries and invariants
@@ -64,6 +67,7 @@ flowchart LR
 3. Administrative Function to Contentful Management/Cloudinary: only server-side credentials and validated, authorized operations may cross this boundary.
 4. CMS/Markdown/upstream data to browser DOM: rendering and navigation must constrain executable markup, unsafe URLs, and active content.
 5. Deployment configuration to runtime: credential references and policy settings must remain server-side, least-privilege, and free of public diagnostics.
+6. Identity provider state to production administrative SPA: a provider user is accepted only when a matching ephemeral browser-session marker exists and the finite inactivity interval is less than 15 minutes. This local gate limits session reuse but never replaces Function-side authentication, role, ownership, version, or lifecycle enforcement.
 
 ## Attack Surface, Mitigations, and Attacker Stories
 
@@ -77,6 +81,7 @@ The following are hypotheses and review priorities, not validated findings.
 | High | Server diagnostics or credentials are returned to a browser or published artifact | Error path, bundle, log, or build configuration exposes sensitive values | Credential theft or internal reconnaissance | Public error classes and build credential tests exist | Scan outputs without reading secret files; enforce stable safe errors | `app/netlify/functions/contentfulAdminCore.js:110-119`, `app/netlify/functions/contentfulProxyCore.js:431-443` |
 | Medium | Unbounded queries, uploads, retries, or provider calls exhaust resources | Repeated public/admin requests or oversized input | Availability, cost, or provider throttling impact | Several query and retry bounds exist | Inventory all limits and add deterministic abuse controls | `app/netlify/functions/contentfulProxyCore.js:1-6`, `app/netlify/functions/contentfulAdminCore.js:1203-1209` |
 | Medium | Replayed or stale lifecycle mutation overwrites newer state or repeats destruction | Repeated request, stale version, or race | Data loss or inconsistent editorial state | Version headers and conflict errors exist | Verify every mutation's idempotency, version, and replay behavior | `app/netlify/functions/contentfulAdminCore.js:101-107`, `app/netlify/functions/contentfulAdminCore.js:1310-1320` |
+| Medium | A durable or restored Identity provider session remains usable after the intended browser session or after prolonged inactivity | Prior valid administrative login plus access to the same unattended/shared browser profile | Unauthorized reuse of the prior user's administrative browser access | Function-side authorization still requires a valid provider session; the SPA now requires an opaque ephemeral marker and expires it after 15 minutes of inactivity | Preserve fail-closed marker validation, explicit continuation, pre-fetch rejection, cross-tab logout, and deployment verification of provider session policy | `app/src/utils/adminSessionLifecycle.js`, `app/src/utils/adminAuth.js`, `app/src/utils/adminApi.js`; some browsers may restore session cookies when restoring a previous session |
 
 ## Severity Calibration
 
@@ -88,4 +93,4 @@ The following are hypotheses and review priorities, not validated findings.
 Impact, confidence, reachability, and missing deployment evidence remain separate. No scenario above is a confirmed vulnerability until source-to-sink validation completes.
 
 Repository: marcelo-munhoz
-Version: issue_49@6ceb845
+Version: issue_51 working tree — 2026-08-31
