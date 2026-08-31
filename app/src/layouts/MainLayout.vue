@@ -148,6 +148,19 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="adminSessionWarning" persistent>
+      <q-card class="admin-session-warning-card" role="alertdialog" aria-live="assertive" aria-labelledby="admin-session-warning-title">
+        <q-card-section>
+          <h2 id="admin-session-warning-title" class="admin-access-title">Admin session expiring</h2>
+          <p class="admin-access-copy">Your administrative session will end in less than one minute due to inactivity.</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Sign out" @click="signOutFromWarning" />
+          <q-btn unelevated no-caps color="blue-grey-8" label="Continue session" @click="continueAdminSession" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-banner
       v-if="adminAccessNotice"
       class="admin-access-notice"
@@ -178,6 +191,7 @@ import {
   rejectAdminAccess,
   signOutAdmin,
 } from "../utils/adminAuth.js";
+import { adminSessionLifecycle } from "../utils/adminSessionLifecycle.js";
 import { authorPhotoCandidates, nextAuthorPhotoIndex } from "../utils/authorPhotos.js";
 
 const route = useRoute();
@@ -193,6 +207,7 @@ const nameNavigationTimer = ref(null);
 const adminLoginRequested = ref(false);
 const adminAccessNotice = ref("");
 const adminAccessNoticeTimer = ref(null);
+const adminSessionWarning = ref(false);
 const adminDisplay = computed(() => adminSessionDisplay(adminSession.value));
 const adminNavLabel = computed(() => (adminSession.value ? adminDisplay.value.name : "Admin"));
 const adminNavCaption = computed(() =>
@@ -203,6 +218,7 @@ const adminProfilePhotoUrl = computed(
   () => authorPhotoCandidates(adminProfile.value || {})[adminProfilePhotoIndex.value] || ""
 );
 let stopIdentityCallbacks = () => {};
+let stopAdminActivity = () => {};
 let unmounted = false;
 
 const profileLoader = createAdminProfileLoader({
@@ -223,6 +239,11 @@ const advanceAdminProfilePhoto = () => {
 };
 
 const finishAdminSignOut = async () => {
+  adminSessionLifecycle.clearLocalSession();
+  adminSessionLifecycle.stop();
+  stopAdminActivity();
+  stopAdminActivity = () => {};
+  adminSessionWarning.value = false;
   profileLoader.invalidate();
   adminSession.value = null;
   adminProfile.value = null;
@@ -231,9 +252,33 @@ const finishAdminSignOut = async () => {
 };
 
 const signOut = async () => {
-  const signedOut = await signOutAdmin();
+  await signOutAdmin({ onLocalSignOut: finishAdminSignOut });
+};
 
-  if (signedOut && adminSession.value) await finishAdminSignOut();
+const signOutFromWarning = () => signOutAdmin({ confirmImpl: () => true, onLocalSignOut: finishAdminSignOut });
+
+const continueAdminSession = () => {
+  if (adminSessionLifecycle.continueSession()) adminSessionWarning.value = false;
+};
+
+const startAdminSessionLifecycle = (session) => {
+  adminSessionLifecycle.stop();
+  stopAdminActivity();
+  stopAdminActivity = () => {};
+  adminSessionWarning.value = false;
+
+  if (!session || session.preview) return;
+
+  adminSessionLifecycle.start({
+    identity: globalThis.netlifyIdentity,
+    onWarning: () => {
+      adminSessionWarning.value = true;
+    },
+    onExpire: () => finishAdminSignOut(),
+  });
+  stopAdminActivity = adminSessionLifecycle.observeActivity({
+    isAdminSurface: () => Boolean(route.meta?.requiresAdmin),
+  });
 };
 
 const navigateHome = () => {
@@ -283,13 +328,6 @@ const submitAdminAccess = async () => {
 };
 
 onMounted(async () => {
-  const session = await getAdminSession();
-
-  if (unmounted) return;
-  adminSession.value = session;
-  await loadAdminProfile();
-  if (unmounted) return;
-
   const identity = globalThis.netlifyIdentity;
   stopIdentityCallbacks = bindIdentityCallbacks({
     identity,
@@ -297,9 +335,11 @@ onMounted(async () => {
       profileLoader.invalidate();
       return completeAdminIdentityLogin({
         identity,
+        lifecycle: adminSessionLifecycle,
         getSessionImpl: getAdminSession,
         setSession: (sessionAfterLogin) => {
           adminSession.value = sessionAfterLogin;
+          startAdminSessionLifecycle(sessionAfterLogin);
         },
         loadProfile: loadAdminProfile,
         isLoginRequested: () => adminLoginRequested.value,
@@ -313,6 +353,13 @@ onMounted(async () => {
     },
     onLogout: () => finishAdminSignOut(),
   });
+
+  const session = await getAdminSession();
+
+  if (unmounted) return;
+  adminSession.value = session;
+  startAdminSessionLifecycle(session);
+  await loadAdminProfile();
 });
 
 onBeforeUnmount(() => {
@@ -321,6 +368,8 @@ onBeforeUnmount(() => {
   clearTimeout(nameNavigationTimer.value);
   clearTimeout(adminAccessNoticeTimer.value);
   stopIdentityCallbacks();
+  adminSessionLifecycle.stop();
+  stopAdminActivity();
 });
 </script>
 
@@ -354,6 +403,11 @@ onBeforeUnmount(() => {
 .admin-access-card {
   max-width: calc(100vw - 24px);
   width: 380px;
+}
+
+.admin-session-warning-card {
+  max-width: calc(100vw - 24px);
+  width: 440px;
 }
 
 .admin-access-title {

@@ -27,6 +27,11 @@ const deferred = () => {
   return { promise, reject, resolve };
 };
 
+const acceptedLifecycle = {
+  acceptedSessionId: () => "browser-session-test",
+  canUseSession: (sessionId) => sessionId === "browser-session-test",
+};
+
 describe("admin auth preview sessions", () => {
   it("uses owner as the default local preview role for full admin testing", () => {
     assert.equal(selectedPreviewRole({ storage: null }), "owner");
@@ -100,7 +105,7 @@ describe("admin auth preview sessions", () => {
     };
 
     try {
-      const session = await getAdminSession();
+      const session = await getAdminSession({ lifecycle: acceptedLifecycle });
 
       assert.deepEqual(session.roles, ["owner"]);
       assert.equal(adminSessionDisplay(session).role, "Owner");
@@ -129,13 +134,14 @@ describe("admin auth preview sessions", () => {
     };
 
     try {
-      assert.deepEqual(await getAdminSession(), {
+      assert.deepEqual(await getAdminSession({ lifecycle: acceptedLifecycle }), {
         subject: "user-123",
         name: "writer@example.test",
         roles: ["writer"],
         authorEntryId: "author-1",
         token: "token",
         preview: false,
+        lifecycleId: "browser-session-test",
       });
     } finally {
       globalThis.netlifyIdentity = previousIdentity;
@@ -377,6 +383,27 @@ describe("admin auth preview sessions", () => {
 
     assert.equal(await signOutAdmin({ identity, confirmImpl: () => true }), true);
     assert.deepEqual(calls, ["logout"]);
+  });
+
+  it("clears local UI state before provider logout work settles", async () => {
+    const events = [];
+    const lifecycle = {
+      logout() {
+        events.push("lifecycle-local-clear");
+        return Promise.resolve().then(() => events.push("provider-logout"));
+      },
+    };
+
+    assert.equal(
+      await signOutAdmin({
+        identity: {},
+        lifecycle,
+        confirmImpl: () => true,
+        onLocalSignOut: () => events.push("ui-clear"),
+      }),
+      true
+    );
+    assert.deepEqual(events, ["lifecycle-local-clear", "ui-clear", "provider-logout"]);
   });
 
   it("returns a signed-out admin route home without adding browser history", async () => {
