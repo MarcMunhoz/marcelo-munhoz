@@ -26,6 +26,7 @@ The marker and coordination events contain no JWT, provider identity, email, rol
 - `app/src/utils/adminAuth.js` rejects provider-restored users before requesting a JWT when the local browser-session gate is not accepted.
 - `app/src/utils/adminApi.js` rejects an expired production session before starting a protected fetch.
 - `app/src/layouts/MainLayout.vue` owns Identity callbacks, the inactivity warning, lifecycle teardown, profile cleanup, and signed-out navigation.
+- The warning displays an `MM:SS` countdown recalculated from authoritative lifecycle snapshots; it cannot renew the session and stops on continuation, logout, expiration, cross-tab dismissal, or teardown.
 - Administrative pages use the centralized hydration path and no longer register competing provider callbacks.
 - Cookie decoding errors, unavailable cookie/storage APIs, invalid clocks, transport failures, concurrent logout, and offline provider logout fail closed locally.
 - BroadcastChannel coordination uses a same-origin storage-event fallback with strict message shape, event type, timestamp, marker, and key validation.
@@ -44,8 +45,8 @@ Verification uses the exact locked dependency graph already restored in a dedica
 
 Final automated verification established:
 
-- 363 tests pass in the full existing suite;
-- focused lifecycle tests cover provider restoration, same-session reload, secure marker attributes, explicit and concurrent logout, offline logout, preview isolation, warning and expiry thresholds, explicit continuation, activity scoping and throttling, invalid clocks, cross-tab behavior, strict token-free messages, corrupted browser state, and pre-fetch expiry rejection;
+- 340 tests pass across 25 suites in the full existing test run;
+- focused lifecycle tests cover provider restoration, same-session reload, secure marker attributes, explicit and concurrent logout, offline logout, preview isolation, warning and expiry thresholds, countdown timing and teardown, explicit continuation, activity scoping and throttling, invalid clocks, cross-tab behavior, strict token-free messages, corrupted browser state, and pre-fetch expiry rejection;
 - authentication and administrative frontend regression tests pass;
 - lint passes;
 - the production build passes from a sanitized source copy containing no `.env*` files and with zero injected environment values;
@@ -68,15 +69,28 @@ The review identified and the implementation subsequently resolved these fronten
 
 The reviewer rechecked the fixes and found no directly introduced regression. Manual browser scenarios remain unclaimed until they are executed.
 
-## Manual evidence still required
+## Manual browser evidence
+
+Recorded on 2026-08-31 using a second browser against the deployed application:
+
+- the administrator authenticated successfully;
+- normal reload and cache-bypassing reload preserved the accepted session on `/admin`, `/`, and `/blog` during the same browser session;
+- after fully closing and reopening that browser, the application presented a signed-out state;
+- direct navigation to `/admin` after reopening did not restore administrative access.
+
+This confirms same-session reload behavior, including reloads from public surfaces, plus browser-close/reopen behavior and direct-route rejection for that browser configuration. It does not establish identical session-cookie behavior for every browser or session-restoration setting.
+
+### Evidence still required
 
 Manual browser verification must record the observed result for:
 
-- same-browser-session reload;
-- full browser close and reopen under the tested browser configuration;
 - the 14-minute warning;
 - automatic expiration at 15 minutes;
 - explicit continuation from the warning;
 - cross-tab logout and expiration.
 
 No credentials, provider tokens, account identifiers, private URLs, local paths, screenshots containing sensitive data, or environment-specific identifiers may be included in that record.
+
+### Owner acceptance
+
+On 2026-08-31, the project owner accepted the remaining session-lifecycle behavior based on the deterministic automated coverage and requested closure without further manual execution. The warning, automatic expiration, explicit continuation, and cross-tab scenarios listed above remain unclaimed as observed browser evidence; this acceptance does not reclassify automated results as manual evidence.
