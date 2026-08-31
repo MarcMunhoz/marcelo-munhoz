@@ -132,7 +132,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { getAuthorProfile, updateAuthorProfile, adminUserMessage } from "../utils/adminApi.js";
-import { adminAccountInitials, adminSessionDisplay, bindIdentityCallbacks, getAdminSession, isWriterSession } from "../utils/adminAuth.js";
+import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession } from "../utils/adminAuth.js";
 import {
   authorProfileToForm,
   buildAuthorProfilePayload,
@@ -152,7 +152,6 @@ import {
 const router = useRouter();
 let active = true;
 let profileRequestId = 0;
-let stopIdentityCallbacks = () => {};
 const session = ref(null);
 const sessionResolved = ref(false);
 const profileForm = ref(createEmptyAuthorProfileForm());
@@ -192,19 +191,6 @@ const biographyPreview = computed(() => profileForm.value.biography || "");
 watch(() => profileForm.value.gravatarProfile, () => { profilePhotoIndex.value = 0; });
 watch(() => profileForm.value.fallbackPhotoUrl, () => { profilePhotoIndex.value = 0; });
 
-const registerIdentityCallbacks = () => {
-  const identity = globalThis.netlifyIdentity;
-  stopIdentityCallbacks = bindIdentityCallbacks({
-    identity,
-    onLogin: async () => {
-      identity?.close?.();
-      const sessionAfterLogin = await getAdminSession();
-      if (!active) return;
-      session.value = sessionAfterLogin;
-      await loadAuthorProfile();
-    },
-  });
-};
 const redirectSignedOutVisitor = () => {
       if (!session.value) {
         router.replace("/");
@@ -297,7 +283,6 @@ const useProfileInitials = () => {
   profileForm.value.gravatarProfile = ""; profileForm.value.gravatarHash = ""; profileForm.value.fallbackPhotoUrl = ""; profileForm.value.photoUrl = ""; markPhotoSettingsChanged();
 };
 onMounted(async () => {
-  registerIdentityCallbacks();
   const initialSession = await getAdminSession();
   if (!active) return;
   session.value = initialSession;
@@ -308,7 +293,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   active = false;
   profileRequestId += 1;
-  stopIdentityCallbacks();
 });
 </script>
 

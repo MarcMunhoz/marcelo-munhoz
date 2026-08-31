@@ -1,4 +1,5 @@
 import { buildApiUrl } from "./apiBase.js";
+import { adminSessionLifecycle } from "./adminSessionLifecycle.js";
 
 const ADMIN_ARTICLES_PATH = "/api/admin/contentful/articles";
 const ADMIN_MEDIA_PATH = "/media/assets";
@@ -57,7 +58,11 @@ export const adminUserMessage = (error, { media = false } = {}) => {
   return media ? "Media request failed." : "The admin request could not be completed.";
 };
 
-export const adminRequest = async ({ path, method = "GET", body, session, fetchImpl = fetch }) => {
+export const adminRequest = async ({ path, method = "GET", body, session, fetchImpl = fetch, lifecycle = adminSessionLifecycle }) => {
+  if (!session?.preview && !lifecycle.canUseSession(session?.lifecycleId)) {
+    throw new AdminApiError(401, { error: "Admin session expired" });
+  }
+
   const headers = {
     "content-type": "application/json",
   };

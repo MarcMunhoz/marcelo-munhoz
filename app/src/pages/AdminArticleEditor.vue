@@ -347,7 +347,7 @@ import {
   runTerminalAdminAction,
   slugFromTitle,
 } from "../utils/adminDashboard.js";
-import { bindIdentityCallbacks as bindAdminIdentityCallbacks, getAdminSession, isAdminSignOutNavigation, isWriterSession } from "../utils/adminAuth.js";
+import { getAdminSession, isAdminSignOutNavigation, isWriterSession } from "../utils/adminAuth.js";
 import { normalizeEditorialTagOptions } from "../utils/adminTags.js";
 import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from "../utils/cloudinaryMediaEditor.js";
 const route = useRoute();
@@ -356,7 +356,6 @@ const bodyEditor = ref(null);
 const templateRefs = { bodyEditor };
 let active = true;
 let editorRequestId = 0;
-let stopIdentityCallbacks = () => {};
 const state = reactive({
   session: null, sessionResolved: false, articleForm: createEmptyArticleForm(), originalFormSnapshot: "", slugTouched: false,
   errors: {}, mediaAssets: [], mediaDialogOpen: false, mediaError: "", mediaEditorConfig: null, mediaUploadFile: null,
@@ -379,19 +378,6 @@ const saveButtonLabel = computed(() => ["published", "changed"].includes(state.l
 const articleBodyPreview = computed(() => state.articleForm.body || "");
 Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel, articleBodyPreview });
 const methods = {
-bindIdentityCallbacks() {
-  const identity = globalThis.netlifyIdentity;
-  stopIdentityCallbacks = bindAdminIdentityCallbacks({
-    identity,
-    onLogin: async () => {
-      identity?.close?.();
-      const sessionAfterLogin = await getAdminSession();
-      if (!active) return;
-      state.session = sessionAfterLogin;
-      await state.loadEditor();
-    },
-  });
-},
 redirectSignedOutVisitor() {
   if (!state.session) {
     router.replace("/");
@@ -906,7 +892,6 @@ onBeforeRouteLeave((_to, _from, next) => {
   next();
 });
 onMounted(async () => {
-  state.bindIdentityCallbacks();
   const initialSession = await getAdminSession();
   if (!active) return;
   state.session = initialSession;
@@ -917,13 +902,12 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   active = false;
   editorRequestId += 1;
-  stopIdentityCallbacks();
 });
 const {
   session, sessionResolved, articleForm, originalFormSnapshot, slugTouched, errors, mediaAssets, mediaDialogOpen, mediaError,
   mediaEditorConfig, mediaUploadFile, availableTagOptions, filteredTagOptions, tagsLoading, showMediaDiagnostics,
   bodyEditorMode, bodyEditorModeOptions, articleLocaleOptions, loadedArticle, statusMessage, feedbackMessage, feedbackTone,
-  dashboardError, loadingAction, editorLoading, bindIdentityCallbacks, redirectSignedOutVisitor, snapshotForm, loadEditor,
+  dashboardError, loadingAction, editorLoading, redirectSignedOutVisitor, snapshotForm, loadEditor,
   applyResolvedSession, applyCurrentAuthorProfile, normalizeTagOptions, loadContentfulTags, filterTagOptions,
   createNewContentfulTag, leaveEditor, updateArticleTitle, markSlugTouched, validateArticleForm, saveDraft, submitReview,
   requestUnpublication, ownerUnpublish, openMediaLibrary, applySelectedMedia, applyEditedMedia, loadMediaEditorConfig,
