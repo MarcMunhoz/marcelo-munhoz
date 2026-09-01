@@ -5,6 +5,7 @@ node_modules
 
 # git
 .git
+
 .gitignore
 .gitlab-ci.yml
 
@@ -26,3 +27,14 @@ Dockerfile
 docker-compose.yaml
 docker-compose_dev.yaml
 docker-compose_prod.yaml
+
+# Test isolation
+.env
+.env.*
+app/.env
+app/.env.*
+app/node_modules
+app/.quasar
+app/dist
+coverage
+artifacts
