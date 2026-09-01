@@ -1,27 +1,27 @@
 ## 1. Baseline And Approved Dependency Setup
 
-- [ ] 1.1 Record the 20 legacy test files, 337 existing cases, source-inspection assertions, route matrix, endpoint matrix, and current container validation results as the migration baseline
-- [ ] 1.2 Map every meaningful legacy guarantee to its target Vitest unit, DOM, component, integration, contract, or Cypress suite before removing any test
-- [ ] 1.3 Obtain explicit user approval before installing or changing Vitest, Vue/Quasar test, coverage, Cypress, browser, polyfill, or reporter dependencies
-- [ ] 1.4 Select mutually compatible pinned dependency and container-image versions for Node, Vitest, Vue 3, Quasar, Chrome, and Firefox
-- [ ] 1.5 Install the approved dependencies and update the lockfile only through the container workflow
+- [x] 1.1 Record the 20 legacy test files, 337 existing cases, source-inspection assertions, route matrix, endpoint matrix, and current container validation results as the migration baseline
+- [x] 1.2 Map every meaningful legacy guarantee to its target Vitest unit, DOM, component, integration, contract, or Cypress suite before removing any test
+- [x] 1.3 Obtain explicit user approval before installing or changing Vitest, Vue/Quasar test, coverage, Cypress, browser, polyfill, or reporter dependencies
+- [x] 1.4 Select mutually compatible pinned dependency and container-image versions for Node, Vitest, Vue 3, Quasar, Chrome, and Firefox
+- [x] 1.5 Install the approved dependencies and update the lockfile only through the container workflow
 
 ## 2. Containerized Test Infrastructure
 
-- [ ] 2.1 Add an isolated test container profile for deterministic Node, DOM, component, and contract execution
-- [ ] 2.2 Add browser-enabled Cypress container profiles with pinned Chrome and Firefox versions and no host-browser dependency
-- [ ] 2.3 Add container-networked frontend and backend services that start without reading local `.env` or credential files
-- [ ] 2.4 Add documented container commands for the complete suite and each focused project or browser run
-- [ ] 2.5 Verify clean container startup, shutdown, exit-code propagation, and generated-artifact ownership
+- [x] 2.1 Add an isolated test container profile for deterministic Node, DOM, component, and contract execution
+- [x] 2.2 Add browser-enabled Cypress container profiles with pinned Chrome and Firefox versions and no host-browser dependency
+- [x] 2.3 Add container-networked frontend and backend services that start without reading local `.env` or credential files
+- [x] 2.4 Add documented container commands for the complete suite and each focused project or browser run
+- [x] 2.5 Verify clean container startup, shutdown, exit-code propagation, and generated-artifact ownership
 
 ## 3. Vitest Architecture And Shared Harnesses
 
-- [ ] 3.1 Configure separate `unit-node`, `unit-dom`, and `component` Vitest projects with explicit include and environment boundaries
-- [ ] 3.2 Configure V8 coverage for first-party Vue, utility, middleware, Function, and script code with 100 percent global and per-file thresholds for all four metrics
-- [ ] 3.3 Configure console, HTML, LCOV, and machine-readable coverage reports while excluding only generated output, dependencies, fixtures, and test infrastructure
-- [ ] 3.4 Add a reviewed technical coverage-exclusion allowlist format and automated validation that rejects undocumented broad ignore directives
-- [ ] 3.5 Add minimal deterministic browser polyfills and cleanup for fetch, storage, cookies, history, media queries, observers, broadcast channels, dialogs, file APIs, and timers
-- [ ] 3.6 Add shared Vue/Quasar mount, router, fixture, provider-client, clock, and browser-state factories with per-test isolation
+- [x] 3.1 Configure separate `unit-node`, `unit-dom`, and `component` Vitest projects with explicit include and environment boundaries
+- [x] 3.2 Configure V8 coverage for first-party Vue, utility, middleware, Function, and script code with 100 percent global and per-file thresholds for all four metrics
+- [x] 3.3 Configure console, HTML, LCOV, and machine-readable coverage reports while excluding only generated output, dependencies, fixtures, and test infrastructure
+- [x] 3.4 Add a reviewed technical coverage-exclusion allowlist format and automated validation that rejects undocumented broad ignore directives
+- [x] 3.5 Add minimal deterministic browser polyfills and cleanup for fetch, storage, cookies, history, media queries, observers, broadcast channels, dialogs, file APIs, and timers
+- [x] 3.6 Add shared Vue/Quasar mount, router, fixture, provider-client, clock, and browser-state factories with per-test isolation
 
 ## 4. Legacy Behavioral And Contract Migration
 
