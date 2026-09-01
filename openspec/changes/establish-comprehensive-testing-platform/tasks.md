@@ -25,9 +25,9 @@
 
 ## 4. Legacy Behavioral And Contract Migration
 
-- [ ] 4.1 Migrate pure utility suites for API bases, archives, dates, authors, media, tags, routing helpers, and responsive logic to Vitest
-- [ ] 4.2 Migrate authentication and administrative session lifecycle suites with fake clocks, controlled storage, cross-tab events, and callback cleanup
-- [ ] 4.3 Migrate public proxy middleware and Netlify Function core tests for success, normalization, bounds, missing configuration, upstream failure, and sanitized errors
+- [x] 4.1 Migrate pure utility suites for API bases, archives, dates, authors, media, tags, routing helpers, and responsive logic to Vitest
+- [x] 4.2 Migrate authentication and administrative session lifecycle suites with fake clocks, controlled storage, cross-tab events, and callback cleanup
+- [x] 4.3 Migrate public proxy middleware and Netlify Function core tests for success, normalization, bounds, missing configuration, upstream failure, and sanitized errors
 - [ ] 4.4 Migrate administrative facade and handler tests for authentication, authorization, ownership, workflow state, version conflicts, tags, profiles, and media operations
 - [ ] 4.5 Migrate CORS, credential scanning, route metadata, redirects, security headers, and other declarative guarantees into parsed or executable contract tests
 - [ ] 4.6 Produce a parity report showing the new owner of every retained legacy guarantee and identifying obsolete implementation-detail assertions
