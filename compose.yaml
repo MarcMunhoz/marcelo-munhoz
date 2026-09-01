@@ -1,0 +1,69 @@
+name: marcelo-munhoz
+
+x-test-runtime: &test-runtime
+  image: marcelo-munhoz-tests-test
+  build:
+    context: .
+    target: test-runtime
+  init: true
+  networks: [test-network]
+
+x-browser-runtime: &browser-runtime
+  build:
+    context: .
+    target: test-browser-runtime
+  depends_on:
+    test-frontend:
+      condition: service_started
+    test-backend:
+      condition: service_started
+  init: true
+  networks: [test-network]
+
+services:
+  app:
+    profiles: [dev]
+    image: marcelo-munhoz_img
+    build:
+      context: .
+      target: develop
+    container_name: marcelo-munhoz_ctn
+    command: /bin/sh -c "npm i && npm run dev"
+    environment:
+      NODE_ENV: development
+    ports:
+      - "1991:1991"
+      - "3000:3000"
+    volumes:
+      - ./app:/app
+
+  test:
+    <<: *test-runtime
+    profiles: [test]
+    command: [npm, test]
+
+  test-frontend:
+    <<: *test-runtime
+    profiles: [e2e, chrome, firefox]
+    command: [npm, run, dev, --, --host, 0.0.0.0]
+    expose: ["1991"]
+
+  test-backend:
+    <<: *test-runtime
+    profiles: [e2e, chrome, firefox]
+    command: [node, middleware/server.js]
+    expose: ["3000"]
+
+  cypress-chrome:
+    <<: *browser-runtime
+    profiles: [chrome]
+    command: [npx, cypress, run, --browser, chrome]
+
+  cypress-firefox:
+    <<: *browser-runtime
+    profiles: [firefox]
+    command: [npx, cypress, run, --browser, firefox]
+
+networks:
+  test-network:
+    internal: true

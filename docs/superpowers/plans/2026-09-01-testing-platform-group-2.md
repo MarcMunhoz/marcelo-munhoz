@@ -4,7 +4,7 @@
 
 **Goal:** Provide isolated Node and browser test containers that never load local environment files.
 
-**Architecture:** A dedicated Compose file separates test execution from the existing development service. Docker build stages install dependencies in-image, exclude environment files from context, use a private service network, and pin the Node and Cypress browser images.
+**Architecture:** One canonical Compose file separates development, test, and browser execution through profiles and reuses shared test-runtime fragments. Docker build stages install dependencies in-image, exclude environment files from context, use a private service network, and pin the Node and Cypress browser images.
 
 **Tech Stack:** Docker Compose, Node 22.22.2, Cypress browsers image with Chrome 141.0.7390.107-1 and Firefox 144.0.
 
@@ -22,7 +22,7 @@
 
 **Files:**
 - Create: `.dockerignore`
-- Create: `docker-compose.test.yaml`
+- Create: `compose.yaml`
 - Modify: `Dockerfile`
 - Create: `docs/testing.md`
 

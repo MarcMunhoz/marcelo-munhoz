@@ -24,9 +24,7 @@ README.md
 # Docker config
 .dockerignore
 Dockerfile
-docker-compose.yaml
-docker-compose_dev.yaml
-docker-compose_prod.yaml
+compose.yaml
 
 # Test isolation
 .env

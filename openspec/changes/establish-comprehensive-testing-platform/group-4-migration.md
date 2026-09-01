@@ -51,13 +51,13 @@ The administrative migration therefore expects 99 primary declared cases plus tw
 
 ## Validation commands
 
-All commands run through the isolated test compose definition without loading a local environment file:
+All commands run through the isolated test profile in the canonical Compose definition without loading a local environment file:
 
 ```sh
-rtk docker compose --env-file /dev/null -f docker-compose.test.yaml --profile test run --build --rm test npm exec -- vitest run --project unit-node
-rtk docker compose --env-file /dev/null -f docker-compose.test.yaml --profile test run --build --rm test npm exec -- vitest run
-rtk docker compose --env-file /dev/null -f docker-compose.test.yaml --profile test run --build --rm test node --test --test-reporter=dot 'tests/*.test.js'
-rtk docker compose --env-file /dev/null -f docker-compose.test.yaml --profile test run --build --rm test npm run lint
+rtk docker compose --env-file /dev/null --profile test run --build --rm test npm exec -- vitest run --project unit-node
+rtk docker compose --env-file /dev/null --profile test run --build --rm test npm exec -- vitest run
+rtk docker compose --env-file /dev/null --profile test run --build --rm test node --test --test-reporter=dot 'tests/*.test.js'
+rtk docker compose --env-file /dev/null --profile test run --build --rm test npm run lint
 rtk openspec validate establish-comprehensive-testing-platform --strict
 rtk git diff --check
 ```

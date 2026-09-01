@@ -101,7 +101,7 @@ The implementation will use separate detailed commits for platform scaffolding, 
 ## Migration Plan
 
 1. Obtain explicit approval before installing or changing dependencies, then add pinned Vitest, Vue/Quasar test support, coverage, Cypress, and reporter dependencies inside the container workflow.
-2. Add container test profiles and baseline Vitest projects without removing the legacy runner.
+2. Add a canonical `compose.yaml` with isolated development, test, and browser profiles, reusing shared test-runtime fragments without removing the legacy runner. Test commands explicitly disable implicit environment-file loading.
 3. Migrate executable unit, middleware, Function, authorization, and session tests with a parity inventory.
 4. Replace source-text frontend assertions with mounted component behavior and retain only legitimate parsed contract checks.
 5. Close coverage gaps until every included file and metric reaches 100 percent; review and document any technical allowlist entry.
