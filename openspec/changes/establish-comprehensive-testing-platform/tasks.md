@@ -34,8 +34,8 @@
 
 ## 5. Rendered Vue And Quasar Behavior
 
-- [ ] 5.1 Replace source inspection for the application shell and main layout with rendered navigation, access entry, account menu, cookie, metadata, focus, and responsive tests
-- [ ] 5.2 Add rendered Home, About, and not-found page tests for content, interactions, external-link safety, and responsive presentation
+- [x] 5.1 Replace source inspection for the application shell and main layout with rendered navigation, access entry, account menu, cookie, metadata, focus, and responsive tests
+- [x] 5.2 Add rendered Home, About, and not-found page tests for content, interactions, external-link safety, and responsive presentation
 - [ ] 5.3 Add rendered Blog archive tests for highlights, filters, pagination, URL state, loading, empty, failure, retry, and responsive controls
 - [ ] 5.4 Add rendered article and author tests for locale, Markdown boundary, tags, images, archive return state, chronological neighbors, pagination, and fallbacks
 - [ ] 5.5 Add rendered admin dashboard tests for signed-out, writer, owner, filters, queues, actions, loading, empty, error, and responsive states

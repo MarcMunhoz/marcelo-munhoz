@@ -45,6 +45,16 @@ This report records the disposition of every legacy suite. No legacy test can be
 | Article locale round trip | `tests/unit-node/article-locale-round-trip.test.js` | Two generated locale cases across editor payload, management publication and public delivery |
 | Declarative deployment contracts | `tests/unit-node/declarative-contracts.test.js` | Executable or parsed CORS, server, route, credential, redirect, header, build, Function, robots and Identity guarantees |
 
+## Implemented rendered owners through task 5.2
+
+| Legacy guarantee family | Passing component owner | Migration note |
+| --- | --- | --- |
+| Application shell and route metadata | `tests/component/app-shell.test.js` | Query-stable rendering, public/admin metadata, cookie presentation and dismissal |
+| Main navigation and administrative entry | `tests/component/main-layout.test.js` | Desktop/mobile surfaces, focusability, access phrase, account fallback, warning and sign-out |
+| Home, About and not-found pages | `tests/component/public-pages.test.js` | Rendered content, media, ordered safe links, social interactions, responsive semantic structure and recovery navigation |
+
+Computed breakpoint layout remains with Cypress 7.2 because Happy DOM does not evaluate media queries.
+
 ## Retire only after replacement success
 
 The `compositionApiMigration` suite is implementation detail. Source-text and markup/token assertions in the frontend and responsive suites become rendered component or Cypress assertions. Parsed route, redirect, header, credential-isolation, and build-boundary guarantees remain contract tests. Provider request shape remains an implementation detail unless it is required for an external compatibility contract; normalized input, bounds, version handling, and sanitized failure behavior remain integration guarantees.
@@ -68,10 +78,10 @@ The `compositionApiMigration` suite is implementation detail. Source-text and ma
 | `cloudinaryMedia` | All 15 provider and handler cases: `unit-node/cloudinary-media-facade.test.js` | Rendered media selection remains with 5.6 and 7.6. |
 | `corsPolicy` | Effective HTTP CORS and server wiring: `unit-node/declarative-contracts.test.js` | Fully migrated. |
 | `buildCredentialScan` | Clean and leaking build fixtures: `unit-node/declarative-contracts.test.js` | Real built-output execution remains a release gate in 9.3 and 10.3. |
-| `routingConfiguration` | Helpers: `unit-node/routing-helpers.test.js`; effective routes, redirects, headers, server, Quasar and Function boundaries: `unit-node/declarative-contracts.test.js` | Query-stable rendering and component API use remain with Group 5. |
+| `routingConfiguration` | Helpers: `unit-node/routing-helpers.test.js`; effective routes, redirects, headers, server, Quasar and Function boundaries: `unit-node/declarative-contracts.test.js`; query-stable shell: `component/app-shell.test.js` | Remaining rendered routes move through Group 5. |
 | `blogFrontend` | Pure content helpers: `unit-node/public-content-utilities.test.js`, `blog-archive.test.js`, `routing-helpers.test.js` | Markup, accessibility, focus, states and responsive source assertions move to 5.1–5.4 and Cypress; exact CSS/token matching is obsolete afterward. |
 | `adminFrontend` | Pure editorial helpers: `unit-node/editorial-utilities.test.js`; API calls: `unit-node/admin-api.test.js`; declarative boundaries: `unit-node/declarative-contracts.test.js` | Dashboard/editor/profile/tag rendering moves to 5.5–5.7; helper-existence, import, markup and exact CSS assertions become obsolete afterward. |
-| `publicResponsiveLayout` | Observable shell and containment are assigned to component tests 5.1–5.2 and Cypress 7.2 | All current CSS/source-token assertions are implementation detail and retire only after those owners pass. |
+| `publicResponsiveLayout` | Shell and responsive semantic structure: `component/app-shell.test.js`, `component/main-layout.test.js`, `component/public-pages.test.js`; computed layout: Cypress 7.2 | Exact CSS/source-token assertions retire only after Cypress 7.2 passes. |
 | `compositionApiMigration` | No retained runtime guarantee; observable behavior is owned by component and Cypress suites | All four `script setup` source-form assertions are obsolete implementation detail. |
 
 ## Retirement decision
