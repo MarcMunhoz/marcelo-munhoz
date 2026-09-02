@@ -9,6 +9,7 @@
 import { defineConfig } from "#q-app";
 import dotenv from "dotenv";
 import os from "os";
+import { quasarBuildEnvironment, quasarDevServerProxy } from "./quasarBuildManifest.js";
 
 const isWSL = os.release().toLowerCase().includes("microsoft");
 
@@ -66,7 +67,7 @@ export default defineConfig(function (ctx) {
 
       // publicPath: '/',
       // analyze: true,
-      env: {},
+      env: quasarBuildEnvironment,
       // rawDefine: {}
       // ignorePublicFolder: true,
       // minify: false,
@@ -85,17 +86,7 @@ export default defineConfig(function (ctx) {
     devServer: {
       // https: true
       port: 1991,
-      proxy: {
-        "/api/admin/contentful": {
-          target: "http://localhost:3000",
-          changeOrigin: true,
-        },
-        "/api": {
-          target: "http://localhost:3000",
-          changeOrigin: true,
-          pathRewrite: { "^/api": "/api" },
-        },
-      },
+      proxy: quasarDevServerProxy,
       open: false, // opens browser window automatically
       watch: {
         usePolling: isWSL ? { usePolling: true, interval: 100 } : {},

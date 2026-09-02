@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { createApp } from "../middleware/createApp.js";
+import contentfulAdminRoutes from "../middleware/routes/contentfulAdmin.js";
 import contentfulRoutes from "../middleware/routes/contentful.js";
+import { quasarBuildEnvironment, quasarDevServerProxy } from "../quasarBuildManifest.js";
 import routes from "../src/router/routes.js";
 import { scrollBehavior } from "../src/router/scrollBehavior.js";
 import { publicAuthorMetadata } from "../src/utils/authorProfiles.js";
@@ -130,30 +133,19 @@ describe("routing configuration", () => {
   });
 
   it("mounts local admin Contentful routes separately from public routes", () => {
-    const serverSource = read("../middleware/server.js");
+    const mountedHandlers = createApp().router.stack.map((layer) => layer.handle);
 
-    assert.match(serverSource, /isAllowedCorsOrigin/);
-    assert.match(serverSource, /contentfulAdminRoutes/);
-    assert.match(serverSource, /app\.use\("\/api\/admin\/contentful", contentfulAdminRoutes\)/);
-    assert.match(serverSource, /app\.use\("\/api\/contentful", contentfulRoutes\)/);
+    assert.equal(mountedHandlers.includes(contentfulAdminRoutes), true);
+    assert.equal(mountedHandlers.includes(contentfulRoutes), true);
   });
 
   it("proxies local admin API calls from the Quasar dev server to the local middleware server", () => {
-    const quasarConfig = read("../quasar.config.js");
-
-    assert.match(quasarConfig, /devServer:\s*\{/);
-    assert.match(quasarConfig, /"\/api\/admin\/contentful"/);
-    assert.match(quasarConfig, /target:\s*"http:\/\/localhost:3000"/);
+    assert.equal(quasarDevServerProxy["/api/admin/contentful"].target, "http://localhost:3000");
+    assert.equal(quasarDevServerProxy["/api"].target, "http://localhost:3000");
   });
 
   it("does not inject Contentful credentials into the frontend build config", () => {
-    const quasarConfig = read("../quasar.config.js");
-
-    assert.doesNotMatch(
-      quasarConfig,
-      /CONTENTFUL_DELIVERY_KEY|CONTENTFUL_DELIVERY|CONTENTFUL_SPACE_ID|CONTENTFUL_MANAGEMENT_KEY|CONTENTFUL_MANAGEMENT_TOKEN|CLOUDINARY_API_KEY|CLOUDINARY_API_SECRET/
-    );
-    assert.match(quasarConfig, /env:\s*\{\}/);
+    assert.deepEqual(quasarBuildEnvironment, {});
   });
 
   it("keeps Cloudinary write credentials out of frontend source", () => {
@@ -162,7 +154,6 @@ describe("routing configuration", () => {
       "../src/utils/adminApi.js",
       "../src/utils/adminDashboard.js",
       "../src/utils/contentfulImages.js",
-      "../quasar.config.js",
     ];
 
     for (const file of frontendFiles) {

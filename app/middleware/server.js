@@ -1,36 +1,22 @@
-import express from "express";
 import dotenv from "dotenv";
-import cors from "cors";
-import { isAllowedCorsOrigin } from "./corsPolicy.js";
-import contentfulAdminRoutes from "./routes/contentfulAdmin.js";
-import contentfulRoutes from "./routes/contentful.js";
+import { fileURLToPath } from "node:url";
+import { createApp } from "./createApp.js";
 
-dotenv.config();
+export const loadEnvironment = () => dotenv.config();
 
-const app = express();
-const port = process.env.PORT || 3000;
-const allowedOrigins = (process.env.ALLOWED_ORIGINS?.split(",") || []).map((origin) => origin.trim()).filter(Boolean);
+const allowedOriginsFrom = (env) =>
+  (env.ALLOWED_ORIGINS?.split(",") || []).map((origin) => origin.trim()).filter(Boolean);
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (isAllowedCorsOrigin(origin, { nodeEnv: process.env.NODE_ENV, allowedOrigins })) {
-        return callback(null, true);
-      }
-      callback(new Error("Not allowed by CORS"));
-    },
-  })
-);
+export const startServer = ({ appFactory = createApp, env = process.env, loadEnv = loadEnvironment, onListen, port } = {}) => {
+  loadEnv();
 
-// Keeps banckend alive
-app.get("/healthz", (_, res) => {
-  res.status(200).send("OK");
-});
+  const resolvedPort = port ?? (env.PORT || 3000);
+  const app = appFactory({ nodeEnv: env.NODE_ENV, allowedOrigins: allowedOriginsFrom(env) });
+  const logListening = onListen ?? (() => console.log(`🚀 Server running on port ${resolvedPort}`));
 
-// 👉 API
-app.use("/api/admin/contentful", contentfulAdminRoutes);
-app.use("/api/contentful", contentfulRoutes);
+  return app.listen(resolvedPort, logListening);
+};
 
-app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  startServer();
+}
