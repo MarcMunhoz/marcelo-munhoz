@@ -13,7 +13,7 @@
       </q-card-section>
 
       <q-card-actions align="center" class="social-links">
-        <q-btn flat round :icon="`${social.iconPrefix}-${social.nameAccount}`" v-for="social in filteredSocialList()" :key="social.index" @click="onClickItem(`${social.urlAccount}${social.userAccount}`)" size="xl" color="blue-grey-5" />
+        <q-btn flat round :icon="`${social.iconPrefix}-${social.nameAccount}`" :aria-label="social.nameAccount" v-for="social in filteredSocialList()" :key="social.index" @click="onClickItem(`${social.urlAccount}${social.userAccount}`)" size="xl" color="blue-grey-5" />
       </q-card-actions>
     </q-card>
   </q-page>
@@ -30,7 +30,7 @@ defineOptions({
 
 const filteredSocialList = () =>
   sortAnything(socialNetwork, "nameAccount").filter((social) => social.useItOn.includes("where"));
-const onClickItem = (link) => window.open(link, "project");
+const onClickItem = (link) => window.open(link, "project", "noopener,noreferrer");
 const addFlip = (event) => event.target.classList.add("fa-flip");
 const removeFlip = (event) => event.target.classList.remove("fa-flip");
 let icons = [];
