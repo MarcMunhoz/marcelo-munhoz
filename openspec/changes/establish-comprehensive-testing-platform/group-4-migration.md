@@ -35,11 +35,11 @@ The legacy `contentfulProxy` suite contains 49 declared tests and 51 executed ca
 
 No additional dependency, shared provider harness, production modification, legacy removal, or live provider access is planned. One temporary incorrect literal establishes a controlled RED for the migrated suite; it is restored before the focused and complete GREEN runs.
 
-## Item 4.4 investigated and deferred
+## Items 4.4 and 4.5 completed
 
-Item 4.4 is intentionally not implemented in this round. Its discovered migration inventory is:
+Item 4.4 migrated the administrative behavior into five `unit-node` owners:
 
-| Legacy source | Declared cases | Planned Vitest owner | Behavioral boundary |
+| Legacy source | Declared cases | Vitest owner | Behavioral boundary |
 | --- | ---: | --- | --- |
 | `contentfulManagementFacade.test.js` | 34 | `unit-node/contentful-management-facade.test.js` | localized mutations, ownership, workflow transitions, version conflicts, tags, rate limits, configuration and provider failures |
 | `contentfulAdmin.test.js` | 41 | `unit-node/contentful-admin-handler.test.js` | session mapping, authentication, authorization, author profiles, dashboard filtering, writer/owner route behavior and sanitized handler failures |
@@ -47,7 +47,20 @@ Item 4.4 is intentionally not implemented in this round. Its discovered migratio
 | Executable `adminApi` cases from `adminFrontend.test.js` | 9 | `unit-node/admin-api.test.js` | browser facade request paths, bearer or preview headers, versions, tags, profiles, dashboard and editor configuration |
 | `articleLocaleRoundTrip.test.js` | 2 generated cases | `unit-node/article-locale-round-trip.test.js` | locale preservation across editor payload, management publication and public delivery |
 
-The administrative migration therefore expects 99 primary declared cases plus two generated locale round trips. Pure dashboard, author-photo, authentication, access, session, and responsive utilities already have owners from items 4.1 and 4.2 and must not be duplicated. Declarative/source-text portions of the hybrid admin suite remain assigned to tasks 4.5 and 5.x.
+The administrative migration preserves 99 primary declarations plus two generated locale round trips. Pure dashboard, author-photo, authentication, access, session, and responsive utilities remain with their earlier owners and were not duplicated.
+
+Item 4.5 added `tests/unit-node/declarative-contracts.test.js` with executable or parsed ownership for the server entrypoint, CORS, public endpoint registration, credential scanning, Vue route metadata, Netlify redirects and security headers, Quasar build/proxy configuration, Function dependency boundaries, `robots.txt`, and the Identity widget. Minimal pure seams make the Express and Quasar configuration observable without reading environment files or contacting providers. UI-observable guarantees remain assigned to Group 5, and all legacy suites remain available until final retirement.
+
+Validation after items 4.4 and 4.5:
+
+- Focused declarative contracts: 11 passing tests.
+- Complete Vitest run: 294 passing tests in 20 files.
+- Legacy `node:test` regression and ESLint: successful exits.
+- Independent reviews: no unresolved critical findings; all important findings were corrected before completion.
+
+## Item 4.6 completed
+
+`parity-matrix.md` now records the disposition of all 20 legacy suites: the passing Vitest owner for migrated guarantees, the future component or Cypress owner for retained observable behavior, and the source-form, helper-existence, markup-token, or exact-CSS assertions that become obsolete only after their behavioral replacements pass. The report explicitly keeps legacy retirement blocked on Groups 5 and 7 plus final coverage and parity validation.
 
 ## Validation commands
 
