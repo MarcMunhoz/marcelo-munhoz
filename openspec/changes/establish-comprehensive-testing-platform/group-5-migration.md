@@ -20,3 +20,11 @@ Happy DOM proves the rendered semantics and breakpoint-owned component structure
 - Tests use memory routing, fake time where calendar output matters, controlled authentication and session doubles, and no live provider access.
 
 All test commands execute through the isolated Compose test profile with implicit environment-file loading disabled.
+
+## Items 5.3 through 5.8 completed
+
+Items 5.3 through 5.7 add rendered component ownership for the blog archive, article and author pages, administrative dashboard and editor, author profile, and tag management. The resulting component project contains 43 passing tests in 10 files.
+
+Item 5.8 removes 36 source-inspection cases only after their unit, contract, or rendered owners pass. The obsolete four-case Composition API structural suite is removed completely; replaced markup, state, route, and configuration token assertions are removed surgically from the hybrid frontend and routing suites. Functional legacy cases and CSS, focus, containment, and responsive assertions remain until Cypress supplies their browser owners and item 10.1 authorizes final runner retirement.
+
+Validation after retirement: 306 legacy functional or pending-browser cases pass, and the complete Vitest suite passes 336 tests in 29 files. No dependency, production behavior, or container image changes are part of this item.

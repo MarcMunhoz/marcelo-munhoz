@@ -45,13 +45,18 @@ This report records the disposition of every legacy suite. No legacy test can be
 | Article locale round trip | `tests/unit-node/article-locale-round-trip.test.js` | Two generated locale cases across editor payload, management publication and public delivery |
 | Declarative deployment contracts | `tests/unit-node/declarative-contracts.test.js` | Executable or parsed CORS, server, route, credential, redirect, header, build, Function, robots and Identity guarantees |
 
-## Implemented rendered owners through task 5.2
+## Implemented rendered owners through task 5.7
 
 | Legacy guarantee family | Passing component owner | Migration note |
 | --- | --- | --- |
 | Application shell and route metadata | `tests/component/app-shell.test.js` | Query-stable rendering, public/admin metadata, cookie presentation and dismissal |
 | Main navigation and administrative entry | `tests/component/main-layout.test.js` | Desktop/mobile surfaces, focusability, access phrase, account fallback, warning and sign-out |
 | Home, About and not-found pages | `tests/component/public-pages.test.js` | Rendered content, media, ordered safe links, social interactions, responsive semantic structure and recovery navigation |
+| Blog archive | `tests/component/blog-archive.test.js` | Highlights, article rows, metadata, filters, pagination, URL state, loading, empty, failure and retry behavior |
+| Article and author pages | `tests/component/article-author.test.js` | Locale, Markdown boundary, tags, images, return state, chronological neighbors, pagination and fallbacks |
+| Administrative dashboard | `tests/component/admin-dashboard.test.js` | Signed-out, writer and owner rendering, filters, queues, lifecycle actions and feedback states |
+| Administrative editor | `tests/component/admin-article-editor.test.js` | Create and edit modes, validation, ownership, locale, slug, Markdown, tags, media, navigation guards and terminal actions |
+| Author profile and tag management | `tests/component/admin-profile.test.js`; `tests/component/admin-tags.test.js` | Role enforcement, validation, photo fallback/reset, persistence, tag creation, usage constraints and deletion confirmation |
 
 Computed breakpoint layout remains with Cypress 7.2 because Happy DOM does not evaluate media queries.
 
@@ -78,12 +83,12 @@ The `compositionApiMigration` suite is implementation detail. Source-text and ma
 | `cloudinaryMedia` | All 15 provider and handler cases: `unit-node/cloudinary-media-facade.test.js` | Rendered media selection remains with 5.6 and 7.6. |
 | `corsPolicy` | Effective HTTP CORS and server wiring: `unit-node/declarative-contracts.test.js` | Fully migrated. |
 | `buildCredentialScan` | Clean and leaking build fixtures: `unit-node/declarative-contracts.test.js` | Real built-output execution remains a release gate in 9.3 and 10.3. |
-| `routingConfiguration` | Helpers: `unit-node/routing-helpers.test.js`; effective routes, redirects, headers, server, Quasar and Function boundaries: `unit-node/declarative-contracts.test.js`; query-stable shell: `component/app-shell.test.js` | Remaining rendered routes move through Group 5. |
-| `blogFrontend` | Pure content helpers: `unit-node/public-content-utilities.test.js`, `blog-archive.test.js`, `routing-helpers.test.js` | Markup, accessibility, focus, states and responsive source assertions move to 5.1–5.4 and Cypress; exact CSS/token matching is obsolete afterward. |
-| `adminFrontend` | Pure editorial helpers: `unit-node/editorial-utilities.test.js`; API calls: `unit-node/admin-api.test.js`; declarative boundaries: `unit-node/declarative-contracts.test.js` | Dashboard/editor/profile/tag rendering moves to 5.5–5.7; helper-existence, import, markup and exact CSS assertions become obsolete afterward. |
+| `routingConfiguration` | Helpers: `unit-node/routing-helpers.test.js`; effective routes, redirects, headers, server, Quasar and Function boundaries: `unit-node/declarative-contracts.test.js`; query-stable shell: `component/app-shell.test.js` | Redundant source-token assertions retired in 5.8; executable legacy duplicates remain until 10.1. |
+| `blogFrontend` | Pure content helpers: `unit-node/public-content-utilities.test.js`, `blog-archive.test.js`, `routing-helpers.test.js`; rendered archive/article behavior: `component/blog-archive.test.js`, `component/article-author.test.js` | Replaced markup/state assertions retired in 5.8; CSS, focus and responsive assertions remain until Cypress 7.3–7.4. |
+| `adminFrontend` | Pure editorial helpers: `unit-node/editorial-utilities.test.js`; API calls: `unit-node/admin-api.test.js`; declarative boundaries: `unit-node/declarative-contracts.test.js`; rendered administration: component suites from 5.5–5.7 | Replaced helper-existence, import, markup and state assertions retired in 5.8; CSS and responsive assertions remain until Cypress 7.6–7.7. |
 | `publicResponsiveLayout` | Shell and responsive semantic structure: `component/app-shell.test.js`, `component/main-layout.test.js`, `component/public-pages.test.js`; computed layout: Cypress 7.2 | Exact CSS/source-token assertions retire only after Cypress 7.2 passes. |
-| `compositionApiMigration` | No retained runtime guarantee; observable behavior is owned by component and Cypress suites | All four `script setup` source-form assertions are obsolete implementation detail. |
+| `compositionApiMigration` | No retained runtime guarantee; observable behavior is owned by component suites | Suite removed in 5.8 because all four `script setup` source-form assertions were obsolete implementation detail. |
 
 ## Retirement decision
 
-Group 4 establishes passing Vitest ownership for executable server, utility, session, administrative and declarative guarantees. Legacy removal is not yet authorized: rendered frontend guarantees listed above must first pass in Group 5, browser journeys must pass in Group 7, and final parity and coverage validation must pass before tasks 5.8 and 10.1 remove redundant suites.
+Task 5.8 removed 36 redundant source-inspection cases after their unit, contract or rendered component owners passed: the four-case `compositionApiMigration` suite, 19 administrative cases plus the source-only portion of one hybrid case, four public blog markup/state cases, and nine routing/configuration token cases. Functional legacy tests and CSS, focus, containment and responsive assertions remain available until their Cypress owners pass. Removing the legacy runner and the remaining duplicate suites is still reserved for 10.1 after Groups 6 and 7 and final parity validation.

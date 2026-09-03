@@ -41,7 +41,7 @@
 - [x] 5.5 Add rendered admin dashboard tests for signed-out, writer, owner, filters, queues, actions, loading, empty, error, and responsive states
 - [x] 5.6 Add rendered article editor tests for create and edit modes, validation, ownership, locale, slug, Markdown, tags, images, unsaved changes, and terminal actions
 - [x] 5.7 Add rendered author profile and tag management tests for validation, photo fallbacks, creation, usage constraints, deletion confirmation, and role enforcement
-- [ ] 5.8 Remove redundant composition and source-text assertions only after their observable or contract guarantees pass in the replacement suites
+- [x] 5.8 Remove redundant composition and source-text assertions only after their observable or contract guarantees pass in the replacement suites
 
 ## 6. Complete Coverage Closure
 
