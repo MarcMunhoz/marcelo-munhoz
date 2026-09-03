@@ -132,7 +132,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { getAuthorProfile, updateAuthorProfile, adminUserMessage } from "../utils/adminApi.js";
-import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession } from "../utils/adminAuth.js";
+import { adminAccountInitials, adminSessionDisplay, getAdminSession, isWriterSession, openAdminLogin } from "../utils/adminAuth.js";
 import {
   authorProfileToForm,
   buildAuthorProfilePayload,
@@ -249,6 +249,7 @@ const validateProfileForm = () => {
       return Object.keys(validationErrors).length === 0;
 };
 const showFeedback = (message, tone = "info") => { feedbackMessage.value = message; feedbackTone.value = tone; };
+const openLogin = () => openAdminLogin();
 const saveProfile = async () => {
       if (!validateProfileForm()) {
         showFeedback("Fix the highlighted fields before saving.", "error");
