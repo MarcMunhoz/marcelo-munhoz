@@ -36,11 +36,11 @@
 
 - [x] 5.1 Replace source inspection for the application shell and main layout with rendered navigation, access entry, account menu, cookie, metadata, focus, and responsive tests
 - [x] 5.2 Add rendered Home, About, and not-found page tests for content, interactions, external-link safety, and responsive presentation
-- [ ] 5.3 Add rendered Blog archive tests for highlights, filters, pagination, URL state, loading, empty, failure, retry, and responsive controls
-- [ ] 5.4 Add rendered article and author tests for locale, Markdown boundary, tags, images, archive return state, chronological neighbors, pagination, and fallbacks
-- [ ] 5.5 Add rendered admin dashboard tests for signed-out, writer, owner, filters, queues, actions, loading, empty, error, and responsive states
-- [ ] 5.6 Add rendered article editor tests for create and edit modes, validation, ownership, locale, slug, Markdown, tags, images, unsaved changes, and terminal actions
-- [ ] 5.7 Add rendered author profile and tag management tests for validation, photo fallbacks, creation, usage constraints, deletion confirmation, and role enforcement
+- [x] 5.3 Add rendered Blog archive tests for highlights, filters, pagination, URL state, loading, empty, failure, retry, and responsive controls
+- [x] 5.4 Add rendered article and author tests for locale, Markdown boundary, tags, images, archive return state, chronological neighbors, pagination, and fallbacks
+- [x] 5.5 Add rendered admin dashboard tests for signed-out, writer, owner, filters, queues, actions, loading, empty, error, and responsive states
+- [x] 5.6 Add rendered article editor tests for create and edit modes, validation, ownership, locale, slug, Markdown, tags, images, unsaved changes, and terminal actions
+- [x] 5.7 Add rendered author profile and tag management tests for validation, photo fallbacks, creation, usage constraints, deletion confirmation, and role enforcement
 - [ ] 5.8 Remove redundant composition and source-text assertions only after their observable or contract guarantees pass in the replacement suites
 
 ## 6. Complete Coverage Closure
