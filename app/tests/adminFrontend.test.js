@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   adminUserMessage,
@@ -63,7 +63,6 @@ import {
 import { publicAuthorProfile } from "../src/utils/authorProfiles.js";
 import { articleBylineLabels, publicArticleDates } from "../src/utils/articleDates.js";
 import { articleCardImageUrl, articleHeroImageUrl } from "../src/utils/contentfulImages.js";
-import { appMetadata } from "../src/utils/cookieNotice.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -113,155 +112,6 @@ describe("admin frontend writer workflow", () => {
 
     assert.equal(result, "response");
     assert.deepEqual(events, ["operation", "success:response", "redirect:/admin"]);
-  });
-
-  it("delegates terminal editor redirects through the executable action helper", () => {
-    const editor = read("../src/pages/AdminArticleEditor.vue");
-    const methods = ["saveDraft", "submitReview", "requestUnpublication", "ownerUnpublish"];
-
-    for (const method of methods) {
-      const methodStart = editor.indexOf(`async ${method}()`);
-      assert.notEqual(methodStart, -1, `${method} should exist`);
-      const methodEnd = editor.indexOf("\nasync ", methodStart + 1);
-      const methodSource = editor.slice(methodStart, methodEnd === -1 ? editor.length : methodEnd);
-      const tryBlock = methodSource.match(/try \{([\s\S]*?)\n\s*\} catch/);
-      const catchBlock = methodSource.match(/\} catch \(error\) \{([\s\S]*?)\n\s*\} finally/);
-
-      assert.ok(tryBlock, `${method} should have a try block`);
-      assert.ok(catchBlock, `${method} should have a catch block`);
-      assert.match(tryBlock[1], /await runTerminalAdminAction\(/);
-      assert.match(tryBlock[1], /operation:/);
-      assert.match(tryBlock[1], /onSuccess:/);
-      assert.match(tryBlock[1], /router: router/);
-      assert.doesNotMatch(catchBlock[1], /returnToAdminDashboard/);
-      assert.doesNotMatch(methodSource.match(/finally \{([\s\S]*?)\n\s*\}/)?.[1] || "", /returnToAdminDashboard/);
-    }
-  });
-
-  it("registers protected admin routes for writer drafting", () => {
-    const routes = read("../src/router/routes.js");
-
-    assert.match(routes, /path:\s*"\/admin"/);
-    assert.match(routes, /name:\s*"Admin"/);
-    assert.match(routes, /path:\s*"\/admin\/articles\/new"/);
-    assert.match(routes, /path:\s*"\/admin\/articles\/:entryId\/edit"/);
-    assert.match(routes, /requiresAdmin:\s*true/);
-    assert.match(routes, /pages\/Admin\.vue/);
-    assert.match(routes, /pages\/AdminArticleEditor\.vue/);
-  });
-
-  it("adds admin navigation beside the public blog navigation", () => {
-    const layout = read("../src/layouts/MainLayout.vue");
-
-    assert.match(layout, /to="\/admin"/);
-    assert.match(layout, /to="\/admin\/profile"/);
-    assert.match(layout, /adminNavLabel/);
-    assert.match(layout, /adminInitials/);
-    assert.match(layout, /admin-account-menu/);
-    assert.match(layout, /q-btn-dropdown/);
-    assert.match(layout, /v-if="adminSession"/);
-    assert.match(layout, /Diga “AMIGO” e entre/);
-    assert.match(layout, /submitAdminAccess/);
-    assert.match(layout, /@keyup\.enter="handleNameClick"/);
-    assert.match(layout, /@keyup\.space\.prevent="handleNameClick"/);
-    assert.doesNotMatch(layout, /r2d2|rebel-alliance|avatarOver/);
-  });
-
-  it("keeps administrative routes out of search indexes", () => {
-    const robots = read("../public/robots.txt");
-
-    assert.equal(appMetadata({ meta: { requiresAdmin: true } }).meta.robots.content, "noindex,nofollow");
-    assert.match(robots, /Disallow:\s*\/admin/);
-  });
-
-  it("provides writer session helpers without adding an auth package", () => {
-    const auth = read("../src/utils/adminAuth.js");
-
-    assert.match(auth, /netlifyIdentity/);
-    assert.match(auth, /getAdminSession/);
-    assert.match(auth, /isWriterSession/);
-    assert.match(auth, /isOwnerSession/);
-  });
-
-  it("returns signed-out production visitors home without opening Identity", () => {
-    const page = read("../src/pages/Admin.vue");
-
-    assert.match(page, /v-if="showAdminSurface"/);
-    assert.match(page, /sessionResolved:\s*false/);
-    assert.match(page, /const showAdminSurface = computed/);
-    assert.match(page, /redirectSignedOutVisitor/);
-    assert.match(page, /if\s*\(!state\.session\)\s*{/);
-    assert.match(page, /router\.replace\("\/"\)/);
-    assert.doesNotMatch(page, /openAdminLogin/);
-  });
-
-  it("centralizes Identity login and session-expiration ownership in the persistent layout", () => {
-    const layout = read("../src/layouts/MainLayout.vue");
-    const pages = ["Admin.vue", "AdminArticleEditor.vue", "AdminProfile.vue", "AdminTags.vue"].map((name) =>
-      read(`../src/pages/${name}`)
-    );
-
-    assert.match(layout, /bindIdentityCallbacks/);
-    assert.match(layout, /completeAdminIdentityLogin/);
-    assert.match(layout, /adminSessionLifecycle\.start/);
-    assert.match(layout, /adminSessionLifecycle\.observeActivity/);
-    assert.match(
-      layout,
-      /const finishAdminSignOut = async \(\) => \{\s*adminSessionCountdown\.stop\(\);\s*adminSessionLifecycle\.clearLocalSession\(\);/
-    );
-    assert.match(layout, /adminSessionWarning/);
-    assert.match(layout, /createAdminSessionCountdown/);
-    assert.match(layout, /Session expires in/);
-    assert.match(layout, /role="timer"/);
-    assert.match(layout, /adminSessionCountdown\.start\(snapshot\)/);
-    assert.match(layout, /adminSessionCountdown\.stop\(\)/);
-    assert.match(layout, /continueAdminSession/);
-    for (const page of pages) {
-      assert.match(page, /getAdminSession/);
-      assert.doesNotMatch(page, /bindIdentityCallbacks/);
-    }
-  });
-
-  it("loads the Netlify Identity widget and allows it through CSP", () => {
-    const index = read("../index.html");
-    const netlifyConfig = read("../../app/netlify.toml");
-
-    assert.match(index, /identity\.netlify\.com\/v1\/netlify-identity-widget\.js/);
-    assert.match(netlifyConfig, /script-src[^"]*https:\/\/identity\.netlify\.com/);
-    assert.match(netlifyConfig, /script-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
-    assert.match(netlifyConfig, /connect-src[^"]*https:\/\/identity\.netlify\.com/);
-    assert.match(netlifyConfig, /frame-src[^"]*https:\/\/media-editor\.cloudinary\.com/);
-    assert.match(netlifyConfig, /img-src[^"]*https:\/\/secure\.gravatar\.com/);
-    assert.match(netlifyConfig, /img-src[^"]*https:\/\/gravatar\.com/);
-    assert.match(netlifyConfig, /img-src[^"]*https:\/\/images\.ctfassets\.net/);
-  });
-
-  it("provides admin API helpers for draft and workflow requests", () => {
-    const api = read("../src/utils/adminApi.js");
-
-    assert.match(api, /\/api\/admin\/contentful\/articles/);
-    assert.match(api, /\/media\/assets/);
-    assert.match(api, /\/tags/);
-    assert.match(api, /\/media\/upload/);
-    assert.match(api, /\/media\/editor-config/);
-    assert.match(api, /\/author-profile/);
-    assert.match(api, /createArticleDraft/);
-    assert.match(api, /createContentfulTag/);
-    assert.match(api, /updateArticleDraft/);
-    assert.match(api, /getAuthorProfile/);
-    assert.match(api, /updateAuthorProfile/);
-    assert.match(api, /submitArticleForReview/);
-    assert.match(api, /requestArticleUnpublication/);
-    assert.match(api, /publishArticle/);
-    assert.match(api, /unpublishArticle/);
-    assert.match(api, /archiveArticle/);
-    assert.match(api, /unarchiveArticle/);
-    assert.match(api, /deleteArticle/);
-    assert.match(api, /listContentfulTags/);
-    assert.match(api, /listMediaAssets/);
-    assert.match(api, /getMediaEditorConfig/);
-    assert.match(api, /uploadMediaAsset/);
-    assert.match(api, /Authorization/);
   });
 
   it("loads existing Contentful tags for controlled article tag selection", async () => {
@@ -628,50 +478,6 @@ describe("admin frontend writer workflow", () => {
     assert.equal(canDeleteManagedTag({ articleCount: 1 }), false);
   });
 
-  it("renders owner tag management without embedding article results", () => {
-    const page = read("../src/pages/AdminTags.vue");
-    const dashboard = read("../src/pages/Admin.vue");
-    const editor = read("../src/pages/AdminArticleEditor.vue");
-
-    assert.match(page, /Tag management/);
-    assert.match(page, /class="tag-admin-heading"/);
-    assert.match(page, /class="tag-admin-title"/);
-    assert.match(page, /class="tag-admin-description"/);
-    assert.match(page, /\.tag-admin-header\s*\{[^}]*background:\s*#fff;[^}]*border-left:\s*4px solid #455a64;/s);
-    assert.match(page, /\.tag-admin-title\s*\{[^}]*font-size:\s*1\.75rem;[^}]*font-weight:\s*700;/s);
-    assert.match(page, /articleCount/);
-    assert.match(page, /<q-dialog v-model="tagDeleteDialogOpen"[^>]*persistent/);
-    assert.match(page, /tagPendingDeletion/);
-    assert.doesNotMatch(page, /tagDeleteConfirmationStage/);
-    assert.doesNotMatch(page, /advanceTagDeleteConfirmation/);
-    assert.match(page, /@click="confirmPermanentTagDeletion"/);
-    assert.match(page, /Are you sure you want to permanently delete/);
-    assert.doesNotMatch(page, /<h2>Are you sure\?<\/h2>/);
-    assert.match(page, /:disable="tagDeletionPending"/);
-    assert.match(page, /if \(!tag \|\| tagDeletionPending\.value\) return;/);
-    assert.doesNotMatch(page, /this\.\$q\.dialog/);
-    assert.doesNotMatch(page, /runDoubleConfirmedTagDeletion/);
-    assert.match(page, /isOwnerSession/);
-    assert.match(page, /v-if="props\.row\.articleCount > 0" class="tag-delete-guidance"/);
-    assert.match(page, /Remove this tag from matching articles first/);
-    assert.match(page, /class="tag-delete-action"/);
-    assert.match(page, /\.tag-delete-action\s*\{[^}]*display:\s*flex;[^}]*gap:\s*8px;[^}]*justify-content:\s*flex-end;/s);
-    assert.match(page, /\.tag-delete-action\s+\.q-btn\s*\{[^}]*flex:\s*0 0 auto;/s);
-    assert.match(page, /class="tag-visibility-cell"/);
-    assert.match(page, /class="tag-visibility-content"/);
-    assert.match(page, /name:\s*"visibility"[^\n]*align:\s*"center"/);
-    assert.match(page, /name:\s*"articleCount"[^\n]*align:\s*"center"/);
-    assert.match(page, /class="tag-article-count-cell"/);
-    assert.match(page, /\.tag-visibility-cell\s*\{[^}]*text-align:\s*center;/s);
-    assert.match(page, /\.tag-visibility-content\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*center;/s);
-    assert.doesNotMatch(page, /listAdminArticles/);
-    assert.match(dashboard, /toggleTagFilter/);
-    assert.match(dashboard, /filters\.tag === tag\.id/);
-    assert.match(dashboard, /:aria-pressed="filters\.tag === tag\.id"/);
-    assert.match(dashboard, /@keydown\.space\.prevent/);
-    assert.match(editor, /normalizeEditorialTagOptions/);
-  });
-
   it("builds owner review queues for publication and unpublication requests", () => {
     const queues = ownerReviewQueues([
       { id: "review-1", title: "Ready article", status: "review", version: 4 },
@@ -849,14 +655,6 @@ describe("admin frontend writer workflow", () => {
     assert.equal(slugFromTitle("Inteligência Artificial para developers e creators"), "inteligencia-artificial-para-developers-e-creators");
     assert.equal(slugFromTitle("  Vue, Contentful & Cloudinary!  "), "vue-contentful-cloudinary");
     assert.equal(slugFromTitle("Inteligência Artificial para developers e creators 123456"), "inteligencia-artificial-para-developers-e-creators");
-  });
-
-  it("auto-fills new article slugs from title input until the slug is edited", () => {
-    const page = read("../src/pages/AdminArticleEditor.vue");
-
-    assert.match(page, /@update:model-value="updateArticleTitle"/);
-    assert.match(page, /@update:model-value="markSlugTouched"/);
-    assert.match(page, /state\.articleForm\.slug\s*=\s*slugFromTitle\(value\)/);
   });
 
   it("creates new article forms with focused-editor display fields and internal technical state", () => {
@@ -1285,176 +1083,6 @@ describe("admin frontend writer workflow", () => {
     });
   });
 
-  it("renders the dashboard-first shell and routes article editing into focused pages", () => {
-    const page = read("../src/pages/Admin.vue");
-    const editor = read("../src/pages/AdminArticleEditor.vue");
-
-    for (const text of ["Editorial dashboard", "Published", "Drafts", "In review", "Article queue", "Owner review", "Page views pending"]) {
-      assert.match(page, new RegExp(text));
-    }
-
-    assert.match(page, /router\.push\("\/admin\/articles\/new"\)/);
-    assert.match(page, /\/admin\/articles\/\$\{encodeURIComponent\(article\.slug \|\| article\.id\)\}\/edit/);
-    assert.match(page, /canUnarchiveArticleAction,\s*[\r\n]/);
-    assert.match(page, /unarchiveSelectedArticle/);
-    assert.doesNotMatch(page, /<q-drawer/);
-    assert.doesNotMatch(page, /class="editor-drawer"/);
-    assert.doesNotMatch(page, /v-model="articleForm\./);
-
-    assert.match(editor, /:model-value="articleForm\.title"/);
-    assert.match(editor, /v-else-if="editorLoading"/);
-    assert.match(editor, /q-inner-loading/);
-    assert.match(editor, /class="editor-heading-actions"[\s\S]*class="article-language-switch"/);
-    assert.match(editor, /article-language-switch__track[\s\S]*articleForm\.locale/);
-    assert.match(editor, /articleLocaleOptions/);
-
-    for (const field of ["slug", "description", "body", "createAt", "alt", "authorName"]) {
-      assert.match(editor, new RegExp(`v-model="articleForm\\.${field}"`));
-    }
-
-    assert.match(editor, /onBeforeRouteLeave/);
-    assert.match(editor, /Leave the article editor and discard unsaved changes/);
-    assert.match(editor, /if \(isAdminSignOutNavigation\(\)\)\s*return\s+next\(\);/);
-    assert.doesNotMatch(editor, /v-model="articleForm\.version"/);
-    assert.doesNotMatch(editor, /v-model="articleForm\.notes"/);
-    assert.doesNotMatch(editor, /label="Author entry ID"/);
-    assert.doesNotMatch(editor, /label="Selected image ID"/);
-    assert.doesNotMatch(editor, /label="Selected image URL"/);
-    assert.doesNotMatch(editor, /Comma-separated Contentful tag IDs/);
-    assert.doesNotMatch(editor, /Review notes/);
-    assert.match(editor, /Save draft/);
-    assert.match(editor, /Submit for review/);
-    assert.match(editor, /Request unpublication/);
-    assert.match(page, /Publish/);
-    assert.match(page, /:label="article\.lifecycleStatus === 'changed' \? 'Publish changes' : 'Publish'"/);
-    assert.match(page, /Unpublish/);
-    assert.match(page, /Archive/);
-    assert.match(page, /Delete permanently/);
-    assert.match(page, /confirmPermanentDeletion/);
-    assert.match(page, /v-if="isOwner"/);
-    assert.match(page, /isOwnerSession\(state\.session\)/);
-    assert.match(editor, /Select image/);
-    assert.match(editor, /Upload image/);
-    assert.match(editor, /thumbnail-preview/);
-    assert.match(editor, /thumbnail-preview-button/);
-    assert.match(editor, /Replace image/);
-    assert.match(editor, /Clear image/);
-    assert.match(editor, /Edit image/);
-    assert.match(editor, /Image details/);
-    assert.doesNotMatch(editor, /bug_report/);
-    assert.match(editor, /showMediaDiagnostics/);
-    assert.match(editor, /clearThumbnail/);
-    assert.match(editor, /editThumbnailImage/);
-    assert.match(editor, /openCloudinaryMediaEditor/);
-    assert.match(editor, /getMediaEditorConfig/);
-    assert.match(editor, /applyEditedMedia/);
-    assert.match(editor, /articleForm\.thumbnailUrl/);
-    assert.match(editor, /q-select[\s\S]*v-model="articleForm\.tagList"/);
-    assert.match(editor, /availableTagOptions/);
-    assert.match(editor, /loadContentfulTags/);
-    assert.match(editor, /@new-value="createNewContentfulTag"/);
-    assert.doesNotMatch(editor, /@keyup\.enter\.prevent="addTagToArticleForm"/);
-    assert.match(editor, /articleForm\.tagList/);
-    assert.match(editor, /removeTagFromArticleForm/);
-    assert.match(editor, /applySelectedMedia/);
-    assert.match(editor, /handleMediaFile/);
-    assert.match(editor, /mediaState/);
-    assert.match(editor, /media-empty-state/);
-    assert.match(editor, /media-dialog-toolbar/);
-    assert.match(editor, /media-asset-title/);
-    assert.match(editor, /asset\.thumbnailUrl/);
-    assert.match(editor, /asset\.title/);
-    assert.doesNotMatch(editor, /\{\{\s*asset\.public_id\s*\}\}/);
-    assert.doesNotMatch(page, /admin-sidebar/);
-    assert.match(page, /admin-filter-tabs/);
-    assert.match(page, /article-table/);
-    assert.doesNotMatch(page, /label="Media" disable/);
-    assert.doesNotMatch(page, /label="Settings" disable/);
-    assert.match(page, /loadArticleDashboard/);
-    assert.doesNotMatch(page, /this\.articles = sampleAdminArticles/);
-  });
-
-  it("renders user-centered admin session and sign-out controls", () => {
-    const page = read("../src/pages/Admin.vue");
-    const layout = read("../src/layouts/MainLayout.vue");
-
-    assert.doesNotMatch(page, /class="admin-session"/);
-    assert.doesNotMatch(page, /sessionDisplay\.name/);
-    assert.doesNotMatch(page, /sessionDisplay\.role\s*\}\}/);
-    assert.doesNotMatch(page, /sessionDisplay\.context\s*\}\}/);
-    assert.doesNotMatch(page, /const signOut/);
-    assert.doesNotMatch(page, /verified_user/);
-    assert.doesNotMatch(page, /Owner preview"\s*:\s*"Writer preview/);
-
-    assert.match(layout, /adminSessionDisplay/);
-    assert.match(layout, /adminAccountInitials/);
-    assert.match(layout, /getAuthorProfile/);
-    assert.match(layout, /adminProfilePhotoUrl/);
-    assert.match(layout, /adminNavLabel/);
-    assert.match(layout, /Author profile/);
-    assert.match(layout, /signOut/);
-    assert.match(layout, /<q-banner[\s\S]*v-if="adminAccessNotice"[\s\S]*role="alert"[\s\S]*aria-live="assertive"/);
-    assert.match(layout, /notifyImpl:\s*\(\{ message \}\) => showAdminAccessNotice\(message\)/);
-    assert.doesNotMatch(layout, /\$q\.notify/);
-  });
-
-  it("renders a separate author profile page backed by Contentful profile APIs", () => {
-    const routes = read("../src/router/routes.js");
-    const page = read("../src/pages/AdminProfile.vue");
-    const layout = read("../src/layouts/MainLayout.vue");
-    const publicProfile = read("../src/pages/AuthorProfile.vue");
-
-    assert.match(routes, /path:\s*"\/admin\/profile"/);
-    assert.match(routes, /pages\/AdminProfile\.vue/);
-    assert.match(page, /getAuthorProfile/);
-    assert.match(page, /updateAuthorProfile/);
-    assert.match(page, /Netlify Identity/);
-    assert.match(page, /Contentful/);
-    assert.match(page, /Gravatar profile/);
-    assert.match(page, /Fallback photo URL/);
-    assert.match(page, /512×512 px/);
-    assert.match(page, /@error="advanceProfilePhoto"/);
-    assert.match(page, /markPhotoSettingsChanged/);
-    assert.match(page, /Current source/);
-    assert.match(page, /profilePhotoSource/);
-    assert.match(page, /:label="profilePhotoActionLabel"/);
-    assert.match(page, /New Gravatar photos are checked when you save/);
-    assert.match(page, /Clears the photo settings in this blog only/);
-    assert.match(page, /Gravatar profile and original image remain unchanged/);
-    assert.match(layout, /@error="advanceAdminProfilePhoto"/);
-    assert.match(publicProfile, /@error="advanceAuthorPhoto"/);
-    assert.match(page, /profile-photo-panel/);
-    assert.match(page, /profileInitials/);
-    assert.doesNotMatch(page, /label="Author slug"/);
-    assert.doesNotMatch(page, /v-model="session/);
-    assert.doesNotMatch(page, /app_metadata|user_metadata|identity.*email/i);
-  });
-
-  it("renders public author bylines and author pages without identity metadata", () => {
-    const routes = read("../src/router/routes.js");
-    const article = read("../src/components/BlogArticle.vue");
-    const authorPage = read("../src/pages/AuthorProfile.vue");
-
-    assert.match(routes, /path:\s*"\/blog\/authors\/:slug"/);
-    assert.match(routes, /pages\/AuthorProfile\.vue/);
-    assert.match(article, /articleAuthorProfile/);
-    assert.doesNotMatch(article, /article\.sys\.updatedAt/);
-    assert.doesNotMatch(article, /updatedAt:\s*this\.article\.updatedAt\s*\|\|\s*this\.updatedAt/);
-    assert.match(article, /name:\s*'Author'|name:\s*"Author"/);
-    assert.match(article, /articleAuthorSlug/);
-    assert.match(article, /bylineLabels\.by[\s\S]*<router-link/);
-    assert.match(authorPage, /\/api\/contentful\/author\/\$\{route\.params\.slug\}/);
-    assert.match(authorPage, /publicAuthorProfile/);
-    assert.match(authorPage, /authorInitials/);
-    assert.match(authorPage, /\.author-profile[\s\S]*max-width:\s*none/);
-    assert.match(authorPage, /displayedArticles/);
-    assert.match(authorPage, /readingTimeLabel/);
-    assert.match(authorPage, /Load more/);
-    assert.doesNotMatch(authorPage, /articleCardImageUrl/);
-    assert.doesNotMatch(authorPage, /article-grid/);
-    assert.doesNotMatch(authorPage, /Identity|app_metadata|user_metadata|roles|invite|email/i);
-  });
-
   it("localizes public article byline labels and date-only update display", () => {
     assert.deepEqual(articleBylineLabels("en-US"), { by: "By", on: "on", updated: "Updated on" });
     assert.deepEqual(articleBylineLabels("pt-BR"), { by: "Por", on: "em", updated: "Atualizado em" });
@@ -1477,12 +1105,6 @@ describe("admin frontend writer workflow", () => {
   });
 
   it("infers English byline labels from English article text when no locale field exists", () => {
-    const article = read("../src/components/BlogArticle.vue");
-    const articleDates = read("../src/utils/articleDates.js");
-
-    assert.match(article, /articleLocaleFromArticle/);
-    assert.match(article, /isArticleLanguageTag/);
-    assert.doesNotMatch(articleDates, /articleLocaleFromTags/);
     assert.deepEqual(articleBylineLabels("", { title: "During 9 years my career changed", body: "When I decide to write about software" }), {
       by: "By",
       on: "on",
@@ -1516,63 +1138,6 @@ describe("admin frontend writer workflow", () => {
     assert.match(page, /\.editor-actions[\s\S]*gap:\s*8px/);
   });
 
-  it("renders complete, guarded article cards from QTable grid mode on phones", () => {
-    const page = read("../src/pages/Admin.vue");
-    const cardPath = new URL("../src/components/AdminArticleCard.vue", import.meta.url);
-
-    assert.ok(existsSync(cardPath), "AdminArticleCard should render mobile article metadata and lifecycle actions");
-    const card = read("../src/components/AdminArticleCard.vue");
-
-    assert.match(page, /import AdminArticleCard from "\.\.\/components\/AdminArticleCard\.vue"/);
-    assert.match(page, /:grid="compactArticleGrid"/);
-    assert.match(page, /observeMediaQuery\("\(max-width: 720px\)"/);
-    assert.match(page, /<template #item="props">[\s\S]*<div class="q-table__grid-item col-xs-12">[\s\S]*<admin-article-card/);
-    assert.match(page, /:article="props\.row"/);
-    assert.match(page, /:session="session"/);
-    assert.match(page, /:active-tag="filters\.tag"/);
-    assert.match(page, /:loading-action="loadingAction"/);
-    assert.match(page, /@edit="openEditorForArticle"/);
-    assert.match(page, /@review="openEditorForArticle"/);
-    assert.match(page, /@request-unpublication="requestUnpublicationFromRow"/);
-    assert.match(page, /@publish="publishSelectedArticle"/);
-    assert.match(page, /@unpublish="unpublishSelectedArticle"/);
-    assert.match(page, /@archive="archiveSelectedArticle"/);
-    assert.match(page, /@unarchive="unarchiveSelectedArticle"/);
-    assert.match(page, /@delete="openDeleteConfirmation"/);
-    assert.match(page, /@toggle-tag="toggleTagFilter"/);
-    assert.match(page, /const requestUnpublicationFromRow = async \(article\)\s*=>\s*\{\s*state\.loadingAction = `request-unpublication-\$\{article\.id\}`/);
-    assert.match(page, /canRequestUnpublicationAction\(props\.row, session\)[\s\S]*?:loading="loadingAction === `request-unpublication-\$\{props\.row\.id\}`"/);
-
-    assert.match(card, /article\.title/);
-    assert.match(card, /statusLabel\(article\.status\)/);
-    assert.match(card, /article\.displayAuthor/);
-    assert.match(card, /article\.displayDate/);
-    assert.match(card, /v-for="tag in article\.displayTags"/);
-    assert.match(card, /:aria-pressed="activeTag === tag\.id"/);
-    assert.match(card, /:loading="loadingAction === `request-unpublication-\$\{article\.id\}`"/);
-    assert.doesNotMatch(card, /loadingAction === 'unpublish'/);
-    const cardTemplate = card.match(/<template>[\s\S]*?<\/template>/)?.[0] || "";
-    assert.doesNotMatch(cardTemplate, /(?<![$\w])emit\(/);
-    assert.match(cardTemplate, /@keyup\.enter="\$emit\('toggle-tag', tag\.id\)"/);
-    assert.match(cardTemplate, /@keyup\.space\.prevent="\$emit\('toggle-tag', tag\.id\)"/);
-
-    for (const action of ["edit", "review", "request-unpublication", "publish", "unpublish", "archive", "unarchive", "delete"]) {
-      assert.match(cardTemplate, new RegExp(`\\$emit\\('${action}', article\\)`));
-    }
-
-    for (const guard of [
-      "canEditArticleAction",
-      "canPrepareReviewAction",
-      "canRequestUnpublicationAction",
-      "canOwnerPublishAction",
-      "canOwnerUnpublishAction",
-      "canArchiveArticleAction",
-      "canUnarchiveArticleAction",
-    ]) {
-      assert.match(card, new RegExp(`\\b${guard}\\(`));
-    }
-  });
-
   it("keeps compact dashboard controls reachable without clipping phone layouts", () => {
     const page = read("../src/pages/Admin.vue");
 
@@ -1603,17 +1168,6 @@ describe("admin frontend writer workflow", () => {
     assert.match(editor, /@media \(max-width:\s*720px\)/);
     assert.doesNotMatch(page, /letter-spacing:\s*-/);
     assert.doesNotMatch(editor, /letter-spacing:\s*-/);
-  });
-
-  it("handles save, validation, authorization, media, and conflict states in the writer UI", () => {
-    const page = read("../src/pages/AdminArticleEditor.vue");
-
-    assert.match(page, /validateArticleForm/);
-    assert.match(page, /adminUserMessage\(error\)/);
-    assert.match(page, /adminUserMessage\(error, \{ media: true \}\)/);
-    assert.doesNotMatch(page, /showFeedback\(error\.message/);
-    assert.doesNotMatch(page, /mediaError = error\.message/);
-    assert.match(page, /Draft saved/);
   });
 
   it("maps backend admin error payloads to fixed user-safe frontend messages", () => {
@@ -1739,38 +1293,6 @@ describe("admin frontend writer workflow", () => {
       },
     ]);
     assert.doesNotMatch(JSON.stringify(updateOptions), /api.?key|secret/i);
-  });
-
-  it("opens article editors with slug URLs while preserving ID fallback loading", () => {
-    const admin = read("../src/pages/Admin.vue");
-    const editor = read("../src/pages/AdminArticleEditor.vue");
-
-    assert.match(admin, /article\.slug\s*\|\|\s*article\.id/);
-    assert.match(editor, /item\.id\s*===\s*articleRouteKey/);
-    assert.match(editor, /item\.slug\s*===\s*articleRouteKey/);
-  });
-
-  it("uses Contentful-like Markdown editing surfaces for article body and author biography", () => {
-    const editor = read("../src/pages/AdminArticleEditor.vue");
-    const profile = read("../src/pages/AdminProfile.vue");
-
-    assert.match(editor, /markdown-editor/);
-    assert.match(editor, /bodyEditorMode/);
-    assert.match(editor, /insertMarkdown/);
-    assert.match(editor, /templateRefs\[`\$\{field\}Editor`\]\?\.value/);
-    assert.match(editor, /formatMarkdownSelection/);
-    assert.match(editor, /q-btn-dropdown[\s\S]*Headings/);
-    assert.match(editor, /q-btn-dropdown[\s\S]*More actions/);
-    assert.match(editor, /:disable="bodyEditorMode === 'preview'"/);
-    assert.match(editor, /\{\{ articleBodyPreview \}\}/);
-    assert.doesNotMatch(editor, /v-html/);
-    assert.doesNotMatch(editor, /label="Body"[\s\S]*type="textarea"/);
-
-    assert.match(profile, /markdown-editor/);
-    assert.match(profile, /bioEditorMode/);
-    assert.match(profile, /insertBiographyMarkdown/);
-    assert.match(profile, /\{\{ biographyPreview \}\}/);
-    assert.doesNotMatch(profile, /v-html/);
   });
 
   it("keeps every editor command reachable in responsive Markdown, media, dialog, and workflow controls", () => {

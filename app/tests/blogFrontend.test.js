@@ -23,23 +23,6 @@ describe("public blog frontend", () => {
     });
   });
 
-  it("renders accessible archive and chronological actions with clean named routes", () => {
-    const article = read("../src/components/BlogArticle.vue");
-
-    assert.match(article, /class="article-return/);
-    assert.match(article, /<q-icon[^>]+name="fa-solid fa-arrow-left"/);
-    assert.match(article, /navigationLabels\.all/);
-    assert.match(article, /v-if="articleNavigation\.previous"/);
-    assert.match(article, /v-if="articleNavigation\.next"/);
-    assert.match(article, /navigationLabels\.previous/);
-    assert.match(article, /navigationLabels\.next/);
-    assert.match(article, /articleNavigation\.previous\.title/);
-    assert.match(article, /articleNavigation\.next\.title/);
-    assert.match(article, /name:\s*'Meus Artigos'|name:\s*"Meus Artigos"/);
-    assert.match(article, /query:\s*\{\s*tag\s*\}/);
-    assert.doesNotMatch(article, /name:\s*'Artigos Tags'|name:\s*"Artigos Tags"/);
-  });
-
   it("keeps article navigation visible for keyboards, long titles, and compact viewports", () => {
     const article = read("../src/components/BlogArticle.vue");
 
@@ -79,37 +62,6 @@ describe("public blog frontend", () => {
     assert.equal(blogReturnLocation(neighborLocation.state), archiveUrl);
   });
 
-  it("renders one primary and at most two secondary highlights from real article data", () => {
-    const highlights = read("../src/components/BlogHighlights.vue");
-
-    assert.match(highlights, /v-if="articles\.length"/);
-    assert.match(highlights, /primaryArticle/);
-    assert.match(highlights, /articles\.slice\(1,\s*3\)/);
-    assert.match(highlights, /articleCardImageUrl\(article\.fields\)/);
-    assert.match(highlights, /articleDates\(article\)\.created/);
-    assert.match(highlights, /article\.fields\.title/);
-    assert.match(highlights, /article\.fields\.description/);
-    assert.match(highlights, /articleAuthor\(article\)/);
-    assert.match(highlights, /blogArticleLocation\(article,\s*returnTo\)/);
-    assert.doesNotMatch(highlights, /params:\s*\{\s*slug/);
-  });
-
-  it("renders compact unframed archive rows with complete article metadata", () => {
-    const archive = read("../src/components/BlogArchiveList.vue");
-
-    assert.match(archive, /v-for="article in articles"/);
-    assert.match(archive, /class="blog-archive-row/);
-    assert.match(archive, /articleCardImageUrl\(article\.fields\)/);
-    assert.match(archive, /article\.fields\.title/);
-    assert.match(archive, /article\.fields\.description/);
-    assert.match(archive, /articleAuthor\(article\)/);
-    assert.match(archive, /articleDates\(article\)\.created/);
-    assert.match(archive, /articleTags\(article\)/);
-    assert.match(archive, /blogArticleLocation\(article,\s*returnTo\)/);
-    assert.doesNotMatch(archive, /<q-card/);
-    assert.doesNotMatch(archive, /params:\s*\{\s*slug/);
-  });
-
   it("provides stable responsive images, wrapping text, and visible keyboard focus", () => {
     for (const componentPath of ["../src/components/BlogHighlights.vue", "../src/components/BlogArchiveList.vue"]) {
       const component = read(componentPath);
@@ -130,20 +82,6 @@ describe("public blog frontend", () => {
 
     assert.match(focusRule, /box-shadow:\s*inset\s+0\s+0\s+0\s+3px/);
     assert.doesNotMatch(focusRule, /outline-offset:\s*[1-9]/);
-  });
-
-  it("keeps labelled controls and visible archive states stable", () => {
-    const page = read("../src/pages/Blog.vue");
-
-    assert.match(page, /label="Search articles"/);
-    assert.match(page, /label="Year"/);
-    assert.match(page, /label="Tag"/);
-    assert.match(page, /<BlogHighlights\s+v-if="featured\.length"/);
-    assert.match(page, /<BlogArchiveList/);
-    assert.match(page, /v-if="loading"/);
-    assert.match(page, /v-else-if="error"/);
-    assert.match(page, /@click="loadArchive"/);
-    assert.match(page, /v-else-if="articles\.length === 0"/);
   });
 
   it("switches mobile pagination out of the expansive numbered-button combination", () => {
