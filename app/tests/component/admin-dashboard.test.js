@@ -85,7 +85,11 @@ const mountAdmin = async ({ media = {}, settle = true } = {}) => {
   await router.isReady();
   const wrapper = createTestMount({ router })(Admin, {
     attachTo: document.body,
-    global: { stubs: { QPage: { template: "<main><slot /></main>" } } },
+    global: {
+      stubs: {
+        QPage: { template: "<main><slot /></main>" },
+      },
+    },
   });
   if (settle) await flushPromises();
 
@@ -204,4 +208,66 @@ describe("rendered admin dashboard", () => {
     expect(mounted.wrapper.text()).toContain("Request unpublication");
     expect(mounted.wrapper.text()).not.toContain("Delete permanently");
   });
+
+  it("routes owner lifecycle events from compact cards and keeps API failures visible", async () => {
+    controls.session = ownerSession;
+    const mounted = await mountAdmin({ media: { "(max-width: 720px)": true } });
+    const cards = mounted.wrapper.findAllComponents({ name: "AdminArticleCard" });
+
+    cards.find((card) => card.props("article").id === "published-1").vm.$emit("archive", fixtures[1]);
+    cards.find((card) => card.props("article").id === "archived-1").vm.$emit("unarchive", fixtures[4]);
+    await flushPromises();
+
+    expect(controls.archive).toHaveBeenCalledWith(expect.objectContaining({ articleId: "published-1", session: ownerSession }));
+    expect(controls.unarchive).toHaveBeenCalledWith(expect.objectContaining({ articleId: "archived-1", session: ownerSession }));
+
+    controls.requestUnpublication.mockRejectedValueOnce({ publicMessage: "Request rejected." });
+    cards.find((card) => card.props("article").id === "published-1").vm.$emit("request-unpublication", fixtures[1]);
+    await flushPromises();
+
+    expect(mounted.wrapper.get(".feedback-error").text()).toBe("Request rejected.");
+  });
+
+  it("updates filter, navigation, lifecycle, and deletion feedback through dashboard controls", async () => {
+    controls.session = ownerSession;
+    const mounted = await mountAdmin();
+    const page = mounted.wrapper.vm;
+    const table = () => mounted.wrapper.findComponent({ name: "QTable" });
+
+    page.setStatusFilter("draft");
+    await flushPromises();
+    expect(table().props("rows").map((row) => row.id)).toEqual(["draft-1"]);
+    page.setStatusFilter("draft");
+    page.toggleTagFilter("vue");
+    await flushPromises();
+    expect(table().props("rows").map((row) => row.id)).toEqual(["published-1"]);
+    await page.openEditorForArticle(fixtures[1]);
+    expect(mounted.router.currentRoute.value.path).toBe("/admin/articles/published-vue/edit");
+
+    controls.publish.mockResolvedValueOnce({ editorialRequestClosurePending: true });
+    await page.publishSelectedArticle(fixtures[2]);
+    expect(mounted.wrapper.get(".feedback-info").text()).toBe("Article published. Review cleanup is pending.");
+    controls.publish.mockRejectedValueOnce({ publicMessage: "Publication rejected." });
+    await page.publishSelectedArticle(fixtures[2]);
+    expect(mounted.wrapper.get(".feedback-error").text()).toBe("Publication rejected.");
+
+    page.openDeleteConfirmation(fixtures[4]);
+    page.deleteConfirmation = "Not the article";
+    await page.confirmPermanentDeletion();
+    expect(controls.remove).not.toHaveBeenCalled();
+    page.deleteConfirmation = "Archived article";
+    await page.confirmPermanentDeletion();
+    expect(controls.remove).toHaveBeenCalledWith(expect.objectContaining({ articleId: "archived-1", session: ownerSession }));
+  });
+
+  it("rejects owner-only controls for writers", async () => {
+    const mounted = await mountAdmin();
+    const page = mounted.wrapper.vm;
+
+    page.openDeleteConfirmation(fixtures[0]);
+    await page.archiveSelectedArticle(fixtures[0]);
+    expect(controls.archive).not.toHaveBeenCalled();
+    expect(mounted.wrapper.get(".feedback-error").text()).toBe("Only owners can perform this action.");
+  });
+
 });

@@ -154,4 +154,22 @@ describe("rendered author profile management", () => {
     await flushPromises();
     expect(mounted.wrapper.get(".feedback-error").text()).toBe("Profile update was rejected.");
   });
+
+  it("preserves the existing public slug and shows an empty-profile fallback after a failed load", async () => {
+    controls.getProfile.mockRejectedValueOnce({ publicMessage: "Profile is temporarily unavailable." });
+    const failed = await mountProfile();
+
+    expect(failed.wrapper.get(".feedback-error").text()).toBe("Profile is temporarily unavailable.");
+    expect(inputByLabel(failed.wrapper, "Name").props("modelValue")).toBe("");
+
+    const mounted = await mountProfile();
+    inputByLabel(mounted.wrapper, "Name").vm.$emit("update:modelValue", "New Writer");
+    await mounted.wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(controls.updateProfile).toHaveBeenCalledWith({
+      profile: expect.objectContaining({ name: "New Writer", slug: "writer-one" }),
+      session: expect.objectContaining({ authorEntryId: "author-1" }),
+    });
+  });
 });

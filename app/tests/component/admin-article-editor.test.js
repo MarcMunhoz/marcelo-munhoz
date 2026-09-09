@@ -285,4 +285,63 @@ describe("rendered article editor", () => {
     await flushPromises();
     expect(controls.unpublish).toHaveBeenCalledWith(expect.objectContaining({ articleId: "article-1", version: 7, session: owner }));
   });
+
+  it("handles media and tag edge cases without persisting incomplete editor state", async () => {
+    const mounted = await mountEditor();
+    const tags = mounted.wrapper.findComponent({ name: "QSelect" });
+    const existingDone = vi.fn();
+    const emptyDone = vi.fn();
+
+    tags.vm.$emit("newValue", "Testing", existingDone);
+    tags.vm.$emit("newValue", "   ", emptyDone);
+    await flushPromises();
+    expect(existingDone).toHaveBeenCalledWith("testing", "add-unique");
+    expect(emptyDone).toHaveBeenCalledWith();
+    expect(controls.createTag).not.toHaveBeenCalled();
+
+    expect(buttonByText(mounted.wrapper, "Edit image").attributes("disabled")).toBeDefined();
+    expect(controls.editorConfig).not.toHaveBeenCalled();
+
+    controls.listMedia.mockRejectedValueOnce({ publicMessage: "Media library is unavailable." });
+    await buttonByText(mounted.wrapper, "Select image").trigger("click");
+    await flushPromises();
+    expect(mounted.wrapper.get(".feedback-error").text()).toBe("Media library is unavailable.");
+  });
+
+  it("keeps the editor usable when its loading requests return no usable data", async () => {
+    controls.listTags.mockRejectedValueOnce({ publicMessage: "Tags failed." });
+    const tagFailure = await mountEditor();
+    expect(tagFailure.wrapper.get(".editor-feedback").text()).toBe("Tags failed.");
+
+    controls.profile.mockRejectedValueOnce({ publicMessage: "Author profile failed." });
+    const profileFailure = await mountEditor();
+    expect(profileFailure.wrapper.get(".editor-feedback").text()).toBe("Author profile failed.");
+    expect(inputByLabel(profileFailure.wrapper, "Author").props("modelValue")).toBe("Writer One");
+
+    controls.listArticles.mockResolvedValueOnce({ articles: [], session: {} });
+    const missing = await mountEditor({ initialPath: "/admin/articles/missing/edit" });
+    expect(missing.wrapper.get(".editor-feedback").text()).toContain("Article not found");
+
+    controls.listArticles.mockRejectedValueOnce({ publicMessage: "Article list failed." });
+    const failed = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    expect(failed.wrapper.get(".editor-feedback").text()).toBe("Article list failed.");
+  });
+
+  it("uploads a selected file through its injected reader and reports a rejected upload", async () => {
+    const mounted = await mountEditor();
+    const page = mounted.wrapper.findComponent(AdminArticleEditor).vm;
+    const file = { name: "cover.png" };
+    page.readFileAsDataUrl = vi.fn().mockResolvedValue("data:image/png;base64,Y292ZXI=");
+
+    await page.handleMediaFile(file);
+    await flushPromises();
+    expect(controls.upload).toHaveBeenCalledWith({ file: "data:image/png;base64,Y292ZXI=", filename: "cover.png", session: writer });
+    expect(mounted.wrapper.get(".thumbnail-preview img").attributes("src")).toBe("https://res.cloudinary.com/demo/upload.jpg");
+
+    controls.upload.mockRejectedValueOnce({ publicMessage: "Upload rejected." });
+    await page.handleMediaFile(file);
+    await flushPromises();
+    expect(mounted.wrapper.get(".feedback-error").text()).toBe("Upload rejected.");
+  });
+
 });

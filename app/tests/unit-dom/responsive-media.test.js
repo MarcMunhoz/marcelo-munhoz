@@ -41,4 +41,41 @@ describe("native responsive media queries", () => {
     assert.deepEqual(values, [false]);
     assert.doesNotThrow(stop);
   });
+
+  it("supports the legacy media-query listener contract and optional cleanup", () => {
+    const values = [];
+    let listener;
+    let removed;
+    const mediaQuery = {
+      matches: false,
+      addListener(callback) {
+        listener = callback;
+      },
+      removeListener(callback) {
+        removed = callback;
+      },
+    };
+
+    const stop = observeMediaQuery("(pointer: coarse)", (matches) => values.push(matches), { matchMedia: () => mediaQuery });
+    listener({ matches: 1 });
+    stop();
+
+    assert.deepEqual(values, [false, true]);
+    assert.equal(removed, listener);
+    assert.doesNotThrow(observeMediaQuery("all", () => {}, { matchMedia: () => ({ matches: true }) }));
+  });
+
+  it("uses the runtime matchMedia implementation by default", () => {
+    const previous = globalThis.matchMedia;
+    const queries = [];
+    globalThis.matchMedia = (query) => ({ matches: true, addEventListener() {}, removeEventListener() {} });
+
+    try {
+      const stop = observeMediaQuery("(min-width: 1px)", (matches) => queries.push(matches));
+      stop();
+      assert.deepEqual(queries, [true]);
+    } finally {
+      globalThis.matchMedia = previous;
+    }
+  });
 });

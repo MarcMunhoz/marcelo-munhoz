@@ -38,6 +38,59 @@ const navigationArticle = ({ title, slug, createAt, createdAt }) => ({
 });
 
 describe("contentful proxy handler", () => {
+  it("sanitizes malformed article navigation paths", async () => {
+    const response = await createContentfulHandler({ logger: { error: () => undefined } })({
+      path: "/article-navigation/%E0%A4%A",
+    });
+
+    assert.equal(response.statusCode, 500);
+    assert.deepEqual(JSON.parse(response.body), { error: "Failed to fetch article navigation" });
+  });
+
+  it("builds authenticated runtime requests for tags", async () => {
+    const requests = [];
+    const handler = createContentfulHandler({
+      env: { CONTENTFUL_SPACE_ID: "space-id", CONTENTFUL_DELIVERY_KEY: "delivery-key" },
+      fetchImpl: async (url, options) => {
+        requests.push({ url, options });
+        return { ok: true, status: 200, json: async () => ({ items: [] }) };
+      },
+    });
+
+    const response = await handler({ path: "/tags" });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requests.length, 1);
+    assert.match(requests[0].url.toString(), /spaces\/space-id\/environments\/master\/tags/);
+    assert.equal(requests[0].options.headers.authorization, "Bearer delivery-key");
+  });
+
+  it("resolves cyclic included links without unbounded recursion", async () => {
+    const handler = createContentfulHandler({
+      env: { CONTENTFUL_SPACE_ID: "space-id", CONTENTFUL_DELIVERY_KEY: "delivery-key" },
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ sys: { type: "Link", linkType: "Entry", id: "author-1" } }],
+          includes: {
+            Entry: [
+              {
+                sys: { id: "author-1" },
+                fields: { related: { sys: { type: "Link", linkType: "Entry", id: "author-1" } } },
+              },
+            ],
+          },
+        }),
+      }),
+    });
+
+    const response = await handler({ path: "/entries", query: {} });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(JSON.parse(response.body).items[0].sys.id, "author-1");
+  });
+
   it("normalizes allowlisted blog-index query values before calling Contentful", async () => {
     const calls = [];
     const handler = createContentfulHandler({

@@ -219,4 +219,15 @@ describe("rendered author profile", () => {
     expect(mounted.wrapper.get(".empty-state").text()).toBe("No published articles found for this author.");
     expect(error).toHaveBeenCalledTimes(1);
   });
+
+  it("uses a minimum reading time for sparse entries and no longer offers pagination for a single page", async () => {
+    const sparseArticle = {
+      sys: { id: "sparse" },
+      fields: { title: "Sparse", slug: "sparse", description: "", body: "" },
+    };
+    const mounted = await mountAuthor({ payload: { author, articles: [sparseArticle] } });
+
+    expect(mounted.wrapper.get(".article-row").text()).toContain("1 min read");
+    expect(mounted.wrapper.findAllComponents({ name: "QBtn" }).some((button) => button.text() === "Load more")).toBe(false);
+  });
 });

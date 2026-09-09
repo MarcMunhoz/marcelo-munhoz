@@ -210,4 +210,26 @@ describe("Blog archive", () => {
     expect(mounted.router.currentRoute.value.fullPath).toBe("/blog?page=3");
 
   });
+
+  it("keeps the current page for invalid compact input and degrades optional filters independently", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const mounted = await mountBlog({
+      initialPath: "/blog?page=2",
+      media: { "(max-width: 599px)": true },
+      fetchImpl: async (url) => {
+        const value = String(url);
+        if (value.includes("blog-years") || value.includes("/tags")) return jsonResponse({ error: "unavailable" }, 503);
+        return endpointResponse(url, indexPayload({ page: 2, totalPages: 3, total: 36 }));
+      },
+    });
+
+    const pageInput = mounted.wrapper.findAllComponents({ name: "QInput" }).find((input) => input.props("label") === "Page");
+    pageInput.vm.$emit("change", { target: { value: "not-a-page" } });
+    await flushPromises();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe("/blog?page=2");
+    expect(mounted.wrapper.findAllComponents({ name: "QSelect" })[0].props("options")).toEqual([]);
+    expect(mounted.wrapper.findAllComponents({ name: "QSelect" })[1].props("options")).toEqual([]);
+    expect(errors).toHaveBeenCalledTimes(2);
+  });
 });

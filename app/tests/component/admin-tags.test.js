@@ -100,6 +100,18 @@ describe("rendered tag management", () => {
     expect(mounted.wrapper.get(".feedback-success").text()).toBe("Tag created.");
   });
 
+  it("keeps the tag list unchanged when the submitted name has no visible characters", async () => {
+    const mounted = await mountTags();
+
+    inputByLabel(mounted.wrapper, "New tag name").vm.$emit("update:modelValue", "   ");
+    await mounted.wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(controls.create).not.toHaveBeenCalled();
+    expect(controls.list).toHaveBeenCalledTimes(1);
+    expect(mounted.wrapper.get(".tag-admin-panel").text()).toContain("Quality");
+  });
+
   it("requires confirmation and deletes only an unused tag", async () => {
     const mounted = await mountTags();
     await mounted.wrapper.get("button[aria-label='Delete Unused']").trigger("click");

@@ -8,6 +8,8 @@ const controls = vi.hoisted(() => ({
   login: vi.fn(),
   signOut: vi.fn(),
   lifecycleOptions: null,
+  continueSession: true,
+  identityCallbacks: null,
 }));
 
 vi.mock("../../src/utils/adminApi.js", () => ({
@@ -23,8 +25,16 @@ vi.mock("../../src/utils/adminAuth.js", () => ({
     context: session?.preview ? "Preview" : "Authenticated",
     canSignOut: Boolean(session && !session.preview),
   }),
-  bindIdentityCallbacks: () => () => {},
-  completeAdminIdentityLogin: vi.fn(),
+  bindIdentityCallbacks: (callbacks) => {
+    controls.identityCallbacks = callbacks;
+    return () => {};
+  },
+  completeAdminIdentityLogin: vi.fn(async ({ setSession, loadProfile, clearLoginRequest }) => {
+    const loggedInSession = { name: "Grace Hopper", role: "writer", preview: false };
+    setSession(loggedInSession);
+    await loadProfile(loggedInSession);
+    clearLoginRequest();
+  }),
   createAdminProfileLoader: ({ getAuthorProfileImpl, applyProfile }) => ({
     invalidate: vi.fn(),
     async load(session) {
@@ -55,7 +65,7 @@ vi.mock("../../src/utils/adminAuth.js", () => ({
 vi.mock("../../src/utils/adminSessionLifecycle.js", () => ({
   adminSessionLifecycle: {
     clearLocalSession: vi.fn(),
-    continueSession: vi.fn(() => true),
+    continueSession: vi.fn(() => controls.continueSession),
     observeActivity: vi.fn(() => () => {}),
     start: vi.fn((options) => { controls.lifecycleOptions = options; }),
     stop: vi.fn(),
@@ -90,6 +100,8 @@ beforeEach(() => {
   controls.login.mockClear();
   controls.signOut.mockClear();
   controls.lifecycleOptions = null;
+  controls.continueSession = true;
+  controls.identityCallbacks = null;
 });
 
 describe("main layout", () => {
@@ -176,5 +188,69 @@ describe("main layout", () => {
     expect(controls.signOut).toHaveBeenCalledOnce();
     expect(router.currentRoute.value.path).toBe("/");
     wrapper.unmount();
+  });
+
+  it("catches retained session warnings and stale profile photos after recovery", async () => {
+    controls.session = { name: "Ada Lovelace", role: "owner", preview: false };
+    controls.profile = {
+      photo: {
+        fallback_url: "https://images.ctfassets.net/demo/fallback.jpg",
+        secure_url: "https://images.ctfassets.net/demo/legacy.jpg",
+      },
+    };
+    const { router, wrapper } = await mountLayout("/admin");
+
+    await wrapper.get(".admin-account-menu").trigger("click");
+    await flushPromises();
+    const photo = document.body.querySelector(".admin-account-summary img");
+    expect(photo.getAttribute("src")).toBe("https://images.ctfassets.net/demo/fallback.jpg");
+    photo.dispatchEvent(new Event("error"));
+    await flushPromises();
+    expect(document.body.querySelector(".admin-account-summary img").getAttribute("src")).toBe("https://images.ctfassets.net/demo/legacy.jpg");
+
+    controls.lifecycleOptions.onWarning({ label: "00:10" });
+    await flushPromises();
+    const continueButton = [...document.body.querySelectorAll(".admin-session-warning-card button")]
+      .find((button) => button.textContent.includes("Continue session"));
+    continueButton.click();
+    await flushPromises();
+    expect(document.body.querySelector(".admin-session-warning-card")).toBeNull();
+
+    await controls.lifecycleOptions.onExpire();
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/");
+    expect(wrapper.find(".admin-account-menu").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("catches removal of identity login and logout state transitions", async () => {
+    const { wrapper } = await mountLayout("/about");
+    await controls.identityCallbacks.onLogin();
+    await flushPromises();
+    expect(wrapper.get(".admin-account-menu").text()).toContain("Grace Hopper");
+    await controls.identityCallbacks.onLogout();
+    await flushPromises();
+    expect(wrapper.find(".admin-account-menu").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps expiring sessions visible when renewal is rejected and skips preview tracking", async () => {
+    controls.session = { name: "Preview Admin", preview: true };
+    const preview = await mountLayout("/about");
+    expect(preview.wrapper.get(".admin-account-menu").text()).toContain("Preview Admin");
+    expect(controls.lifecycleOptions).toBeNull();
+    preview.wrapper.unmount();
+
+    controls.session = { name: "Ada Lovelace", role: "owner", preview: false };
+    controls.continueSession = false;
+    const active = await mountLayout("/admin");
+    controls.lifecycleOptions.onWarning({ label: "00:05" });
+    await flushPromises();
+    const continueButton = [...document.body.querySelectorAll(".admin-session-warning-card button")]
+      .find((button) => button.textContent.includes("Continue session"));
+    continueButton.click();
+    await flushPromises();
+    expect(document.body.querySelector(".admin-session-warning-card")).not.toBeNull();
+    active.wrapper.unmount();
   });
 });

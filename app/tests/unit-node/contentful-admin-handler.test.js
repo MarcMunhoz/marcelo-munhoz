@@ -25,6 +25,13 @@ const createSession = (roles = [], overrides = {}) => ({
 });
 
 describe("contentful admin handler", () => {
+  it("fails closed when the default session provider is anonymous", async () => {
+    const anonymousHandler = createContentfulAdminHandler();
+    const anonymousResponse = await anonymousHandler({ method: "GET", path: "/tags" });
+
+    assert.deepEqual(parse(anonymousResponse), { error: "Authentication required" });
+  });
+
   it("creates local preview sessions from dev-only role headers", () => {
     assert.deepEqual(devPreviewSessionFromHeaders({ "x-admin-preview-role": "owner" }, { nodeEnv: "development" }), {
       subject: "local-preview-owner",
