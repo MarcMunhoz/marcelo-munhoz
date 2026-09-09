@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -9,10 +9,14 @@ import express from "express";
 import { describe, it, vi } from "vitest";
 
 import { createApp } from "../../middleware/createApp.js";
+import { isAllowedCorsOrigin } from "../../middleware/corsPolicy.js";
 import { PUBLIC_CONTENTFUL_ROUTE_PATHS } from "../../middleware/routes/contentful.js";
-import { startServer } from "../../middleware/server.js";
+import { loadEnvironment, startServer } from "../../middleware/server.js";
+import { handler as contentfulNetlifyHandler } from "../../netlify/functions/contentful.js";
+import { handler as contentfulAdminNetlifyHandler } from "../../netlify/functions/contentful-admin.js";
 import { quasarBuildEnvironment, quasarDevServerProxy } from "../../quasarBuildManifest.js";
-import { scanBuiltAssetsForCredentials } from "../../scripts/scan-built-assets.js";
+import { executeScanBuiltAssetsCli, scanBuiltAssetsForCredentials } from "../../scripts/scan-built-assets.js";
+import { validateCoverageExclusions } from "../../scripts/validate-coverage-exclusions.js";
 import routes from "../../src/router/routes.js";
 
 vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
@@ -29,6 +33,26 @@ const withFixtureDir = (files, callback) => {
     }
 
     return callback(directory);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+};
+
+const withCoverageLedgerFixture = async ({ version = 1, entries = [], files = {} }, callback) => {
+  const directory = mkdtempSync(join(tmpdir(), "coverage-ledger-contract-"));
+
+  try {
+    for (const scope of ["src", "middleware", "netlify/functions", "scripts"]) {
+      mkdirSync(join(directory, scope), { recursive: true });
+    }
+    writeFileSync(join(directory, "coverage-exclusions.json"), JSON.stringify({ version, entries }));
+    for (const [file, source] of Object.entries(files)) {
+      const target = join(directory, file);
+      mkdirSync(join(target, ".."), { recursive: true });
+      writeFileSync(target, source);
+    }
+
+    return await callback(directory);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -215,6 +239,59 @@ describe("declarative deployment contracts", () => {
     }
   });
 
+  it("uses configured port and default listener when server overrides are omitted", () => {
+    const calls = [];
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      const result = startServer({
+        env: { PORT: "4100" },
+        appFactory(options) {
+          assert.deepEqual(options, { nodeEnv: undefined, allowedOrigins: [] });
+          return {
+            listen(port, listener) {
+              calls.push({ port, listener });
+              listener();
+              return "listening";
+            },
+          };
+        },
+        loadEnv: () => undefined,
+      });
+
+      assert.equal(result, "listening");
+      assert.equal(calls[0].port, "4100");
+      assert.equal(log.mock.calls[0][0], "🚀 Server running on port 4100");
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("loads dotenv and falls back to the default server port", async () => {
+    const { default: dotenv } = await import("dotenv");
+    const ports = [];
+
+    loadEnvironment();
+    startServer({
+      env: {},
+      loadEnv: () => undefined,
+      onListen: () => undefined,
+      appFactory: () => ({
+        listen(port) {
+          ports.push(port);
+          return "default-port";
+        },
+      }),
+    });
+
+    assert.equal(dotenv.config.mock.calls.length > 0, true);
+    assert.deepEqual(ports, [3000]);
+  });
+
+  it("rejects malformed development origins after URL parsing", () => {
+    assert.equal(isAllowedCorsOrigin("not a URL", { nodeEnv: "development" }), false);
+  });
+
   it("declares the complete public Contentful endpoint family", () => {
     assert.deepEqual(PUBLIC_CONTENTFUL_ROUTE_PATHS, [
       "/entries",
@@ -332,6 +409,109 @@ describe("declarative deployment contracts", () => {
     );
   });
 
+  it("ignores extensionless files and reports a missing built-assets directory", () => {
+    withFixtureDir({ LICENSE: "CONTENTFUL_MANAGEMENT_KEY" }, (rootDir) => {
+      assert.deepEqual(scanBuiltAssetsForCredentials({ rootDir, env: {} }), []);
+      assert.throws(
+        () => scanBuiltAssetsForCredentials({ rootDir: join(rootDir, "missing"), env: {} }),
+        /Built assets directory not found/
+      );
+    });
+  });
+
+  it("reports CLI credential findings and leaves a clean scan successful", () => {
+    const errors = [];
+    const processRef = {};
+
+    assert.deepEqual(
+      executeScanBuiltAssetsCli({
+        argv: ["node", "scan-built-assets.js", "output"],
+        scan: ({ rootDir }) => {
+          assert.equal(rootDir, "output");
+          return [{ file: "bundle.js", indicator: "CONTENTFUL_MANAGEMENT_KEY" }];
+        },
+        log: (message) => errors.push(message),
+        processRef,
+      }),
+      [{ file: "bundle.js", indicator: "CONTENTFUL_MANAGEMENT_KEY" }]
+    );
+    assert.deepEqual(errors, ["Credential indicator found in built asset: bundle.js (CONTENTFUL_MANAGEMENT_KEY)"]);
+    assert.equal(processRef.exitCode, 1);
+    assert.deepEqual(executeScanBuiltAssetsCli({ argv: ["node", "scan-built-assets.js"], scan: () => [] }), []);
+  });
+
+  it("validates the checked-in coverage exclusion ledger", async () => {
+    await assert.doesNotReject(() => validateCoverageExclusions());
+  });
+
+  it("rejects malformed, broad, undocumented, and stale coverage exclusions", async () => {
+    await withCoverageLedgerFixture({ version: 2, entries: [], files: {} }, async (root) => {
+      await assert.rejects(() => validateCoverageExclusions({ root }), /must declare version 1/);
+    });
+    await withCoverageLedgerFixture({ entries: [{}] }, async (root) => {
+      await assert.rejects(() => validateCoverageExclusions({ root }), /Each coverage exclusion/);
+    });
+    await withCoverageLedgerFixture(
+      {
+        entries: [
+          {
+            file: "scripts/entry.js",
+            line: 1,
+            directive: "v8 ignore next",
+            rationale: "This deliberate fixture exercises duplicate exclusion rejection.",
+            reviewedBy: "Codex",
+          },
+          {
+            file: "scripts/entry.js",
+            line: 1,
+            directive: "v8 ignore next",
+            rationale: "This deliberate fixture exercises duplicate exclusion rejection.",
+            reviewedBy: "Codex",
+          },
+        ],
+      },
+      async (root) => {
+        await assert.rejects(() => validateCoverageExclusions({ root }), /Duplicate coverage exclusion/);
+      }
+    );
+    await withCoverageLedgerFixture(
+      {
+        entries: [
+          {
+            file: "scripts/entry.js",
+            line: 1,
+            directive: "v8 ignore next",
+            rationale: "This deliberate fixture exercises a broad exclusion rejection.",
+            reviewedBy: "Codex",
+          },
+        ],
+        files: { "scripts/entry.js": "/* v8 ignore start */\n" },
+      },
+      async (root) => {
+        await assert.rejects(() => validateCoverageExclusions({ root }), /Broad coverage ignore directive/);
+      }
+    );
+    await withCoverageLedgerFixture({ files: { "scripts/entry.js": "/* v8 ignore next */\n" } }, async (root) => {
+      await assert.rejects(() => validateCoverageExclusions({ root }), /Undocumented coverage exclusion/);
+    });
+    await withCoverageLedgerFixture(
+      {
+        entries: [
+          {
+            file: "scripts/entry.js",
+            line: 1,
+            directive: "v8 ignore next",
+            rationale: "This deliberate fixture exercises stale exclusion detection.",
+            reviewedBy: "Codex",
+          },
+        ],
+      },
+      async (root) => {
+        await assert.rejects(() => validateCoverageExclusions({ root }), /Stale coverage exclusion/);
+      }
+    );
+  });
+
   it("marks administrative route metadata and canonicalizes legacy tag URLs", () => {
     const mainLayout = routes.find((route) => route.path === "/");
     const children = mainLayout.children;
@@ -422,6 +602,18 @@ describe("declarative deployment contracts", () => {
       await importFunction("contentful-admin.js");
       await importFunction("contentfulAdminCore.js");
     });
+  });
+
+  it("adapts sparse Netlify events into stable public and administrative responses", async () => {
+    const publicResponse = await contentfulNetlifyHandler({ path: "/unknown" });
+    const adminResponse = await contentfulAdminNetlifyHandler({ path: "/unknown", httpMethod: "GET" });
+
+    assert.deepEqual(publicResponse, {
+      statusCode: 404,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ error: "Not found" }),
+    });
+    assert.deepEqual(adminResponse, publicResponse);
   });
 
   it("collects static and dynamic Function module specifiers through ESLint's API", () => {
