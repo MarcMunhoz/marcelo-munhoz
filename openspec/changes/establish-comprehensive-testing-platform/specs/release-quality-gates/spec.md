@@ -30,7 +30,7 @@ All package-manager, build, lint, security scan, unit, component, integration, c
 The release workflow MUST expose one stable aggregate quality check that evaluates every required current-run result and fails unless all dependencies succeed.
 
 #### Scenario: Every required validation succeeds
-- **WHEN** source policy, lint, build, credential scanning, complete coverage, Chrome E2E, Firefox E2E, and remote smoke all succeed for the current pull-request commit
+- **WHEN** source policy, lint, build, credential scanning, the behavior suite with its coverage baseline, Chrome E2E, Firefox E2E, and remote smoke all succeed for the current pull-request commit
 - **THEN** the aggregate `quality-gate` check succeeds
 
 #### Scenario: Required validation does not succeed

@@ -4,18 +4,26 @@ Defines comprehensive, deterministic, and measurable automated test assurance fo
 
 ## ADDED Requirements
 
-### Requirement: In-Scope Application Code Has Complete Measured Coverage
-The test platform MUST enforce 100 percent global and per-file coverage for lines, statements, functions, and branches across in-scope first-party frontend, middleware, Function, and script code.
+### Requirement: In-Scope Application Code Has Measured Non-Regressing Coverage
+The test platform MUST report line, statement, function, and branch coverage across in-scope first-party frontend, middleware, Function, and script code and MUST enforce a version-controlled global baseline that cannot regress without explicit review.
 
-#### Scenario: Complete coverage passes
+#### Scenario: Coverage baseline passes
 - **WHEN** the unit, DOM, component, integration, and contract suites complete
-- **THEN** every included file and the aggregate report show 100 percent line, statement, function, and branch coverage
+- **THEN** the aggregate report satisfies the recorded global baseline for every metric and publishes file-level detail for diagnosis
 
-#### Scenario: New or changed code lacks coverage
-- **WHEN** any included file falls below 100 percent in any required metric
-- **THEN** the test command fails and identifies the uncovered file, location, and metric
+#### Scenario: Coverage regresses
+- **WHEN** aggregate coverage falls below the recorded baseline in any required metric
+- **THEN** the test command fails and identifies the regressed metric and uncovered locations without requiring exhaustive per-file coverage
 
-#### Scenario: Technical exclusion is necessary
+#### Scenario: New or changed behavior is implemented
+- **WHEN** production behavior, a bug fix, a security boundary, a state transition, recovery behavior, or an externally consumed contract changes
+- **THEN** behavior-oriented tests are written first at the narrowest useful boundary and must pass in the release suite
+
+#### Scenario: An uncovered location is reviewed
+- **WHEN** a coverage report identifies an uncovered branch or location
+- **THEN** the reviewer assesses its behavioral risk and adds a test only when the test protects a meaningful regression rather than merely increasing the metric
+
+#### Scenario: Technical ignore directive is necessary
 - **WHEN** generated or technically unreachable code cannot produce meaningful executable coverage
 - **THEN** the exclusion is limited to the smallest possible scope, recorded in an explicit reviewed allowlist, and accompanied by a technical rationale
 

@@ -3,7 +3,7 @@ import prettier from "eslint-config-prettier";
 
 export default [
   {
-    ignores: ["dist/**", "src-capacitor/**", "src-cordova/**", ".quasar/**", "node_modules/**"],
+    ignores: ["coverage/**", "dist/**", "src-capacitor/**", "src-cordova/**", ".quasar/**", "node_modules/**"],
   },
   ...vue.configs["flat/essential"],
   prettier,

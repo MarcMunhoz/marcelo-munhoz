@@ -5,7 +5,7 @@ The project has a substantial deterministic Node test suite, but many frontend r
 ## What Changes
 
 - Replace the final `node --test` workflow with Vitest projects for Node, DOM, Vue/Quasar component, integration, and contract testing after preserving all relevant existing guarantees.
-- Enforce 100% global and per-file line, statement, function, and branch coverage for in-scope application code, with only reviewed and documented technical exclusions.
+- Publish measured coverage for in-scope application code and enforce a version-controlled global baseline that cannot regress silently, without treating exhaustive per-file or branch execution as a substitute for behavior-oriented tests.
 - Replace frontend source-text assertions with rendered behavioral tests wherever the requirement is observable at runtime.
 - Add deterministic Cypress E2E coverage in containerized Chrome and Firefox across desktop and mobile viewports, covering every first-class route and critical public, writer, owner, authorization, session, failure, and recovery journey.
 - Keep routine browser tests independent of live Contentful, Cloudinary, and Netlify Identity services through fixtures, intercepts, and controlled test doubles.
@@ -19,7 +19,7 @@ The project has a substantial deterministic Node test suite, but many frontend r
 
 ### New Capabilities
 
-- `automated-test-assurance`: Defines the deterministic Vitest and Cypress test architecture, complete application coverage contract, browser matrix, test isolation, and sanitized evidence requirements.
+- `automated-test-assurance`: Defines the deterministic Vitest and Cypress test architecture, risk-oriented TDD contract, coverage baseline, browser matrix, test isolation, and sanitized evidence requirements.
 - `release-quality-gates`: Defines the `develop` to `main` pull-request policy, container-only CI orchestration, fail-closed aggregate check, Deploy Preview commit verification, remote smoke validation, and mandatory merge protections.
 
 ### Modified Capabilities

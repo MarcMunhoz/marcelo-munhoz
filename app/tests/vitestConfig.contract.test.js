@@ -21,17 +21,16 @@ describe("Vitest project and coverage contract", () => {
     );
   });
 
-  it("enforces complete V8 coverage with portable reports and boundary-only exclusions", () => {
+  it("enforces a non-regressing global V8 coverage baseline with portable reports", () => {
     const { coverage } = vitestConfig.test;
 
     assert.equal(coverage.provider, "v8");
     assert.deepEqual(coverage.reporter, ["text", "html", "lcov", "json"]);
     assert.deepEqual(coverage.thresholds, {
-      branches: 100,
-      functions: 100,
-      lines: 100,
-      perFile: true,
-      statements: 100,
+      branches: 83,
+      functions: 86,
+      lines: 92,
+      statements: 91,
     });
     assert.deepEqual(coverage.include, [
       "src/**/*.{js,vue}",

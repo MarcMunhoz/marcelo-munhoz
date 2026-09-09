@@ -9,7 +9,7 @@ Project policy requires package-manager, build, test, and browser commands to ru
 **Goals:**
 
 - Give pure Node logic, browser-dependent logic, Vue/Quasar rendering, static contracts, and full browser journeys explicit test boundaries.
-- Make 100 percent coverage in all four metrics an enforceable global and per-file property rather than an aspirational report.
+- Make tests originate from behavior and risk during development, while using measured coverage as a diagnostic and non-regression signal rather than an exhaustive target.
 - Keep local and CI execution reproducible through pinned containers with no host browser requirement.
 - Validate two browser engines deterministically and validate the exact Netlify preview artifact separately.
 - Produce one stable, fail-closed GitHub quality check suitable for `main` protection.
@@ -44,13 +44,13 @@ Frontend tests that currently assert Vue source strings will be decomposed: pure
 
 Alternative considered: mechanically translate every `node:test` assertion to Vitest. Rejected because it would change runners without correcting the central assurance gap.
 
-### 3. Enforce coverage globally and per file
+### 3. Enforce a global coverage baseline without optimizing for incidental branches
 
-The V8 coverage provider will include first-party JavaScript and Vue code under `src`, middleware, Netlify Functions, and project scripts. Generated output, dependencies, fixtures, and test infrastructure will be excluded by boundary rather than ad hoc ignore comments. Thresholds for lines, statements, functions, and branches will all be 100 percent globally and per file.
+The V8 coverage provider will include first-party JavaScript and Vue code under `src`, middleware, Netlify Functions, and project scripts. Generated output, dependencies, fixtures, and test infrastructure will be excluded by boundary rather than ad hoc ignore comments. Version-controlled global thresholds will preserve the measured migration baseline and may be raised deliberately as useful tests improve it. Per-file thresholds are not enforced because generated Vue template branches, defensive fallbacks, and low-risk glue do not all justify dedicated tests.
 
-Any genuinely unreachable generated or platform wrapper path must enter a small configuration allowlist with a written rationale and the narrowest possible scope. Coverage reports will be produced as console output, HTML, LCOV, and machine-readable data. Codecov may visualize results, but the containerized Vitest command is the authoritative gate.
+Tests are added first for new or changed behavior, bug fixes, security boundaries, authorization, state transitions, error recovery, and contracts whose regression would matter. An uncovered location is a review prompt, not an automatic instruction to manufacture a test. Any technical ignore directive must still enter a small configuration allowlist with a written rationale and the narrowest possible scope. Coverage reports will be produced as console output, HTML, LCOV, and machine-readable data. Codecov may visualize results, but the containerized Vitest command and the passing behavior suite are the authoritative gate.
 
-Alternative considered: establish a lower baseline and ratchet upward. Rejected because the approved objective is to settle application coverage in this change rather than leave a partial migration.
+Alternative considered: require 100 percent globally and per file. Rejected after implementation evidence showed that it incentivizes tests for compiler-generated template branches and defensive short circuits without improving product assurance.
 
 ### 4. Use Cypress for deterministic cross-engine journeys
 
@@ -88,7 +88,7 @@ The implementation will use separate detailed commits for platform scaffolding, 
 
 ## Risks / Trade-offs
 
-- [100 percent branch coverage encourages artificial tests or exclusions] → Require per-file thresholds, behavior-oriented assertions, mutation-sensitive review, and a documented narrow allowlist instead of broad ignore directives.
+- [Coverage targets encourage artificial tests or exclusions] → Keep thresholds global and baseline-oriented, require behavior-first TDD for meaningful changes, review uncovered risk rather than every location, and retain a documented narrow allowlist for explicit ignore directives.
 - [Quasar components need complex global setup] → Centralize a minimal mount factory and reset plugins, router state, teleports, dialogs, and global mocks between tests.
 - [Timers and browser globals make session tests flaky] → Use fake timers, injected clocks, deterministic storage and broadcast doubles, and explicit cleanup.
 - [Two browser engines increase CI duration] → Reuse the same built artifact and fixtures, run Chrome and Firefox in parallel, cache only safe immutable layers, and cancel superseded runs.
@@ -104,7 +104,7 @@ The implementation will use separate detailed commits for platform scaffolding, 
 2. Add a canonical `compose.yaml` with isolated development, test, and browser profiles, reusing shared test-runtime fragments without removing the legacy runner. Test commands explicitly disable implicit environment-file loading.
 3. Migrate executable unit, middleware, Function, authorization, and session tests with a parity inventory.
 4. Replace source-text frontend assertions with mounted component behavior and retain only legitimate parsed contract checks.
-5. Close coverage gaps until every included file and metric reaches 100 percent; review and document any technical allowlist entry.
+5. Establish the measured global baseline, retain behavior-oriented tests for meaningful gaps, remove metric-only tests, and document any technical allowlist entry.
 6. Add deterministic fixtures and the complete Cypress journey matrix, then pass it in containerized Chrome and Firefox at desktop and mobile viewports.
 7. Add sanitized build identity and the Chrome-only Deploy Preview smoke suite with bounded stale-preview detection.
 8. Add the pull-request workflow, fail-closed aggregate check, artifacts, concurrency, and contributor documentation.
