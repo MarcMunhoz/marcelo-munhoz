@@ -54,9 +54,10 @@ FROM cypress/browsers:node-22.21.0-chrome-141.0.7390.107-1-ff-144.0-edge-141.0.3
 
 WORKDIR /app
 ENV CYPRESS_CACHE_FOLDER=/opt/cypress-cache
+ENV NPM_CONFIG_CACHE=/opt/npm-cache
 
-RUN mkdir -p /opt/cypress-cache \
-  && chown 1001:1001 /app /opt/cypress-cache
+RUN mkdir -p /opt/cypress-cache /opt/npm-cache \
+  && chown 1001:1001 /app /opt/cypress-cache /opt/npm-cache
 
 USER 1001
 
@@ -67,3 +68,7 @@ RUN npm ci
 COPY --chown=1001:1001 ./app ./
 
 ENV NODE_ENV=test
+
+# Xvfb needs to create its socket under /tmp before Cypress drops Chromium's
+# sandbox. The browser container is ephemeral and has no writable host mount.
+USER root

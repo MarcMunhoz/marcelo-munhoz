@@ -11,6 +11,8 @@
     "test": "node --test",
     "test:vitest": "vitest",
     "test:vitest:coverage": "vitest run --coverage",
+    "e2e:chrome": "node scripts/run-cypress-matrix.js chrome",
+    "e2e:firefox": "node scripts/run-cypress-matrix.js firefox",
     "validate:coverage-exclusions": "node scripts/validate-coverage-exclusions.js",
     "scan:build-credentials": "node scripts/scan-built-assets.js dist",
     "dev": "concurrently \"quasar dev\" \"node middleware/server.js\"",

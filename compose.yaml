@@ -14,9 +14,9 @@ x-browser-runtime: &browser-runtime
     target: test-browser-runtime
   depends_on:
     test-frontend:
-      condition: service_started
+      condition: service_healthy
     test-backend:
-      condition: service_started
+      condition: service_healthy
   init: true
   networks: [test-network]
 
@@ -45,24 +45,38 @@ services:
   test-frontend:
     <<: *test-runtime
     profiles: [e2e, chrome, firefox]
-    command: [npm, run, dev, --, --host, 0.0.0.0]
+    command: [./node_modules/.bin/quasar, dev, --hostname, 0.0.0.0]
+    environment:
+      API_PROXY_TARGET: http://test-backend:3000
     expose: ["1991"]
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, http://127.0.0.1:1991]
+      interval: 2s
+      timeout: 2s
+      retries: 30
 
   test-backend:
     <<: *test-runtime
     profiles: [e2e, chrome, firefox]
     command: [node, middleware/server.js]
+    environment:
+      NODE_ENV: development
     expose: ["3000"]
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, http://127.0.0.1:3000/healthz]
+      interval: 2s
+      timeout: 2s
+      retries: 30
 
   cypress-chrome:
     <<: *browser-runtime
     profiles: [chrome]
-    command: [npx, cypress, run, --browser, chrome]
+    command: [npm, run, e2e:chrome]
 
   cypress-firefox:
     <<: *browser-runtime
     profiles: [firefox]
-    command: [npx, cypress, run, --browser, firefox]
+    command: [npm, run, e2e:firefox]
 
 networks:
   test-network:

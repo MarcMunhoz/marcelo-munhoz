@@ -38,4 +38,17 @@ export default [
       ],
     },
   },
+  {
+    files: ["cypress/**/*.js"],
+    languageOptions: {
+      globals: {
+        beforeEach: "readonly",
+        cy: "readonly",
+        Cypress: "readonly",
+        describe: "readonly",
+        expect: "readonly",
+        it: "readonly",
+      },
+    },
+  },
 ];

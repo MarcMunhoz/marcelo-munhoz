@@ -9,7 +9,7 @@
 import { defineConfig } from "#q-app";
 import dotenv from "dotenv";
 import os from "os";
-import { quasarBuildEnvironment, quasarDevServerProxy } from "./quasarBuildManifest.js";
+import { quasarBuildEnvironment, quasarDevServerAllowedHosts, quasarDevServerProxy } from "./quasarBuildManifest.js";
 
 const isWSL = os.release().toLowerCase().includes("microsoft");
 
@@ -86,6 +86,7 @@ export default defineConfig(function (ctx) {
     devServer: {
       // https: true
       port: 1991,
+      allowedHosts: quasarDevServerAllowedHosts,
       proxy: quasarDevServerProxy,
       open: false, // opens browser window automatically
       watch: {
