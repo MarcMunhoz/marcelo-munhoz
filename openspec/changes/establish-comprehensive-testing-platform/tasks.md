@@ -54,15 +54,15 @@
 
 ## 7. Deterministic Cypress Journey Matrix
 
-- [ ] 7.1 Configure Cypress fixtures, commands, accessible selector conventions, API intercepts, failure artifact limits, and state reset between scenarios
-- [ ] 7.2 Cover the public shell, Home, About, not-found, desktop navigation, mobile navigation, and cookie behavior
-- [ ] 7.3 Cover Blog default, search, year, tag, pagination, invalid URL state, empty, failure, retry, browser history, and responsive flows
-- [ ] 7.4 Cover article direct entry, archive return, previous and next boundaries, author navigation, locale, tags, images, and malformed-response recovery
-- [ ] 7.5 Cover signed-out administrative entry and safe redirect behavior without opening or depending on live Netlify Identity
-- [ ] 7.6 Cover writer dashboard, draft creation and editing, validation, save, review submission, unpublication request, thumbnail workflows, and unsaved-change guards
-- [ ] 7.7 Cover owner dashboard, review queues, publish, unpublish, archive, unarchive, permanent delete, profile, and tag management flows
-- [ ] 7.8 Cover session warning, continuation, expiration, sign-out, and applicable cross-tab behavior with deterministic time control
-- [ ] 7.9 Run the complete shared journey suite in pinned Chrome and Firefox containers at desktop and mobile viewport classes
+- [x] 7.1 Configure Cypress fixtures, commands, accessible selector conventions, API intercepts, failure artifact limits, and state reset between scenarios
+- [x] 7.2 Cover the public shell, Home, About, not-found, desktop navigation, mobile navigation, and cookie behavior
+- [x] 7.3 Cover Blog default, search, year, tag, pagination, invalid URL state, empty, failure, retry, browser history, and responsive flows
+- [x] 7.4 Cover article direct entry, archive return, previous and next boundaries, author navigation, locale, tags, images, and malformed-response recovery
+- [x] 7.5 Cover signed-out administrative entry and safe redirect behavior without opening or depending on live Netlify Identity
+- [x] 7.6 Cover writer dashboard, draft creation and editing, validation, save, review submission, unpublication request, thumbnail workflows, and unsaved-change guards
+- [x] 7.7 Cover owner dashboard, review queues, publish, unpublish, archive, unarchive, permanent delete, profile, and tag management flows
+- [x] 7.8 Cover session warning, continuation, expiration, sign-out, and applicable cross-tab behavior with deterministic time control
+- [x] 7.9 Run the complete shared journey suite in pinned Chrome and Firefox containers at desktop and mobile viewport classes
 
 ## 8. Deploy Preview Identity And Remote Smoke
 
