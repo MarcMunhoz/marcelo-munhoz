@@ -60,11 +60,12 @@ describe("blog article recovery paths", () => {
     expect(mounted.wrapper.text()).toContain("Description second");
   });
 
-  it("catches a failed article request leaving stale content visible", async () => {
+  it("offers recovery after a failed article request", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const mounted = await mountArticle({ initialPath: "/blog/missing", fetchImpl: () => Promise.resolve(response({ error: "missing" }, 404)) });
 
-    expect(mounted.wrapper.find(".article-content").classes()).toContain("hidden");
+    expect(mounted.wrapper.get('[role="alert"]').text()).toContain("We could not load this article.");
+    expect(mounted.wrapper.get("button").text()).toContain("Try again");
     expect(mounted.wrapper.find(".article-navigation").exists()).toBe(false);
     expect(error).toHaveBeenCalledOnce();
   });

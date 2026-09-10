@@ -146,28 +146,28 @@
 
                 <template #body-cell-actions="props">
                   <q-td :props="props" class="table-actions">
-                    <q-btn v-if="canEditArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="edit" @click="openEditorForArticle(props.row)">
+                    <q-btn v-if="canEditArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="edit" aria-label="Edit" @click="openEditorForArticle(props.row)">
                       <q-tooltip>Edit article</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canPrepareReviewAction(props.row, session)" dense flat round color="blue-grey-7" icon="rate_review" @click="openEditorForArticle(props.row)">
+                    <q-btn v-if="canPrepareReviewAction(props.row, session)" dense flat round color="blue-grey-7" icon="rate_review" aria-label="Review" @click="openEditorForArticle(props.row)">
                       <q-tooltip>Submit draft for review</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canRequestUnpublicationAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" :loading="loadingAction === `request-unpublication-${props.row.id}`" @click="requestUnpublicationFromRow(props.row)">
+                    <q-btn v-if="canRequestUnpublicationAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" aria-label="Request unpublication" :loading="loadingAction === `request-unpublication-${props.row.id}`" @click="requestUnpublicationFromRow(props.row)">
                       <q-tooltip>Request unpublication</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canOwnerPublishAction(props.row, session)" dense flat round color="blue-grey-8" icon="publish" @click="publishSelectedArticle(props.row)">
+                    <q-btn v-if="canOwnerPublishAction(props.row, session)" dense flat round color="blue-grey-8" icon="publish" :aria-label="props.row.lifecycleStatus === 'changed' ? 'Publish changes' : 'Publish'" @click="publishSelectedArticle(props.row)">
                       <q-tooltip>{{ props.row.lifecycleStatus === "changed" ? "Publish changes" : "Publish" }}</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canOwnerUnpublishAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" @click="unpublishSelectedArticle(props.row)">
+                    <q-btn v-if="canOwnerUnpublishAction(props.row, session)" dense flat round color="amber-9" icon="visibility_off" aria-label="Unpublish" @click="unpublishSelectedArticle(props.row)">
                       <q-tooltip>Unpublish</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canArchiveArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="archive" @click="archiveSelectedArticle(props.row)">
+                    <q-btn v-if="canArchiveArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="archive" aria-label="Archive" @click="archiveSelectedArticle(props.row)">
                       <q-tooltip>Archive</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canUnarchiveArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="unarchive" @click="unarchiveSelectedArticle(props.row)">
+                    <q-btn v-if="canUnarchiveArticleAction(props.row, session)" dense flat round color="blue-grey-7" icon="unarchive" aria-label="Unarchive" @click="unarchiveSelectedArticle(props.row)">
                       <q-tooltip>Unarchive</q-tooltip>
                     </q-btn>
-                    <q-btn v-if="canUnarchiveArticleAction(props.row, session)" dense flat round color="negative" icon="delete_forever" @click="openDeleteConfirmation(props.row)">
+                    <q-btn v-if="canUnarchiveArticleAction(props.row, session)" dense flat round color="negative" icon="delete_forever" aria-label="Delete" @click="openDeleteConfirmation(props.row)">
                       <q-tooltip>Delete permanently</q-tooltip>
                     </q-btn>
                   </q-td>

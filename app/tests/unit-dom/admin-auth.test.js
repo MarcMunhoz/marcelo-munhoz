@@ -3,6 +3,7 @@ import { describe, it } from "vitest";
 
 import {
   adminAccountInitials,
+  adminPreviewAllowed,
   adminSessionDisplay,
   bindIdentityCallbacks,
   completeAdminIdentityLogin,
@@ -33,6 +34,12 @@ const acceptedLifecycle = {
 };
 
 describe("admin auth preview sessions", () => {
+  it("allows tests to disable development preview without enabling it outside development", () => {
+    assert.equal(adminPreviewAllowed({ isDevelopment: true, previewDisabled: true }), false);
+    assert.equal(adminPreviewAllowed({ isDevelopment: true, previewDisabled: false }), true);
+    assert.equal(adminPreviewAllowed({ isDevelopment: false, previewDisabled: false }), false);
+  });
+
   it("uses owner as the default local preview role for full admin testing", () => {
     assert.equal(selectedPreviewRole({ storage: null }), "owner");
     assert.deepEqual(createPreviewSession({ role: "owner" }), {
