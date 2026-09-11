@@ -78,6 +78,14 @@ services:
     profiles: [firefox]
     command: [npm, run, e2e:firefox]
 
+  cypress-remote:
+    build:
+      context: .
+      target: test-browser-runtime
+    profiles: [remote-smoke]
+    init: true
+    command: [npm, run, e2e:remote-smoke]
+
 networks:
   test-network:
     internal: true

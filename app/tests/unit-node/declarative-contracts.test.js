@@ -548,11 +548,16 @@ describe("declarative deployment contracts", () => {
     const csp = parseCsp(headers["Content-Security-Policy"]);
 
     assert.deepEqual(configuration.redirects, [
+      { from: "/healthz", to: "/.netlify/functions/health", status: 200, force: true },
       { from: "/api/admin/contentful/*", to: "/.netlify/functions/contentful-admin/:splat", status: 200, force: true },
       { from: "/api/contentful/*", to: "/.netlify/functions/contentful/:splat", status: 200, force: true },
       { from: "/*", to: "index.html", status: 200 },
     ]);
-    assert.equal(configuration.build.environment.SECRETS_SCAN_OMIT_KEYS, "CLOUDINARY_UPLOAD_FOLDER,CLOUDINARY_FOLDER");
+    assert.deepEqual(configuration.build, {
+      command: "npm run build:netlify",
+      publish: "dist",
+      environment: { SECRETS_SCAN_OMIT_KEYS: "CLOUDINARY_UPLOAD_FOLDER,CLOUDINARY_FOLDER" },
+    });
     assert.deepEqual([...csp.entries()], [
       ["default-src", ["https:"]],
       ["connect-src", ["'self'", "https://identity.netlify.com", "https://media-editor.cloudinary.com", "https://res.cloudinary.com"]],

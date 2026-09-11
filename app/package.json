@@ -17,6 +17,8 @@
     "scan:build-credentials": "node scripts/scan-built-assets.js dist",
     "dev": "concurrently \"quasar dev\" \"node middleware/server.js\"",
     "build": "quasar build",
+    "build:netlify": "npm run build && node scripts/write-build-identity.js",
+    "e2e:remote-smoke": "node scripts/run-remote-smoke.js",
     "start": "node middleware/server.js"
   },
   "dependencies": {

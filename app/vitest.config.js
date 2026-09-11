@@ -15,6 +15,10 @@ const coverageExclude = [
   ".quasar/**",
   "node_modules/**",
   "tests/**",
+  // Browser-process launchers are test infrastructure; their invoked policy,
+  // readiness, and sanitization modules remain measured independently.
+  "scripts/run-cypress-matrix.js",
+  "scripts/run-remote-smoke.js",
   "**/__fixtures__/**",
   "**/fixtures/**",
   "coverage/**",
