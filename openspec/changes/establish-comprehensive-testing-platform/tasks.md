@@ -66,21 +66,21 @@
 
 ## 8. Deploy Preview Identity And Remote Smoke
 
-- [ ] 8.1 Add a minimal sanitized build identity artifact that allows the tested Deploy Preview commit to be compared with the pull-request head commit
-- [ ] 8.2 Add bounded preview readiness and commit-matching logic that fails on timeout or stale content instead of falling back
-- [ ] 8.3 Add a Chrome-only remote smoke configuration that cannot invoke privileged mutations or require administrative credentials
-- [ ] 8.4 Cover deployed Home, About, Blog, not-found, SPA routing, redirects, assets, public Functions, health behavior, and critical browser errors
-- [ ] 8.5 Cover deployed security headers, administrative indexing policy, signed-out admin safety, and representative desktop and mobile layouts
-- [ ] 8.6 Sanitize remote smoke logs, screenshots, videos, request diagnostics, URLs, paths, and environment metadata before artifact publication
+- [x] 8.1 Add a minimal sanitized build identity artifact that allows the tested Deploy Preview commit to be compared with the pull-request head commit
+- [x] 8.2 Add bounded preview readiness and commit-matching logic that fails on timeout or stale content instead of falling back
+- [x] 8.3 Add a Chrome-only remote smoke configuration that cannot invoke privileged mutations or require administrative credentials
+- [x] 8.4 Cover deployed Home, About, Blog, not-found, SPA routing, redirects, assets, public Functions, health behavior, and critical browser errors
+- [x] 8.5 Cover deployed security headers, administrative indexing policy, signed-out admin safety, and representative desktop and mobile layouts
+- [x] 8.6 Sanitize remote smoke logs, screenshots, videos, request diagnostics, URLs, paths, and environment metadata before artifact publication
 
 ## 9. Pull Request CI And Fail-Closed Gate
 
-- [ ] 9.1 Add a GitHub Actions workflow for pull requests targeting `main` with an explicit failing source-policy check for heads other than `develop`
-- [ ] 9.2 Add safe concurrency so a newer pull-request commit cancels obsolete work without allowing the current required checks to disappear
-- [ ] 9.3 Add independent container-orchestrated jobs for lint, build, credential scanning, Vitest coverage, Chrome E2E, Firefox E2E, and remote smoke
-- [ ] 9.4 Upload bounded sanitized coverage and Cypress diagnostics with clear retention and failure behavior
-- [ ] 9.5 Add an unconditional `quality-gate` job that inspects every dependency result and fails for failure, timeout, cancellation, or unexpected skip
-- [ ] 9.6 Verify the workflow never installs or runs project packages or browsers directly on the GitHub runner host
+- [x] 9.1 Add a GitHub Actions workflow for pull requests targeting `main` with an explicit failing source-policy check for heads other than `develop`
+- [x] 9.2 Add safe concurrency so a newer pull-request commit cancels obsolete work without allowing the current required checks to disappear
+- [x] 9.3 Add independent container-orchestrated jobs for lint, build, credential scanning, Vitest coverage, Chrome E2E, Firefox E2E, and remote smoke
+- [x] 9.4 Upload bounded sanitized coverage and Cypress diagnostics with clear retention and failure behavior
+- [x] 9.5 Add an unconditional `quality-gate` job that inspects every dependency result and fails for failure, timeout, cancellation, or unexpected skip
+- [x] 9.6 Verify the workflow never installs or runs project packages or browsers directly on the GitHub runner host
 - [ ] 9.7 Verify a non-`develop` pull request to `main` fails explicitly and a `develop` to `main` pull request exercises every required job
 
 ## 10. Final Migration, Documentation, And Repository Protection
