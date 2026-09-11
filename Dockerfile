@@ -43,6 +43,7 @@ WORKDIR /app
 
 COPY --from=test-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node ./app ./
+COPY --chown=node:node ./.github /workspace/.github
 RUN chown node:node /app
 
 USER node
