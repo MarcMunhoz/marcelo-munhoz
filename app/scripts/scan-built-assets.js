@@ -101,15 +101,21 @@ export const scanBuiltAssetsForCredentials = ({ rootDir = "dist", env = process.
 
 const isCli = process.argv[1] === fileURLToPath(import.meta.url);
 
-if (isCli) {
-  const rootDir = process.argv[2] || "dist";
-  const findings = scanBuiltAssetsForCredentials({ rootDir });
+export const executeScanBuiltAssetsCli = ({ argv = process.argv, scan = scanBuiltAssetsForCredentials, log = console.error, processRef = process } = {}) => {
+  const rootDir = argv[2] || "dist";
+  const findings = scan({ rootDir });
 
   if (findings.length > 0) {
     for (const finding of findings) {
-      console.error(`Credential indicator found in built asset: ${finding.file} (${finding.indicator})`);
+      log(`Credential indicator found in built asset: ${finding.file} (${finding.indicator})`);
     }
 
-    process.exitCode = 1;
+    processRef.exitCode = 1;
   }
+
+  return findings;
+};
+
+if (isCli) {
+  executeScanBuiltAssetsCli();
 }

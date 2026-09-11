@@ -181,7 +181,7 @@ These items are not promoted to vulnerability candidates without additional depl
 - `.env` is ignored, but `.env.*` variants are not covered by the same repository ignore rule (`.gitignore:42`). No prohibited file was opened and no environment file is tracked.
 - The built-asset credential scanner omits the Contentful Delivery credential name, so a future browser-bundle leak of that server-side value may evade its current indicators (`app/scripts/scan-built-assets.js:5-24`, `app/netlify/functions/contentfulProxyCore.js:300`). No actual leak was identified.
 - The container build installs unpinned global CLIs and uses `npm install` in the shared production base (`Dockerfile:13-15`); the base image is tag-pinned but not digest-pinned.
-- The local development compose command runs dependency installation on each container start (`docker-compose.yaml:16`).
+- The local development compose command runs dependency installation on each container start (`compose.yaml`).
 - The frontend API base accepts an absolute build-time value, and administrative bearer requests use the resulting URL (`app/src/utils/apiBase.js:14-23`, `app/src/utils/adminApi.js:59-80`). The normal deployment documents a same-origin base, so this remains a build-integrity hardening observation unless a user-controlled or untrusted configuration path is established.
 
 ## Confirmed controls and negative results

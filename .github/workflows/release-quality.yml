@@ -1,0 +1,191 @@
+name: Release quality
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source-policy:
+    name: source-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the production source
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps
+          -e PR_HEAD_REF -e PR_HEAD_REPOSITORY -e BASE_REPOSITORY
+          test node scripts/release-quality-policy.js source
+
+  lint:
+    needs: source-policy
+    if: "${{ needs.source-policy.result == 'success' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file /dev/null run --build --rm --no-deps test npm run lint
+
+  build:
+    needs: source-policy
+    if: "${{ needs.source-policy.result == 'success' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          COMMIT_REF: ${{ github.event.pull_request.head.sha }}
+        run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps
+          -e NODE_ENV=production -e COMMIT_REF test npm run build:netlify
+
+  credential-scan:
+    needs: source-policy
+    if: "${{ needs.source-policy.result == 'success' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps
+          -e NODE_ENV=production test sh -ec
+          "npm run build && npm run scan:build-credentials"
+
+  coverage:
+    needs: source-policy
+    if: "${{ needs.source-policy.result == 'success' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps --user root
+          -v ./app/coverage:/app/coverage test npm run test:vitest:coverage
+      - name: Sanitize coverage evidence
+        if: "${{ always() }}"
+        run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps --user root
+          -v ./app/coverage:/app/coverage -v ./app/artifacts:/app/artifacts
+          test node scripts/sanitize-coverage-artifacts.js coverage artifacts/coverage-sanitized
+      - name: Upload sanitized coverage
+        if: "${{ always() }}"
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-sanitized
+          path: app/artifacts/coverage-sanitized
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e-chrome:
+    needs: source-policy
+    if: "${{ needs.source-policy.result == 'success' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: >-
+          docker compose --env-file /dev/null --profile chrome run --build --rm
+          -v ./app/artifacts:/app/artifacts cypress-chrome
+      - if: "${{ always() }}"
+        run: docker compose --env-file /dev/null down --remove-orphans
+      - name: Sanitize Chrome diagnostics
+        if: "${{ always() }}"
+        run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps --user root
+          -v ./app/artifacts:/app/artifacts test
+          node scripts/sanitize-remote-smoke-artifacts.js artifacts/cypress artifacts/cypress-sanitized
+      - name: Upload sanitized Chrome diagnostics
+        if: "${{ always() }}"
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-chrome-sanitized
+          path: app/artifacts/cypress-sanitized
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e-firefox:
+    needs: source-policy
+    if: "${{ needs.source-policy.result == 'success' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: >-
+          docker compose --env-file /dev/null --profile firefox run --build --rm
+          -v ./app/artifacts:/app/artifacts cypress-firefox
+      - if: "${{ always() }}"
+        run: docker compose --env-file /dev/null down --remove-orphans
+      - name: Sanitize Firefox diagnostics
+        if: "${{ always() }}"
+        run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps --user root
+          -v ./app/artifacts:/app/artifacts test
+          node scripts/sanitize-remote-smoke-artifacts.js artifacts/cypress artifacts/cypress-sanitized
+      - name: Upload sanitized Firefox diagnostics
+        if: "${{ always() }}"
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-firefox-sanitized
+          path: app/artifacts/cypress-sanitized
+          if-no-files-found: error
+          retention-days: 7
+
+  remote-smoke:
+    needs: source-policy
+    if: "${{ needs.source-policy.result == 'success' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DEPLOY_PREVIEW_URL: https://deploy-preview-${{ github.event.pull_request.number }}--${{ vars.NETLIFY_SITE_NAME }}.netlify.app
+      EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: >-
+          docker compose --env-file /dev/null --profile remote-smoke run --build --rm
+          -v ./app/artifacts:/app/artifacts
+          -e DEPLOY_PREVIEW_URL -e EXPECTED_COMMIT_SHA cypress-remote
+      - name: Upload sanitized remote diagnostics
+        if: "${{ always() }}"
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-smoke-sanitized
+          path: app/artifacts/remote-smoke/sanitized
+          if-no-files-found: error
+          retention-days: 7
+
+  quality-gate:
+    name: quality-gate
+    if: "${{ always() }}"
+    needs: [source-policy, lint, build, credential-scan, coverage, e2e-chrome, e2e-firefox, remote-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail closed on every required result
+        env:
+          RESULT_SOURCE_POLICY: ${{ needs.source-policy.result }}
+          RESULT_LINT: ${{ needs.lint.result }}
+          RESULT_BUILD: ${{ needs.build.result }}
+          RESULT_CREDENTIAL_SCAN: ${{ needs.credential-scan.result }}
+          RESULT_COVERAGE: ${{ needs.coverage.result }}
+          RESULT_E2E_CHROME: ${{ needs.e2e-chrome.result }}
+          RESULT_E2E_FIREFOX: ${{ needs.e2e-firefox.result }}
+          RESULT_REMOTE_SMOKE: ${{ needs.remote-smoke.result }}
+        run: >-
+          docker compose --env-file /dev/null run --build --rm --no-deps
+          -e RESULT_SOURCE_POLICY -e RESULT_LINT -e RESULT_BUILD
+          -e RESULT_CREDENTIAL_SCAN -e RESULT_COVERAGE -e RESULT_E2E_CHROME
+          -e RESULT_E2E_FIREFOX -e RESULT_REMOTE_SMOKE
+          test node scripts/release-quality-policy.js gate

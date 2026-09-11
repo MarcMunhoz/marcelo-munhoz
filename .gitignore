@@ -5,6 +5,7 @@ node_modules
 # Quasar core related directories
 .quasar
 app/dist
+app/artifacts
 
 # Cordova related directories and files
 app/src-cordova/node_modules

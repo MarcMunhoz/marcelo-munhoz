@@ -37,14 +37,14 @@
     </div>
 
     <div class="admin-article-card__actions" aria-label="Article actions">
-      <q-btn v-if="canEditArticleAction(article, session)" dense outline color="blue-grey-7" icon="edit" label="Edit" @click="$emit('edit', article)" />
-      <q-btn v-if="canPrepareReviewAction(article, session)" dense outline color="blue-grey-7" icon="rate_review" label="Review" @click="$emit('review', article)" />
-      <q-btn v-if="canRequestUnpublicationAction(article, session)" dense outline color="amber-9" icon="visibility_off" label="Request unpublication" :loading="loadingAction === `request-unpublication-${article.id}`" @click="$emit('request-unpublication', article)" />
-      <q-btn v-if="canOwnerPublishAction(article, session)" dense unelevated color="blue-grey-8" icon="publish" :label="article.lifecycleStatus === 'changed' ? 'Publish changes' : 'Publish'" :loading="loadingAction === `publish-${article.id}`" @click="$emit('publish', article)" />
-      <q-btn v-if="canOwnerUnpublishAction(article, session)" dense outline color="amber-9" icon="visibility_off" label="Unpublish" :loading="loadingAction === `unpublish-${article.id}`" @click="$emit('unpublish', article)" />
-      <q-btn v-if="canArchiveArticleAction(article, session)" dense outline color="blue-grey-7" icon="archive" label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="$emit('archive', article)" />
-      <q-btn v-if="canUnarchiveArticleAction(article, session)" dense outline color="blue-grey-7" icon="unarchive" label="Unarchive" :loading="loadingAction === `unarchive-${article.id}`" @click="$emit('unarchive', article)" />
-      <q-btn v-if="canUnarchiveArticleAction(article, session)" dense outline color="negative" icon="delete_forever" label="Delete" :loading="loadingAction === `delete-${article.id}`" @click="$emit('delete', article)" />
+      <q-btn v-if="canEditArticleAction(article, session)" dense outline color="blue-grey-7" icon="edit" label="Edit" aria-label="Edit" @click="$emit('edit', article)" />
+      <q-btn v-if="canPrepareReviewAction(article, session)" dense outline color="blue-grey-7" icon="rate_review" label="Review" aria-label="Review" @click="$emit('review', article)" />
+      <q-btn v-if="canRequestUnpublicationAction(article, session)" dense outline color="amber-9" icon="visibility_off" label="Request unpublication" aria-label="Request unpublication" :loading="loadingAction === `request-unpublication-${article.id}`" @click="$emit('request-unpublication', article)" />
+      <q-btn v-if="canOwnerPublishAction(article, session)" dense unelevated color="blue-grey-8" icon="publish" :label="article.lifecycleStatus === 'changed' ? 'Publish changes' : 'Publish'" :aria-label="article.lifecycleStatus === 'changed' ? 'Publish changes' : 'Publish'" :loading="loadingAction === `publish-${article.id}`" @click="$emit('publish', article)" />
+      <q-btn v-if="canOwnerUnpublishAction(article, session)" dense outline color="amber-9" icon="visibility_off" label="Unpublish" aria-label="Unpublish" :loading="loadingAction === `unpublish-${article.id}`" @click="$emit('unpublish', article)" />
+      <q-btn v-if="canArchiveArticleAction(article, session)" dense outline color="blue-grey-7" icon="archive" label="Archive" aria-label="Archive" :loading="loadingAction === `archive-${article.id}`" @click="$emit('archive', article)" />
+      <q-btn v-if="canUnarchiveArticleAction(article, session)" dense outline color="blue-grey-7" icon="unarchive" label="Unarchive" aria-label="Unarchive" :loading="loadingAction === `unarchive-${article.id}`" @click="$emit('unarchive', article)" />
+      <q-btn v-if="canUnarchiveArticleAction(article, session)" dense outline color="negative" icon="delete_forever" label="Delete" aria-label="Delete" :loading="loadingAction === `delete-${article.id}`" @click="$emit('delete', article)" />
     </div>
   </article>
 </template>
