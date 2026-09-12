@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vitest";
@@ -7,7 +7,7 @@ import { describe, it } from "vitest";
 import { createRemoteCypressConfig } from "../../cypress.remote.config.js";
 import { assertReadOnlyRequest } from "../../cypress/remote/read-only.js";
 import { sanitizeRemoteSmokeArtifacts } from "../../scripts/sanitize-remote-smoke-artifacts.js";
-import { remoteSmokeEnvironment } from "../../scripts/run-remote-smoke.js";
+import { remoteSmokeEnvironment, runRemoteSmokeWithDependencies } from "../../scripts/run-remote-smoke.js";
 import { handler as healthHandler } from "../../netlify/functions/health.js";
 
 describe("remote smoke safety", () => {
@@ -73,6 +73,32 @@ describe("remote smoke safety", () => {
       assert.match(diagnostic, /<local-path>/);
       assert.deepEqual(savedManifest, manifest);
       assert.deepEqual(manifest, { sanitizedTextFiles: 1, omittedBinaryFiles: 1, truncatedFiles: 0 });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("publishes sanitized readiness diagnostics when the preview is unavailable", async () => {
+    const root = mkdtempSync(join(tmpdir(), "remote-smoke-readiness-"));
+    const previewUrl = "https://deploy-preview.example.test";
+
+    try {
+      await assert.rejects(
+        () => runRemoteSmokeWithDependencies({
+          env: { DEPLOY_PREVIEW_URL: previewUrl, EXPECTED_COMMIT_SHA: "abc123" },
+          artifactRoot: root,
+          waitForPreview: async () => { throw new Error(`Preview unavailable at ${previewUrl}`); },
+          spawnProcess: () => { throw new Error("Cypress must not start before readiness succeeds"); },
+        }),
+        /Preview unavailable/
+      );
+
+      const diagnostic = readFileSync(join(root, "sanitized", "diagnostic-001.log"), "utf8");
+      const manifest = JSON.parse(readFileSync(join(root, "sanitized", "manifest.json"), "utf8"));
+      assert.doesNotMatch(diagnostic, /deploy-preview\.example\.test/);
+      assert.match(diagnostic, /<preview-url>/);
+      assert.deepEqual(manifest, { sanitizedTextFiles: 1, omittedBinaryFiles: 0, truncatedFiles: 0 });
+      assert.equal(existsSync(join(root, "raw")), false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

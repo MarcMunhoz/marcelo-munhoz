@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sanitizeRemoteSmokeArtifacts } from "./sanitize-remote-smoke-artifacts.js";
 import { waitForMatchingPreview } from "./wait-for-preview.js";
@@ -12,24 +13,34 @@ export const remoteSmokeEnvironment = (env = {}) => ({
   DEPLOY_PREVIEW_URL: env.DEPLOY_PREVIEW_URL,
 });
 
-export const runRemoteSmoke = async ({ env = process.env, spawnProcess = spawnSync } = {}) => {
+export const runRemoteSmokeWithDependencies = async ({
+  env = process.env,
+  spawnProcess = spawnSync,
+  waitForPreview = waitForMatchingPreview,
+  artifactRoot = "artifacts/remote-smoke",
+} = {}) => {
   const previewUrl = env.DEPLOY_PREVIEW_URL;
-  await waitForMatchingPreview({ previewUrl, expectedCommit: env.EXPECTED_COMMIT_SHA });
-
-  const rawDir = "artifacts/remote-smoke/raw";
-  const sanitizedDir = "artifacts/remote-smoke/sanitized";
-  rmSync("artifacts/remote-smoke", { recursive: true, force: true });
+  const rawDir = join(artifactRoot, "raw");
+  const sanitizedDir = join(artifactRoot, "sanitized");
+  rmSync(artifactRoot, { recursive: true, force: true });
   mkdirSync(rawDir, { recursive: true });
   let exitCode = 0;
 
   try {
+    try {
+      await waitForPreview({ previewUrl, expectedCommit: env.EXPECTED_COMMIT_SHA });
+    } catch (error) {
+      writeFileSync(join(rawDir, "readiness.log"), `${error.message}\n`, "utf8");
+      throw error;
+    }
+
     for (const viewportClass of ["desktop", "mobile"]) {
       const result = spawnProcess(
         process.execPath,
-        ["node_modules/cypress/bin/cypress", "run", "--config-file", "cypress.remote.config.js", "--browser", "chrome", "--env", `viewportClass=${viewportClass}`],
+        ["node_modules/cypress/bin/cypress", "run", "--config-file", "cypress.remote.config.js", "--browser", "chrome", "--expose", `viewportClass=${viewportClass}`],
         { encoding: "utf8", env: remoteSmokeEnvironment(env), maxBuffer: 2 * 1024 * 1024 }
       );
-      writeFileSync(`${rawDir}/${viewportClass}.log`, `${result.stdout || ""}${result.stderr || ""}`, "utf8");
+      writeFileSync(join(rawDir, `${viewportClass}.log`), `${result.stdout || ""}${result.stderr || ""}`, "utf8");
       if (result.status !== 0) { exitCode = result.status || 1; break; }
     }
   } finally {
@@ -39,6 +50,8 @@ export const runRemoteSmoke = async ({ env = process.env, spawnProcess = spawnSy
 
   return exitCode;
 };
+
+export const runRemoteSmoke = (options = {}) => runRemoteSmokeWithDependencies(options);
 
 const isCli = process.argv[1] === fileURLToPath(import.meta.url);
 const executeCli = async () => {

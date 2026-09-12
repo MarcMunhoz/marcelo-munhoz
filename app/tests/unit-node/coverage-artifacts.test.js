@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vitest";
@@ -21,10 +21,8 @@ describe("coverage artifact publication", () => {
       const manifest = sanitizeCoverageArtifacts({ sourceDir, outputDir, workspaceRoot });
       assert.equal(readFileSync(join(outputDir, "lcov.info"), "utf8").includes(workspaceRoot), false);
       assert.match(readFileSync(join(outputDir, "lcov.info"), "utf8"), /SF:src\/example\.js/);
-      assert.deepEqual(JSON.parse(readFileSync(join(outputDir, "coverage-final.json"), "utf8")), {
-        "src/example.js": { path: "src/example.js" },
-      });
-      assert.deepEqual(manifest, { files: 3, bytes: manifest.bytes });
+      assert.equal(existsSync(join(outputDir, "coverage-final.json")), false);
+      assert.deepEqual(manifest, { files: 2, bytes: manifest.bytes });
       assert.ok(manifest.bytes > 0 && manifest.bytes <= 1_048_576);
     } finally {
       rmSync(root, { recursive: true, force: true });

@@ -25,7 +25,7 @@ describe("Vitest project and coverage contract", () => {
     const { coverage } = vitestConfig.test;
 
     assert.equal(coverage.provider, "v8");
-    assert.deepEqual(coverage.reporter, ["text", "html", "lcov", "json"]);
+    assert.deepEqual(coverage.reporter, ["text", "html", "lcov", "json", "json-summary"]);
     assert.deepEqual(coverage.thresholds, {
       branches: 83,
       functions: 86,

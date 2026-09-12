@@ -7,7 +7,7 @@ describe("public shell journeys", () => {
       cy.acceptCookieNotice();
       cy.contains("Eu faço coisas para a web.").should("be.visible");
 
-      if (Cypress.env("viewportClass") === "mobile") {
+      if (Cypress.expose("viewportClass") === "mobile") {
         cy.get('[aria-label="Navigation menu"]').click();
         cy.contains(".q-menu .q-item", "About").click();
       } else {
@@ -16,7 +16,7 @@ describe("public shell journeys", () => {
       cy.location("pathname").should("eq", "/about");
       cy.contains("Eu sou uma pessoa simples").should("be.visible");
 
-      if (Cypress.env("viewportClass") === "mobile") {
+      if (Cypress.expose("viewportClass") === "mobile") {
         cy.get('[aria-label="Navigation menu"]').click();
         cy.contains(".q-menu .q-item", "Blog").click();
       } else {

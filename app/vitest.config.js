@@ -66,7 +66,7 @@ export default defineConfig({
       provider: "v8",
       include: coverageInclude,
       exclude: coverageExclude,
-      reporter: ["text", "html", "lcov", "json"],
+      reporter: ["text", "html", "lcov", "json", "json-summary"],
       thresholds: {
         branches: 83,
         functions: 86,
