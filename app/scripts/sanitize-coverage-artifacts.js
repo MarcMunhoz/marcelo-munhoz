@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import { basename, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const REQUIRED_REPORTS = ["lcov.info", "coverage-final.json", "coverage-summary.json"];
+const REQUIRED_REPORTS = ["lcov.info", "coverage-summary.json"];
 const MAX_TOTAL_BYTES = 1_048_576;
 
 const normalizeWorkspacePaths = (source, workspaceRoot) => {

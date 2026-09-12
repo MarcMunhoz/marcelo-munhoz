@@ -72,13 +72,14 @@ jobs:
       - uses: actions/checkout@v4
       - run: >-
           docker compose --env-file /dev/null run --build --rm --no-deps --user root
-          -v ./app/coverage:/app/coverage test npm run test:vitest:coverage
+          -v ./app/artifacts:/app/artifacts test npm run test:vitest:coverage --
+          --coverage.reportsDirectory=artifacts/coverage-raw
       - name: Sanitize coverage evidence
         if: "${{ always() }}"
         run: >-
           docker compose --env-file /dev/null run --build --rm --no-deps --user root
-          -v ./app/coverage:/app/coverage -v ./app/artifacts:/app/artifacts
-          test node scripts/sanitize-coverage-artifacts.js coverage artifacts/coverage-sanitized
+          -v ./app/artifacts:/app/artifacts test node scripts/sanitize-coverage-artifacts.js
+          artifacts/coverage-raw artifacts/coverage-sanitized
       - name: Upload sanitized coverage
         if: "${{ always() }}"
         uses: actions/upload-artifact@v4

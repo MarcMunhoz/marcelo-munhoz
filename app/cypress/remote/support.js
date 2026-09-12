@@ -1,11 +1,13 @@
 import { assertReadOnlyRequest } from "./read-only.js";
 
+let criticalConsoleErrorCount = 0;
+
 beforeEach(() => {
-  const mobile = Cypress.env("viewportClass") === "mobile";
+  const mobile = Cypress.expose("viewportClass") === "mobile";
   cy.viewport(mobile ? 390 : 1440, mobile ? 844 : 900);
-  Cypress.env("criticalConsoleErrorCount", 0);
+  criticalConsoleErrorCount = 0;
   cy.on("window:before:load", (windowRef) => {
-    windowRef.console.error = () => Cypress.env("criticalConsoleErrorCount", Cypress.env("criticalConsoleErrorCount") + 1);
+    windowRef.console.error = () => { criticalConsoleErrorCount += 1; };
   });
   cy.intercept("**", (request) => {
     assertReadOnlyRequest(request);
@@ -14,5 +16,5 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  expect(Cypress.env("criticalConsoleErrorCount"), "critical browser console errors").to.equal(0);
+  expect(criticalConsoleErrorCount, "critical browser console errors").to.equal(0);
 });

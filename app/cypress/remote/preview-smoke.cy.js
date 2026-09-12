@@ -57,7 +57,7 @@ describe("deployed public boundary", () => {
 
   it("renders the representative navigation for the active viewport", () => {
     cy.visit("/");
-    if (Cypress.env("viewportClass") === "mobile") {
+    if (Cypress.expose("viewportClass") === "mobile") {
       cy.get('[aria-label="Navigation menu"]').should("be.visible");
     } else {
       cy.get('[aria-label="About"]').filter(":visible").should("be.visible");

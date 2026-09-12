@@ -11,7 +11,13 @@ const clone = (value) => structuredClone(value);
 
 describe("release workflow contract", () => {
   it("orchestrates the complete main release gate through containers", () => {
-    assert.deepEqual(validateReleaseWorkflow(loadWorkflow()), { jobs: 9, artifactUploads: 4 });
+    const workflow = loadWorkflow();
+    assert.deepEqual(validateReleaseWorkflow(workflow), { jobs: 9, artifactUploads: 4 });
+
+    const coverageRun = workflow.jobs.coverage.steps.find((step) => step.run?.includes("test:vitest:coverage")).run;
+    assert.match(coverageRun, /-v \.\/app\/artifacts:\/app\/artifacts/);
+    assert.match(coverageRun, /--coverage\.reportsDirectory=artifacts\/coverage-raw/);
+    assert.doesNotMatch(coverageRun, /\/app\/coverage/);
   });
 
   it("rejects trigger, concurrency, dependency, and fail-open regressions", () => {

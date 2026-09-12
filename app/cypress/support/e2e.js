@@ -1,7 +1,7 @@
 import "./commands.js";
 
 beforeEach(() => {
-  cy.setViewportClass(Cypress.env("viewportClass"));
+  cy.setViewportClass(Cypress.expose("viewportClass"));
   cy.clearAllCookies();
   cy.clearAllLocalStorage();
   cy.clearAllSessionStorage();

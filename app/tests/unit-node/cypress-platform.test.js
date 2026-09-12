@@ -15,6 +15,7 @@ describe("Cypress platform contract", () => {
     assert.match(cypressConfig.videosFolder, /^artifacts\/cypress\//);
     assert.equal(cypressConfig.env.maxFailureScreenshots, 20);
     assert.equal(cypressConfig.env.maxFailureVideos, 10);
+    assert.deepEqual(cypressConfig.expose, { viewportClass: "desktop" });
   });
 
   it("routes E2E API traffic to the isolated backend service", () => {

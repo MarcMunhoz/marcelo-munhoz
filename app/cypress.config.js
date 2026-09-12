@@ -40,7 +40,8 @@ export default defineConfig({
   responseTimeout: 12_000,
   reporter: "junit",
   reporterOptions: { mochaFile: "artifacts/cypress/results/results-[hash].xml", toConsole: false },
-  env: { maxFailureScreenshots: 20, maxFailureVideos: 10, viewportClass: "desktop" },
+  env: { maxFailureScreenshots: 20, maxFailureVideos: 10 },
+  expose: { viewportClass: "desktop" },
   e2e: {
     baseUrl: process.env.CYPRESS_BASE_URL || "http://test-frontend:1991",
     specPattern: "cypress/e2e/**/*.cy.js",
