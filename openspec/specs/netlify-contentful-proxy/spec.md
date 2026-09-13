@@ -83,7 +83,7 @@ The migrated production architecture SHALL NOT require Render for normal blog AP
 - **THEN** operators can restore the previous Render API base through the documented frontend API base URL override
 
 ### Requirement: Automated validation is deterministic
-The implementation MUST include deterministic validation for the migrated proxy and frontend routing behavior without requiring live Contentful data in routine tests.
+The implementation MUST include deterministic validation for the migrated proxy and frontend routing behavior without requiring live Contentful data in routine tests, plus mandatory read-only validation of the deployed Netlify boundary.
 
 #### Scenario: Proxy behavior is tested
 - **WHEN** automated proxy tests run
@@ -94,8 +94,8 @@ The implementation MUST include deterministic validation for the migrated proxy 
 - **THEN** they validate same-origin defaults and API base URL override normalization for blog requests
 
 #### Scenario: Live smoke check is documented
-- **WHEN** a live Contentful or deployed Netlify smoke check is useful
-- **THEN** it is documented as an optional manual validation step rather than a requirement for routine automated tests
+- **WHEN** the current Netlify Deploy Preview is available
+- **THEN** mandatory remote smoke validation confirms the public Function route, SPA routing, redirects, headers, and critical public responses without requiring mutable live Contentful assertions
 
 ### Requirement: Public Legacy Queries Are Bounded
 Legacy public article list and tag routes MUST apply safe-integer, maximum-page, and bounded filter rules before constructing Contentful Delivery queries.

@@ -886,10 +886,10 @@ showFeedback(message, tone = "info") {
 };
 Object.entries(methods).forEach(([name, method]) => { state[name] = method.bind(state); });
 const exposed = { ...toRefs(state), bodyEditor };
-onBeforeRouteLeave((_to, _from, next) => {
-  if (isAdminSignOutNavigation()) return next();
-  if (hasUnsavedChanges.value && !globalThis.confirm?.("Leave the article editor and discard unsaved changes?")) return next(false);
-  next();
+onBeforeRouteLeave(() => {
+  if (isAdminSignOutNavigation()) return true;
+  if (hasUnsavedChanges.value && !globalThis.confirm?.("Leave the article editor and discard unsaved changes?")) return false;
+  return true;
 });
 onMounted(async () => {
   const initialSession = await getAdminSession();

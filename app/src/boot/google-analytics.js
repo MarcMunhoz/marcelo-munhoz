@@ -1,7 +1,7 @@
-import ga from "analytics.js";
+import ga from "../../analytics.js";
 
 export default ({ router }) => {
-  router.afterEach((to, from) => {
-    ga.logPage(to.path, to.name, sessionId);
+  router.afterEach((to) => {
+    ga.logPage(to.path, to.name);
   });
 };

@@ -1,3 +1,8 @@
+[build]
+  command = "npm run build:netlify"
+  ignore = "false"
+  publish = "dist"
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -10,6 +15,12 @@
 
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "CLOUDINARY_UPLOAD_FOLDER,CLOUDINARY_FOLDER"
+
+[[redirects]]
+  from = "/healthz"
+  to = "/.netlify/functions/health"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/contentful/*"

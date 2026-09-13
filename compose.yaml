@@ -1,0 +1,91 @@
+name: marcelo-munhoz
+
+x-test-runtime: &test-runtime
+  image: marcelo-munhoz-tests-test
+  build:
+    context: .
+    target: test-runtime
+  init: true
+  networks: [test-network]
+
+x-browser-runtime: &browser-runtime
+  build:
+    context: .
+    target: test-browser-runtime
+  depends_on:
+    test-frontend:
+      condition: service_healthy
+    test-backend:
+      condition: service_healthy
+  init: true
+  networks: [test-network]
+
+services:
+  app:
+    profiles: [dev]
+    image: marcelo-munhoz_img
+    build:
+      context: .
+      target: develop
+    container_name: marcelo-munhoz_ctn
+    command: /bin/sh -c "npm i && npm run dev"
+    environment:
+      NODE_ENV: development
+    ports:
+      - "1991:1991"
+      - "3000:3000"
+    volumes:
+      - ./app:/app
+
+  test:
+    <<: *test-runtime
+    profiles: [test]
+    command: [npm, test]
+
+  test-frontend:
+    <<: *test-runtime
+    profiles: [e2e, chrome, firefox]
+    command: [./node_modules/.bin/quasar, dev, --hostname, 0.0.0.0]
+    environment:
+      API_PROXY_TARGET: http://test-backend:3000
+    expose: ["1991"]
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, http://127.0.0.1:1991]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  test-backend:
+    <<: *test-runtime
+    profiles: [e2e, chrome, firefox]
+    command: [node, middleware/server.js]
+    environment:
+      NODE_ENV: development
+    expose: ["3000"]
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, http://127.0.0.1:3000/healthz]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  cypress-chrome:
+    <<: *browser-runtime
+    profiles: [chrome]
+    command: [npm, run, e2e:chrome]
+
+  cypress-firefox:
+    <<: *browser-runtime
+    profiles: [firefox]
+    command: [npm, run, e2e:firefox]
+
+  cypress-remote:
+    build:
+      context: .
+      target: test-browser-runtime
+    profiles: [remote-smoke]
+    init: true
+    command: [npm, run, e2e:remote-smoke]
+
+networks:
+  test-network:
+    internal: true
