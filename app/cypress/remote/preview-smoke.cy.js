@@ -3,6 +3,12 @@ const requestOk = (path, options = {}) => cy.request({ url: path, log: false, ..
   return response;
 });
 
+const waitForBlogReads = () => {
+  cy.intercept("GET", "**/api/contentful/blog-years").as("blogYears");
+  cy.intercept("GET", "**/api/contentful/tags").as("blogTags");
+  cy.intercept("GET", "**/api/contentful/blog-index*").as("blogIndex");
+};
+
 describe("deployed public boundary", () => {
   it("serves Home, About, Blog, SPA direct entry, and not-found routes", () => {
     cy.visit("/");
@@ -11,8 +17,12 @@ describe("deployed public boundary", () => {
     cy.visit("/about");
     cy.contains("Eu sou uma pessoa simples").should("be.visible");
 
+    waitForBlogReads();
     cy.visit("/blog");
     cy.contains("Article archive").should("be.visible");
+    cy.wait(["@blogYears", "@blogTags", "@blogIndex"]).each(({ response }) => {
+      expect(response.statusCode).to.be.within(200, 299);
+    });
 
     cy.visit("/remote-smoke-route-that-does-not-exist");
     cy.contains("404").should("be.visible");
