@@ -1,5 +1,6 @@
- [build]
+[build]
   command = "npm run build:netlify"
+  ignore = "false"
   publish = "dist"
 
 [[headers]]

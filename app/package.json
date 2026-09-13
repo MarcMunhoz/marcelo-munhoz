@@ -1,6 +1,6 @@
 {
   "name": "marcelo-munhoz-website",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "productName": "Marcelo Munhoz Website",
   "author": "Marcelo Munhoz",
   "private": true,
@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
-    "test": "node --test",
+    "test": "vitest run",
     "test:vitest": "vitest",
     "test:vitest:coverage": "vitest run --coverage",
     "e2e:chrome": "node scripts/run-cypress-matrix.js chrome",

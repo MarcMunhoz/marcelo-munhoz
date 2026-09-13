@@ -85,9 +85,9 @@
 
 ## 10. Final Migration, Documentation, And Repository Protection
 
-- [ ] 10.1 Remove `node --test`, legacy runner imports, and superseded source-inspection tests after parity and complete new-suite validation pass
-- [ ] 10.2 Update project documentation and badges with container-only Vitest, coverage, Cypress, browser matrix, remote smoke, diagnostics, and troubleshooting commands
-- [ ] 10.3 Run clean container validation for lint, build, credential scanning, the Vitest behavior suite and coverage baseline, Chrome E2E, Firefox E2E, and local runtime startup
+- [x] 10.1 Remove `node --test`, legacy runner imports, and superseded source-inspection tests after parity and complete new-suite validation pass
+- [x] 10.2 Update project documentation and badges with container-only Vitest, coverage, Cypress, browser matrix, remote smoke, diagnostics, and troubleshooting commands
+- [x] 10.3 Run clean container validation for lint, build, credential scanning, the Vitest behavior suite and coverage baseline, Chrome E2E, Firefox E2E, and local runtime startup
 - [ ] 10.4 Validate the current Deploy Preview commit and remote Chrome smoke without exposing or mutating privileged data
 - [ ] 10.5 Run strict OpenSpec validation and reconcile implementation evidence against every requirement and task
 - [ ] 10.6 Use `gh` to configure `quality-gate` and the Netlify Deploy Preview check as required `main` protections after both checks have reported successfully

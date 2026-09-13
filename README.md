@@ -3,7 +3,9 @@
 ![Vue](https://img.shields.io/badge/vue-3.5-42b883?logo=vue.js&logoColor=white)
 ![Quasar](https://img.shields.io/badge/quasar-2.20-1976d2?logo=quasar&logoColor=white)
 ![Netlify Functions](https://img.shields.io/badge/netlify-functions-00ad9f?logo=netlify&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-node%20--test-2ea44f)
+[![Release quality](https://github.com/MarcMunhoz/marcelo-munhoz/actions/workflows/release-quality.yml/badge.svg)](https://github.com/MarcMunhoz/marcelo-munhoz/actions/workflows/release-quality.yml)
+![Vitest](https://img.shields.io/badge/tests-Vitest-6e9f18?logo=vitest&logoColor=white)
+![Cypress](https://img.shields.io/badge/e2e-Chrome%20%2B%20Firefox-17202c?logo=cypress&logoColor=white)
 
 # Marcelo Munhoz Website
 
@@ -56,7 +58,8 @@ The public `/api/contentful/*` proxy remains read-only and is used by public blo
 - `app/middleware/`: local Express wrapper and shared Contentful proxy logic.
 - `app/netlify/functions/`: Netlify Functions entrypoints.
 - `app/netlify.toml`: Netlify redirects, SPA fallback, and security headers.
-- `app/tests/`: deterministic Node test suite.
+- `app/tests/`: isolated Vitest Node, DOM, component, integration, and contract projects.
+- `app/cypress/`: deterministic local journeys and read-only deployed smoke scenarios.
 - `openspec/`: specification-driven change history and active changes.
 
 ## Public Blog Navigation
@@ -193,17 +196,18 @@ make down
 
 ## Validation
 
-Run validation inside the container:
+All package-manager, build, test, and browser commands run in containers without loading a local environment file. The canonical commands are documented in [docs/testing.md](docs/testing.md).
 
 ```bash
-docker compose exec app npm test
-docker compose exec app npm run lint
-docker compose exec app npm run build
-docker compose exec app npm run scan:build-credentials
-openspec validate add-blog-admin-area --strict
+docker compose --env-file /dev/null --profile test run --build --rm test
+docker compose --env-file /dev/null --profile test run --build --rm test npm run test:vitest:coverage
+docker compose --env-file /dev/null --profile test run --build --rm test npm run lint
+docker compose --env-file /dev/null --profile test run --build --rm test npm run build
+docker compose --env-file /dev/null --profile chrome run --build --rm -v ./app/artifacts:/app/artifacts cypress-chrome
+docker compose --env-file /dev/null --profile firefox run --build --rm -v ./app/artifacts:/app/artifacts cypress-firefox
 ```
 
-For a clean build validation without local `.env` files, use a temporary copy that excludes `.env`, `.env.*`, `node_modules`, `dist`, and `.quasar`, then run `npm ci`, `npm test`, `npm run lint`, and `npm run build` inside a Node container.
+Vitest enforces a reviewed global V8 baseline. Cypress runs the same critical journeys in pinned Chrome and Firefox containers at desktop and mobile viewports. Coverage and browser diagnostics are sanitized before publication; raw artifacts must never be attached to issues or pull requests.
 
 ## Netlify Deployment
 
@@ -235,14 +239,17 @@ The Contentful API contract is:
 - `/api/contentful/tagged?page=<page>&tag=<tag>`
 - `/api/contentful/article/<slug>`
 
-Optional public smoke checks after a Netlify deploy:
+Every `develop` to `main` pull request receives mandatory read-only smoke validation against its exact Netlify Deploy Preview. The suite checks the preview commit identity, public pages and Functions, SPA behavior, headers, signed-out admin safety, and desktop/mobile layouts in Chrome. It blocks application mutations and requires no privileged credentials.
+
+The equivalent container entry point is:
 
 ```bash
-curl "https://<netlify-site>/api/contentful/entries?page=1"
-curl "https://<netlify-site>/api/contentful/tags"
+docker compose --env-file /dev/null --profile remote-smoke run --build --rm \
+  -v ./app/artifacts:/app/artifacts \
+  -e DEPLOY_PREVIEW_URL -e EXPECTED_COMMIT_SHA cypress-remote
 ```
 
-Optional live admin smoke checks are separate from routine automated validation. Run them only against a deployed Netlify site with provider credentials configured in Netlify and an invited authenticated writer or owner session:
+Manual live admin checks are separate from automated release validation. Run them only against an explicitly selected non-production environment with provider credentials configured there and an invited authenticated writer or owner session:
 
 - Writer session: open `/admin`, create a draft with placeholder article text, select or upload a Cloudinary thumbnail, save the draft, and submit it for owner review.
 - Owner session: open `/admin`, confirm the submitted article appears in the owner queue, then publish, unpublish, archive, or delete only disposable test content.
@@ -291,6 +298,10 @@ Confirm `CONTENTFUL_SPACE_ID` and `CONTENTFUL_DELIVERY_KEY` are configured for N
 ### Admin Function returns a configuration error
 
 Confirm the admin server-side runtime variables are configured in Netlify Functions using placeholders in documentation and real values only in the provider environment. Do not add `VITE_` versions of Contentful Management or Cloudinary credentials.
+
+### A test or browser container fails
+
+Use the troubleshooting guide in [docs/testing.md](docs/testing.md). Inspect only sanitized evidence, clean browser services with `docker compose --env-file /dev/null down --remove-orphans`, and rerun the affected container profile. A stale Deploy Preview must be rebuilt for the expected commit; never fall back to production or another preview.
 
 ## Reference
 
