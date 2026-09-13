@@ -88,8 +88,8 @@
 - [x] 10.1 Remove `node --test`, legacy runner imports, and superseded source-inspection tests after parity and complete new-suite validation pass
 - [x] 10.2 Update project documentation and badges with container-only Vitest, coverage, Cypress, browser matrix, remote smoke, diagnostics, and troubleshooting commands
 - [x] 10.3 Run clean container validation for lint, build, credential scanning, the Vitest behavior suite and coverage baseline, Chrome E2E, Firefox E2E, and local runtime startup
-- [ ] 10.4 Validate the current Deploy Preview commit and remote Chrome smoke without exposing or mutating privileged data
-- [ ] 10.5 Run strict OpenSpec validation and reconcile implementation evidence against every requirement and task
-- [ ] 10.6 Use `gh` to configure `quality-gate` and the Netlify Deploy Preview check as required `main` protections after both checks have reported successfully
-- [ ] 10.7 Read back the active GitHub ruleset or branch protection through `gh` and verify an unsuccessful or missing required check blocks acceptance
-- [ ] 10.8 Synchronize all change delta specs into the main specs before archiving the completed change
+- [x] 10.4 Validate the current Deploy Preview commit and remote Chrome smoke without exposing or mutating privileged data
+- [x] 10.5 Run strict OpenSpec validation and reconcile implementation evidence against every requirement and task
+- [x] 10.6 Use `gh` to configure `quality-gate` and the Netlify Deploy Preview check as required `main` protections after both checks have reported successfully
+- [x] 10.7 Read back the active GitHub ruleset or branch protection through `gh` and verify an unsuccessful or missing required check blocks acceptance
+- [x] 10.8 Synchronize all change delta specs into the main specs before archiving the completed change
