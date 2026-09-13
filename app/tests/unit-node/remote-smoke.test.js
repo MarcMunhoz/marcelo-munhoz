@@ -5,12 +5,14 @@ import { join } from "node:path";
 import { describe, it } from "vitest";
 
 import { createRemoteCypressConfig } from "../../cypress.remote.config.js";
-import { assertReadOnlyRequest } from "../../cypress/remote/read-only.js";
+import * as remoteReadOnly from "../../cypress/remote/read-only.js";
 import { sanitizeRemoteSmokeArtifacts } from "../../scripts/sanitize-remote-smoke-artifacts.js";
 import { remoteSmokeEnvironment, runRemoteSmokeWithDependencies } from "../../scripts/run-remote-smoke.js";
 import { handler as healthHandler } from "../../netlify/functions/health.js";
 
 describe("remote smoke safety", () => {
+  const { assertReadOnlyRequest } = remoteReadOnly;
+
   it("forwards only the runtime values required by Cypress", () => {
     const runtimeBin = ["", "runtime", "bin"].join("/");
     const runtimeCache = ["", "runtime", "cache"].join("/");
@@ -51,6 +53,29 @@ describe("remote smoke safety", () => {
       assert.throws(() => assertReadOnlyRequest({ method, url: "https://deploy-preview.example.test/api/admin/contentful/articles" }), /read-only/);
     }
     assert.doesNotThrow(() => assertReadOnlyRequest({ method: "GET", url: "https://deploy-preview.example.test/api/admin/contentful/articles" }));
+  });
+
+  it("stubs external telemetry without permitting other remote mutations", () => {
+    assert.equal(typeof remoteReadOnly.enforceReadOnlyRequest, "function");
+
+    const outcomes = [];
+    for (const url of ["https://www.google-analytics.com/g/collect?v=2", "https://sessions.bugsnag.com/"]) {
+      remoteReadOnly.enforceReadOnlyRequest({
+        method: "POST",
+        url,
+        reply: (response) => outcomes.push(["reply", response]),
+        continue: () => outcomes.push(["continue"]),
+      });
+    }
+
+    assert.deepEqual(outcomes, [
+      ["reply", { statusCode: 204, body: "" }],
+      ["reply", { statusCode: 204, body: "" }],
+    ]);
+    assert.throws(
+      () => remoteReadOnly.enforceReadOnlyRequest({ method: "POST", url: "https://example.test/api/articles" }),
+      /read-only/,
+    );
   });
 
   it("publishes only bounded redacted text diagnostics", () => {
