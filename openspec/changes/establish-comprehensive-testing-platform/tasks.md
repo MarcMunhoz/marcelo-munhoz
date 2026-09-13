@@ -81,7 +81,7 @@
 - [x] 9.4 Upload bounded sanitized coverage and Cypress diagnostics with clear retention and failure behavior
 - [x] 9.5 Add an unconditional `quality-gate` job that inspects every dependency result and fails for failure, timeout, cancellation, or unexpected skip
 - [x] 9.6 Verify the workflow never installs or runs project packages or browsers directly on the GitHub runner host
-- [ ] 9.7 Verify a non-`develop` pull request to `main` fails explicitly and a `develop` to `main` pull request exercises every required job
+- [x] 9.7 Verify a non-`develop` pull request to `main` fails explicitly and a `develop` to `main` pull request exercises every required job
 
 ## 10. Final Migration, Documentation, And Repository Protection
 
