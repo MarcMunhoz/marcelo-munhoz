@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
-    "test": "node --test",
+    "test": "vitest run",
     "test:vitest": "vitest",
     "test:vitest:coverage": "vitest run --coverage",
     "e2e:chrome": "node scripts/run-cypress-matrix.js chrome",

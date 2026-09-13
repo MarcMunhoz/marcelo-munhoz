@@ -555,6 +555,7 @@ describe("declarative deployment contracts", () => {
     ]);
     assert.deepEqual(configuration.build, {
       command: "npm run build:netlify",
+      ignore: "false",
       publish: "dist",
       environment: { SECRETS_SCAN_OMIT_KEYS: "CLOUDINARY_UPLOAD_FOLDER,CLOUDINARY_FOLDER" },
     });

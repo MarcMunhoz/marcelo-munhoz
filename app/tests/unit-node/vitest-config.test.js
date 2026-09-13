@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 
-import vitestConfig from "../vitest.config.js";
+import vitestConfig from "../../vitest.config.js";
 
 const projects = vitestConfig.test.projects;
 
@@ -43,6 +43,8 @@ describe("Vitest project and coverage contract", () => {
       ".quasar/**",
       "node_modules/**",
       "tests/**",
+      "scripts/run-cypress-matrix.js",
+      "scripts/run-remote-smoke.js",
       "**/__fixtures__/**",
       "**/fixtures/**",
       "coverage/**",
