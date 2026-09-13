@@ -203,7 +203,7 @@ The system SHALL handle Contentful Management API version conflicts without sile
 - **THEN** the system returns a user-safe conflict response that does not expose raw upstream diagnostics
 
 ### Requirement: Admin Validation Is Deterministic
-The implementation MUST include deterministic validation for admin authorization, Contentful Management API behavior, and credential isolation without requiring live Contentful data in routine tests.
+The implementation MUST include deterministic validation for admin authorization, Contentful Management API behavior, credential isolation, and production-equivalent signed-out administration behavior without requiring live privileged Contentful, Cloudinary, or Identity operations in automated tests.
 
 #### Scenario: Automated admin tests run
 - **WHEN** the automated test suite runs
@@ -214,8 +214,8 @@ The implementation MUST include deterministic validation for admin authorization
 - **THEN** they validate successful mutations, missing configuration, upstream failures, and version conflicts using mocks or fixtures
 
 #### Scenario: Live smoke check is useful
-- **WHEN** a live Contentful or deployed Netlify smoke check is useful
-- **THEN** it is documented as optional manual validation rather than required routine automated validation
+- **WHEN** the current Netlify Deploy Preview is ready for mandatory remote smoke validation
+- **THEN** the suite verifies safe signed-out admin availability, redirect behavior, and indexing policy without authenticating, requiring privileged credentials, or mutating live provider data
 
 ### Requirement: Admin Session Controls Are User-Centered
 The system SHALL present admin session state with the user's display identity, role, dev preview state when applicable, and a sign-out action through a compact account menu instead of a generic duplicated role badge.
