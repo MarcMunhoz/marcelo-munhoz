@@ -109,7 +109,12 @@
               rows="14"
               aria-label="Body"
             ></textarea>
-            <pre v-show="bodyEditorMode === 'preview'" class="markdown-editor-preview article-markdown-preview">{{ articleBodyPreview }}</pre>
+            <ArticleContent
+              v-show="bodyEditorMode === 'preview'"
+              class="markdown-editor-preview article-markdown-preview"
+              :source="articleForm.body"
+              :title="articleForm.title"
+            />
             <p v-if="errors.body" class="markdown-editor-error">{{ errors.body }}</p>
           </div>
 
@@ -316,6 +321,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs } from "vue"
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router"
+import ArticleContent from "../components/ArticleContent.vue";
 import {
   createArticleDraft,
   createContentfulTag,
@@ -375,8 +381,7 @@ const canSubmitArticleForReview = computed(() => canPrepareReviewAction(state.lo
 const canRequestArticleUnpublication = computed(() => canRequestUnpublicationAction(state.loadedArticle, state.session));
 const canOwnerUnpublishArticle = computed(() => canOwnerUnpublishAction(state.loadedArticle, state.session));
 const saveButtonLabel = computed(() => ["published", "changed"].includes(state.loadedArticle?.status) ? "Save" : "Save draft");
-const articleBodyPreview = computed(() => state.articleForm.body || "");
-Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel, articleBodyPreview });
+Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel });
 const methods = {
 redirectSignedOutVisitor() {
   if (!state.session) {
@@ -1121,6 +1126,9 @@ const {
 
 .markdown-editor-preview {
   background: #fbfcfc;
+  font: inherit;
+  max-width: 100%;
+  overflow-x: hidden;
   overflow-wrap: anywhere;
 }
 

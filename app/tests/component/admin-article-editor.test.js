@@ -1,6 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBrowserState, createRouter, createTestMount, installBrowserPolyfills } from "../harness/index.js";
+import markdownFixture from "../fixtures/article-markdown-regression.json";
 
 const controls = vi.hoisted(() => ({
   session: null,
@@ -156,7 +157,35 @@ describe("rendered article editor", () => {
     await mounted.wrapper.get("textarea[aria-label='Body']").setValue("## Preview heading");
     mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "preview");
     await flushPromises();
-    expect(mounted.wrapper.get(".markdown-editor-preview").text()).toBe("## Preview heading");
+    expect(mounted.wrapper.get(".markdown-editor-preview h2").text()).toBe("Preview heading");
+  });
+
+  it("previews the public presentation safely and preserves source selection across mode changes", async () => {
+    const mounted = await mountEditor();
+    const textarea = mounted.wrapper.get("textarea[aria-label='Body']");
+    await textarea.setValue(markdownFixture.markdown);
+    textarea.element.focus();
+    textarea.element.setSelectionRange(5, 20);
+
+    mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "preview");
+    await flushPromises();
+    const preview = mounted.wrapper.get(".markdown-editor-preview");
+    const player = preview.get(".article-video iframe");
+
+    expect(preview.get("h2").text()).toBe("Safe formatting");
+    expect(preview.get("em").text()).toBe("boring");
+    expect(preview.text()).toContain(markdownFixture.existingEmoji);
+    expect(preview.find("script").exists()).toBe(false);
+    expect(preview.find("[onerror]").exists()).toBe(false);
+    expect(preview.find("a[href^='javascript:']").exists()).toBe(false);
+    expect(player.attributes("src")).toBe(markdownFixture.expectedVideoUrl);
+    expect(preview.classes()).toContain("article-markdown-preview");
+
+    mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "editor");
+    await flushPromises();
+    expect(textarea.element.value).toBe(markdownFixture.markdown);
+    expect(textarea.element.selectionStart).toBe(5);
+    expect(textarea.element.selectionEnd).toBe(20);
   });
 
   it("loads edit mode with locale, tags, image, and ownership restrictions", async () => {
