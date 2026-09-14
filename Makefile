@@ -1,21 +1,18 @@
 dev:
-	docker compose up -d
-
-prod:
-	docker compose prod
+	docker compose --profile dev up -d
 
 # Develop stage only
 start:
-	docker compose start
+	docker compose --profile dev start
 	
 stop:
-	docker compose stop
+	docker compose --profile dev stop
 	
 down:
 	docker compose --profile "*" down --volumes --remove-orphans --rmi all && rm -rf app/node_modules app/.quasar
 
 restart:
-	docker compose restart
+	docker compose --profile dev restart
 
 logs:
-	docker compose logs
+	docker compose --profile dev logs
