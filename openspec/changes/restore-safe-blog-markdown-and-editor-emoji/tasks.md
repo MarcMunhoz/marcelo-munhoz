@@ -1,17 +1,17 @@
 ## 1. Baseline And Dependency Approval
 
-- [ ] 1.1 Add a sanitized regression fixture representing Markdown emphasis, links, a standalone YouTube embed URL, existing Unicode emoji, and hostile active content without copying unrelated production data.
-- [ ] 1.2 Review maintained browser sanitizer and comprehensive emoji-picker candidates for license, Vue compatibility, accessibility, runtime network behavior, bundle impact, transitive dependencies, and known advisories.
-- [ ] 1.3 Present the exact dependency and version choices to the user and obtain explicit installation approval before changing package metadata.
-- [ ] 1.4 Install only the approved pinned dependencies inside the project container and update the existing lockfile without installing packages on the host.
+- [x] 1.1 Add a sanitized regression fixture representing Markdown emphasis, links, a standalone YouTube embed URL, existing Unicode emoji, and hostile active content without copying unrelated production data.
+- [x] 1.2 Review maintained browser sanitizer and comprehensive emoji-picker candidates for license, Vue compatibility, accessibility, runtime network behavior, bundle impact, transitive dependencies, and known advisories.
+- [x] 1.3 Present the exact dependency and version choices to the user and obtain explicit installation approval before changing package metadata.
+- [x] 1.4 Install only the approved pinned dependencies inside the project container and update the existing lockfile without installing packages on the host.
 
 ## 2. Shared Safe Article Rendering Boundary
 
-- [ ] 2.1 Add failing unit tests for supported Markdown semantics, raw HTML handling, unsafe URL schemes, hostile attributes, approved image URLs, and preservation of ordinary Unicode emoji.
-- [ ] 2.2 Add failing unit tests for ordered content blocks and standalone-versus-inline video classification, including malformed URLs, unsupported schemes, lookalike hosts, invalid identifiers, and arbitrary iframe input.
-- [ ] 2.3 Implement the shared article-content utility that parses supported Markdown, disables or escapes raw HTML, sanitizes generated output with a strict allowlist, and returns typed presentation blocks.
-- [ ] 2.4 Implement exact YouTube URL validation and canonicalization to the approved privacy-enhanced embed origin without accepting CMS-controlled iframe attributes.
-- [ ] 2.5 Verify the shared utility tests and add explicit regression assertions that only sanitized output can reach an executable HTML rendering boundary.
+- [x] 2.1 Add failing unit tests for supported Markdown semantics, raw HTML handling, unsafe URL schemes, hostile attributes, approved image URLs, and preservation of ordinary Unicode emoji.
+- [x] 2.2 Add failing unit tests for ordered content blocks and standalone-versus-inline video classification, including malformed URLs, unsupported schemes, lookalike hosts, invalid identifiers, and arbitrary iframe input.
+- [x] 2.3 Implement the shared article-content utility that parses supported Markdown, disables or escapes raw HTML, sanitizes generated output with a strict allowlist, and returns typed presentation blocks.
+- [x] 2.4 Implement exact YouTube URL validation and canonicalization to the approved privacy-enhanced embed origin without accepting CMS-controlled iframe attributes.
+- [x] 2.5 Verify the shared utility tests and add explicit regression assertions that only sanitized output can reach an executable HTML rendering boundary.
 
 ## 3. Public Article Presentation
 
