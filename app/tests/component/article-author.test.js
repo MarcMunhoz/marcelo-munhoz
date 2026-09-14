@@ -2,6 +2,7 @@ import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import BlogArticle from "../../src/components/BlogArticle.vue";
 import AuthorProfile from "../../src/pages/AuthorProfile.vue";
+import markdownFixture from "../fixtures/article-markdown-regression.json";
 import { createBrowserState, createRouter, createTestMount, installBrowserPolyfills } from "../harness/index.js";
 
 const author = {
@@ -25,7 +26,7 @@ const article = (overrides = {}) => ({
     title: "Testing the boundaries",
     slug: "testing-the-boundaries",
     description: "A practical article about reliable software.",
-    body: "## A heading\n\n<script>alert('unsafe')</script>\n\n![diagram](https://images.example.test/diagram.png)",
+    body: markdownFixture.markdown,
     locale: "en-US",
     createAt: "2026-08-20T12:00:00.000Z",
     updatedAt: "2026-08-22T12:00:00.000Z",
@@ -91,17 +92,28 @@ afterEach(() => {
 });
 
 describe("rendered blog article", () => {
-  it("localizes the article and preserves Markdown as inert text at the rendering boundary", async () => {
+  it("localizes the article and renders supported Markdown without activating hostile input", async () => {
     const mounted = await mountArticle();
 
     expect(mounted.wrapper.get(".article-return").text()).toBe("All articles");
     expect(mounted.wrapper.get("cite").text()).toContain("By Marcelo Munhoz");
     expect(mounted.wrapper.get("cite").text()).toContain("on August 20, 2026");
     expect(mounted.wrapper.get("cite").text()).toContain("Updated on August 22, 2026");
-    expect(mounted.wrapper.get(".rendered-text").text()).toContain("## A heading");
-    expect(mounted.wrapper.get(".rendered-text").text()).toContain("<script>alert('unsafe')</script>");
+    const content = mounted.wrapper.get(".rendered-text");
+    expect(content.get("h2").text()).toBe("Safe formatting");
+    expect(content.get("em").text()).toBe("boring");
+    expect(content.get("strong").text()).toBe("important");
+    expect(content.get('a[href="https://example.test/reference"]').text()).toBe("documented");
+    expect(content.get("blockquote").text()).toContain("A safe quotation.");
+    expect(content.findAll("li").map((item) => item.text())).toEqual(["First item", "Second item"]);
+    expect(content.get("code").text()).toBe("const safe = true;");
+    expect(content.get("table").text()).toContain("Markdown");
+    expect(content.get('img[src="https://res.cloudinary.com/demo/image/upload/diagram.png"]').attributes("alt")).toBe("A test diagram");
+    expect(content.text()).toContain(markdownFixture.existingEmoji);
     expect(mounted.wrapper.find(".rendered-text script").exists()).toBe(false);
-    expect(mounted.wrapper.find(".rendered-text img").exists()).toBe(false);
+    expect(mounted.wrapper.find(".rendered-text iframe[src^='https://attacker.example.test']").exists()).toBe(false);
+    expect(mounted.wrapper.find(".rendered-text [onerror]").exists()).toBe(false);
+    expect(mounted.wrapper.find(".rendered-text a[href^='javascript:']").exists()).toBe(false);
     expect(mounted.wrapper.get(".article-tags").text()).toBe("#testing");
     expect(mounted.wrapper.get(".article-tags a").attributes("href")).toBe("/blog?tag=testing");
     expect(mounted.wrapper.get("article > img").attributes()).toMatchObject({
@@ -109,6 +121,22 @@ describe("rendered blog article", () => {
       alt: "Testing diagram",
     });
     expect(mounted.wrapper.get(".author-link").attributes("href")).toBe("/blog/authors/marcelo-munhoz");
+  });
+
+  it("renders a standalone trusted video as an accessible responsive player in source order", async () => {
+    const mounted = await mountArticle();
+    const blocks = mounted.wrapper.findAll(".article-body-block");
+    const player = mounted.wrapper.get(".article-video iframe");
+
+    expect(blocks.map((block) => block.classes().includes("article-video") ? "video" : "markdown")).toEqual(["markdown", "video", "markdown"]);
+    expect(player.attributes()).toMatchObject({
+      src: markdownFixture.expectedVideoUrl,
+      title: "YouTube video: Testing the boundaries",
+      loading: "lazy",
+      referrerpolicy: "strict-origin-when-cross-origin",
+      allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+      allowfullscreen: "",
+    });
   });
 
   it("returns to the validated archive and carries it through chronological neighbors", async () => {
