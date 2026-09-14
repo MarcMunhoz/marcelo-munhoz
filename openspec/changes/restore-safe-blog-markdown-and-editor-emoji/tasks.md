@@ -15,16 +15,16 @@
 
 ## 3. Public Article Presentation
 
-- [ ] 3.1 Add failing component tests proving semantic emphasis, headings, strong text, links, lists, blockquotes, code, tables, images, Unicode emoji, and safe hostile-input behavior in a public article.
-- [ ] 3.2 Add a Vue-owned trusted video block with an accessible title, lazy loading, fullscreen support, restrictive referrer policy, and an explicit playback feature allowlist.
-- [ ] 3.3 Migrate the public article body from inert interpolation to ordered safe Markdown and trusted video blocks without changing article loading, metadata, tags, byline, or navigation behavior.
-- [ ] 3.4 Add responsive styles that keep article content bounded and render the player on its own full-width 16:9 row at compact and wide viewports.
+- [x] 3.1 Add failing component tests proving semantic emphasis, headings, strong text, links, lists, blockquotes, code, tables, images, Unicode emoji, and safe hostile-input behavior in a public article.
+- [x] 3.2 Add a Vue-owned trusted video block with an accessible title, lazy loading, fullscreen support, restrictive referrer policy, and an explicit playback feature allowlist.
+- [x] 3.3 Migrate the public article body from inert interpolation to ordered safe Markdown and trusted video blocks without changing article loading, metadata, tags, byline, or navigation behavior.
+- [x] 3.4 Add responsive styles that keep article content bounded and render the player on its own full-width 16:9 row at compact and wide viewports.
 
 ## 4. Administrative Preview Parity
 
-- [ ] 4.1 Add failing component tests proving that editor preview renders the same safe Markdown and trusted video blocks as the public article while source mode retains the original Markdown.
-- [ ] 4.2 Migrate the article editor preview to the shared typed rendering boundary without changing form validation, authorization, draft persistence, dirty state, or lifecycle actions.
-- [ ] 4.3 Verify transitions between source and preview modes preserve Markdown, Unicode emoji, textarea selection where applicable, and compact-viewport containment.
+- [x] 4.1 Add failing component tests proving that editor preview renders the same safe Markdown and trusted video blocks as the public article while source mode retains the original Markdown.
+- [x] 4.2 Migrate the article editor preview to the shared typed rendering boundary without changing form validation, authorization, draft persistence, dirty state, or lifecycle actions.
+- [x] 4.3 Verify transitions between source and preview modes preserve Markdown, Unicode emoji, textarea selection where applicable, and compact-viewport containment.
 
 ## 5. Integrated Emoji Picker
 
