@@ -12,7 +12,7 @@ stop:
 	docker compose stop
 	
 down:
-	docker compose down --volumes --remove-orphans && docker image rm marcelo-munhoz_img && rm -rf app/node_modules app/.quasar
+	docker compose --profile "*" down --volumes --remove-orphans --rmi all && rm -rf app/node_modules app/.quasar
 
 restart:
 	docker compose restart
