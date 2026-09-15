@@ -28,10 +28,10 @@
 
 ## 5. Integrated Emoji Picker
 
-- [ ] 5.1 Add failing utility and component tests for saving a collapsed cursor or ranged selection, inserting a multi-code-point emoji, replacing selected text, restoring focus, positioning the caret, and updating dirty state.
-- [ ] 5.2 Add the approved locally bundled emoji picker to the article-body toolbar with search, categories, skin-tone variants, accessible labels, keyboard operation, visible focus, and deterministic dismissal.
-- [ ] 5.3 Connect emoji selection to the existing textarea model-update path and preserve selection across picker focus changes without altering Contentful storage.
-- [ ] 5.4 Add responsive styling and tests that keep the picker and its controls reachable within compact and wide editor viewports.
+- [x] 5.1 Add failing utility and component tests for saving a collapsed cursor or ranged selection, inserting a multi-code-point emoji, replacing selected text, restoring focus, positioning the caret, and updating dirty state.
+- [x] 5.2 Add the approved locally bundled emoji picker to the article-body toolbar with search, categories, skin-tone variants, accessible labels, keyboard operation, visible focus, and deterministic dismissal.
+- [x] 5.3 Connect emoji selection to the existing textarea model-update path and preserve selection across picker focus changes without altering Contentful storage.
+- [x] 5.4 Add responsive styling and tests that keep the picker and its controls reachable within compact and wide editor viewports.
 
 ## 6. Browser Policy And Security Contracts
 

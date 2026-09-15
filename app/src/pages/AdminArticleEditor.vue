@@ -98,9 +98,11 @@
                 </q-btn-dropdown>
               </div>
               <div class="markdown-mode-actions">
+                <q-btn ref="emojiTrigger" flat dense icon="sentiment_satisfied_alt" aria-label="Insert emoji" aria-controls="body-emoji-picker" :aria-expanded="emojiPickerOpen" :disable="bodyEditorMode === 'preview'" @click="toggleEmojiPicker" />
                 <q-btn-toggle v-model="bodyEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bodyEditorModeOptions" />
               </div>
             </div>
+            <EditorEmojiPicker v-if="emojiPickerOpen" @select="insertEmoji" @close="closeEmojiPicker(true)" />
             <textarea
               v-show="bodyEditorMode === 'editor'"
               ref="bodyEditor"
@@ -319,9 +321,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs, watch } from "vue"
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router"
 import ArticleContent from "../components/ArticleContent.vue";
+import EditorEmojiPicker from "../components/EditorEmojiPicker.vue";
+import { replaceEmojiSelection } from "../utils/emojiSelection.js";
 import {
   createArticleDraft,
   createContentfulTag,
@@ -359,6 +363,26 @@ import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from
 const route = useRoute();
 const router = useRouter();
 const bodyEditor = ref(null);
+const emojiTrigger = ref(null);
+const emojiPickerOpen = ref(false);
+let emojiSelection = {};
+function closeEmojiPicker(restoreFocus = false) {
+  emojiPickerOpen.value = false;
+  if (restoreFocus) nextTick(() => emojiTrigger.value?.$el?.focus());
+}
+function toggleEmojiPicker() {
+  if (emojiPickerOpen.value) return closeEmojiPicker(true);
+  emojiSelection = { selectionStart: bodyEditor.value?.selectionStart, selectionEnd: bodyEditor.value?.selectionEnd };
+  emojiPickerOpen.value = true;
+}
+async function insertEmoji(emoji) {
+  const result = replaceEmojiSelection({ value: state.articleForm.body, ...emojiSelection, emoji });
+  state.articleForm.body = result.value;
+  closeEmojiPicker();
+  await nextTick();
+  bodyEditor.value?.focus();
+  bodyEditor.value?.setSelectionRange(result.selectionStart, result.selectionEnd);
+}
 const templateRefs = { bodyEditor };
 let active = true;
 let editorRequestId = 0;
@@ -371,6 +395,7 @@ const state = reactive({
   statusMessage: "", feedbackMessage: "", feedbackTone: "info", dashboardError: "", loadingAction: "", editorLoading: false,
 });
 const canWrite = computed(() => isWriterSession(state.session));
+watch(() => [state.bodyEditorMode, state.editorLoading, canWrite.value, route.fullPath], () => closeEmojiPicker());
 const showEditorSurface = computed(() => state.sessionResolved);
 const isNewArticle = computed(() => route.name === "Admin Article New");
 const hasUnsavedChanges = computed(() => state.originalFormSnapshot !== JSON.stringify(state.articleForm));

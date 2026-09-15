@@ -19,7 +19,10 @@ const controls = vi.hoisted(() => ({
   unpublish: vi.fn(),
   editorConfig: vi.fn(),
   openEditor: vi.fn(),
+  loadPicker: vi.fn(),
 }));
+
+vi.mock("../../src/utils/emojiPicker.js", () => ({ createEmojiPicker: (...args) => controls.loadPicker(...args) }));
 
 vi.mock("../../src/utils/adminAuth.js", () => ({
   getAdminSession: vi.fn(async () => controls.session),
@@ -128,6 +131,13 @@ beforeEach(() => {
   controls.unpublish.mockReset().mockResolvedValue({});
   controls.editorConfig.mockReset().mockResolvedValue({ mediaEditor: { cloudName: "demo" } });
   controls.openEditor.mockReset().mockResolvedValue(undefined);
+  controls.loadPicker.mockReset().mockImplementation(async (host) => {
+    const picker = document.createElement("div");
+    picker.dataset.testPicker = "true";
+    picker.attachShadow({ mode: "open" }).appendChild(document.createElement("input"));
+    host.appendChild(picker);
+    return picker;
+  });
 });
 
 afterEach(() => {
@@ -136,6 +146,88 @@ afterEach(() => {
 });
 
 describe("rendered article editor", () => {
+  it.each([[3, 3], [3, 11]])("inserts emoji at saved selection %s:%s, restores focus and guards dirty navigation", async (start, end) => {
+    const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const textarea = mounted.wrapper.get("textarea[aria-label='Body']");
+    const original = textarea.element.value;
+    textarea.element.focus();
+    textarea.element.setSelectionRange(start, end);
+    const trigger = mounted.wrapper.get("button[aria-label='Insert emoji']");
+    await trigger.trigger("click");
+    await flushPromises();
+    const picker = mounted.wrapper.get("[data-test-picker]");
+    expect(picker.element.shadowRoot.activeElement).toBe(picker.element.shadowRoot.querySelector("input"));
+    textarea.element.setSelectionRange(0, 0);
+    picker.element.dispatchEvent(new CustomEvent("emoji-click", { detail: { unicode: "👩🏽‍💻" } }));
+    await flushPromises();
+    expect(textarea.element.value).toBe(original.slice(0, start) + "👩🏽‍💻" + original.slice(end));
+    expect(document.activeElement).toBe(textarea.element);
+    expect(textarea.element.selectionStart).toBe(start + 7);
+    expect(textarea.element.selectionEnd).toBe(start + 7);
+    expect(trigger.attributes("aria-expanded")).toBe("false");
+    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
+    await mounted.router.push("/admin");
+    expect(confirm).toHaveBeenCalled();
+  });
+
+  it("dismisses by Escape or close without changing source and disables emoji in preview", async () => {
+    const { wrapper, router } = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const trigger = wrapper.get("button[aria-label='Insert emoji']");
+    await trigger.trigger("click");
+    await flushPromises();
+    await wrapper.get(".emoji-picker-panel").trigger("keydown", { key: "Escape" });
+    expect(document.activeElement).toBe(trigger.element);
+    await trigger.trigger("click");
+    await flushPromises();
+    await wrapper.get("button[aria-label='Close emoji picker']").trigger("click");
+    expect(wrapper.find(".emoji-picker-panel").exists()).toBe(false);
+    wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "preview");
+    await flushPromises();
+    expect(trigger.attributes("disabled")).toBeDefined();
+    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
+    await router.push("/admin");
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("keeps typing available after picker failure and ignores a load completed after dismissal", async () => {
+    controls.loadPicker.mockRejectedValueOnce(new Error("Unavailable"));
+    const { wrapper } = await mountEditor();
+    const trigger = wrapper.get("button[aria-label='Insert emoji']");
+    await trigger.trigger("click");
+    await flushPromises();
+    expect(wrapper.get(".emoji-picker-panel [role='alert']").text()).toContain("unavailable");
+    await wrapper.get("button[aria-label='Close emoji picker']").trigger("click");
+    let resolve;
+    controls.loadPicker.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    await trigger.trigger("click");
+    const close = wrapper.get("button[aria-label='Close emoji picker']");
+    expect(document.activeElement).toBe(close.element);
+    await close.trigger("keydown", { key: "Escape" });
+    resolve(document.createElement("div"));
+    await flushPromises();
+    expect(wrapper.find(".emoji-picker-panel").exists()).toBe(false);
+    await wrapper.get("textarea[aria-label='Body']").setValue("Still editable 🌻");
+    expect(wrapper.get("textarea[aria-label='Body']").element.value).toBe("Still editable 🌻");
+  });
+
+  it("does not steal focus when delayed initialization finishes while the author types", async () => {
+    let complete;
+    controls.loadPicker.mockImplementationOnce((host) => new Promise((resolve) => {
+      complete = () => {
+        const picker = document.createElement("div");
+        picker.attachShadow({ mode: "open" }).appendChild(document.createElement("input"));
+        host.appendChild(picker);
+        resolve(picker);
+      };
+    }));
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    const textarea = wrapper.get("textarea[aria-label='Body']");
+    textarea.element.focus();
+    complete();
+    await flushPromises();
+    expect(document.activeElement).toBe(textarea.element);
+  });
   it("initializes create mode, derives the slug until touched, and switches locale and Markdown preview", async () => {
     const mounted = await mountEditor();
 
