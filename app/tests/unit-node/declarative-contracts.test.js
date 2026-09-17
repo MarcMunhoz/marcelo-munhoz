@@ -563,7 +563,7 @@ describe("declarative deployment contracts", () => {
       ["default-src", ["https:"]],
       ["connect-src", ["'self'", "https://identity.netlify.com", "https://media-editor.cloudinary.com", "https://res.cloudinary.com"]],
       ["script-src", ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.googletagmanager.com", "https://identity.netlify.com", "https://media-editor.cloudinary.com"]],
-      ["frame-src", ["'self'", "https://media-editor.cloudinary.com"]],
+      ["frame-src", ["'self'", "https://media-editor.cloudinary.com", "https://www.youtube-nocookie.com"]],
       ["style-src", ["'self'", "'unsafe-inline'"]],
       [
         "img-src",
@@ -585,6 +585,18 @@ describe("declarative deployment contracts", () => {
     assert.equal(headers["X-Content-Type-Options"], "nosniff");
     assert.equal(headers["X-Frame-Options"], "SAMEORIGIN");
     assert.equal(headers["X-XSS-Protection"], "1; mode=block");
+  });
+
+  it("limits production frames to application-owned integrations and the privacy-enhanced YouTube origin", () => {
+    const configuration = parseNetlifyToml(readProjectFile("../../netlify.toml"));
+    const headers = configuration.headers.find((entry) => entry.for === "/*").values;
+    const frameSources = parseCsp(headers["Content-Security-Policy"]).get("frame-src");
+
+    assert.deepEqual(frameSources, ["'self'", "https://media-editor.cloudinary.com", "https://www.youtube-nocookie.com"]);
+    assert.equal(frameSources.some((source) => source.includes("*")), false);
+    assert.equal(frameSources.includes("https:"), false);
+    assert.equal(frameSources.includes("https://youtube.com"), false);
+    assert.equal(frameSources.includes("https://www.youtube.com"), false);
   });
 
   it("uses a pure frontend manifest with no credential bindings and both local API proxies", () => {

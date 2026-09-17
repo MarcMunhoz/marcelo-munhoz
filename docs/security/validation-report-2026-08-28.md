@@ -175,6 +175,18 @@ Adjacent-boundary probe results:
 
 The complete security diff review found no supported regression beyond the intentional loss of rendered HTML/Markdown preview in favor of safe text-only display. Focused regression evidence is 166/166 tests passed across the admin frontend, admin Function, management facade, and Cloudinary media suites.
 
+## Safe article rendering follow-up — 2026-09-16
+
+The earlier text-only remediation remains the historical closure of the original unsanitized sinks. The article-body boundary now restores supported Markdown through a browser-side sanitizer without restoring direct CMS-to-DOM execution. This follow-up supersedes the text-only statements above for public article bodies and administrative article preview only; article titles continue to use text assignment or Vue interpolation.
+
+| Consumer | Untrusted source | Transform and control | Final sink |
+| --- | --- | --- | --- |
+| Public article | The public Contentful Function returns the published article body as Markdown text. | `BlogArticle.vue` passes the string to the shared `ArticleContent` component. `articleContent.js` escapes raw HTML, constrains links and image origins, parses supported Markdown, and sanitizes every generated HTML block with a strict tag and attribute allowlist. | `ArticleContent.vue` applies `v-html` only to the sanitized `markdown` block output. Raw CMS text and direct parser output do not reach the directive. |
+| Administrative preview | The authenticated Contentful Management facade returns a normalized article body, which the editor preserves as Markdown in `articleForm.body`; current unsaved edits use the same source field. | Preview passes the source to the same shared `ArticleContent` boundary used publicly. Returning to source mode retains the original Markdown rather than generated HTML. | The same sanitized `markdown` block reaches `v-html`; the source textarea remains a non-HTML text-editing boundary. |
+| Approved standalone video | A standalone CMS Markdown paragraph may contain a YouTube URL. | The shared utility requires HTTPS, an exact approved host and path shape, no credentials, port, or fragment, and a bounded identifier, then canonicalizes the URL to the privacy-enhanced embed origin. Inline, malformed, lookalike, unsupported, and iframe inputs are not promoted. | Vue creates the iframe from a structured `youtube` block. Only the canonical `src` is derived from content; title, loading, referrer policy, fullscreen, and playback permissions are component-owned. The sanitizer does not allow iframe markup. |
+
+The production frame policy permits only the privacy-enhanced YouTube origin required by this Vue-owned player in addition to the existing application and media-editor sources. Focused utility, component, and declarative regressions cover hostile markup, unsafe URLs and images, arbitrary iframes, lookalike domains, CMS-controlled player parameters, public rendering, administrative preview parity, and source preservation.
+
 ## Final container validation — 2026-08-28
 
 The authorized final workflow restored the exact lockfile dependencies inside a temporary Node container. An initial build invocation automatically detected a local dotenv file in its mount. No dotenv value was printed or retained as evidence; that build was discarded, its generated output was replaced, and the authoritative workflow was rerun from an isolated copy that excluded `.env` and `.env.*` before any file content was copied.

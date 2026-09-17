@@ -39,6 +39,38 @@ describe("safe article content", () => {
     expect(globalThis.fixtureCompromised).toBeUndefined();
   });
 
+  it("rejects executable CMS content across links, images, markup, and lookalike video hosts", () => {
+    const source = [
+      "<script>globalThis.articleCompromised = true</script>",
+      '<img src="https://res.cloudinary.com/demo/image/upload/safe.png" onload="globalThis.articleCompromised = true">',
+      "[Run](javascript:globalThis.articleCompromised=true)",
+      "![Inline payload](data:image/svg+xml,<svg onload=globalThis.articleCompromised=true>)",
+      '<iframe src="https://www.youtube-nocookie.com/embed/bovBQtB_PDo" allow="*" onload="globalThis.articleCompromised = true"></iframe>',
+      "https://www.youtube-nocookie.com.attacker.example/embed/bovBQtB_PDo",
+    ].join("\n\n");
+    const blocks = articleContentBlocks(source);
+    const rendered = renderedMarkdown(source);
+
+    expect(blocks.every((block) => block.type === "markdown")).toBe(true);
+    expect(rendered.querySelector("script, iframe, [onload]")).toBeNull();
+    expect(rendered.querySelector('a[href^="javascript:"]')).toBeNull();
+    expect(rendered.querySelector('img[src^="data:"]')).toBeNull();
+    expect(globalThis.articleCompromised).toBeUndefined();
+  });
+
+  it("canonicalizes CMS video parameters without accepting CMS-controlled player attributes", () => {
+    const source = [
+      '<iframe src="https://attacker.example/embed/bovBQtB_PDo" title="CMS title" allow="*" allowfullscreen></iframe>',
+      "https://www.youtube-nocookie.com/embed/bovBQtB_PDo?autoplay=1&controls=0",
+    ].join("\n\n");
+    const blocks = articleContentBlocks(source);
+
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toEqual({ type: "markdown", html: expect.not.stringContaining("<iframe") });
+    expect(blocks[1]).toEqual({ type: "youtube", src: fixture.expectedVideoUrl });
+    expect(Object.keys(blocks[1])).toEqual(["type", "src"]);
+  });
+
   it("exposes only sanitized HTML and trusted structured media to rendering boundaries", () => {
     const blocks = articleContentBlocks(fixture.markdown);
     const allowedTags = new Set([
