@@ -15,4 +15,4 @@ Insertion replaces the saved UTF-16 selection through the existing article body 
 
 ### Remaining Browser Verification
 
-The DOM environment does not measure rendered geometry. Real browser checks for overflow, keyboard navigation through categories and skin tones, and complete authoring journeys remain in group 7, along with the release matrices and Deploy Preview validation. Group 6 browser policy and security contracts remain pending.
+The DOM environment does not measure rendered geometry. Real browser checks for overflow, keyboard navigation through categories and skin tones, and complete authoring journeys remain in group 7, along with the release matrices and Deploy Preview validation. Group 6 browser policy and security contracts are recorded separately in `group-6-verification.md`.
