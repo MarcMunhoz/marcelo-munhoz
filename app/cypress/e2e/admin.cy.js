@@ -9,14 +9,14 @@ const stubDashboard = (articles) => {
 };
 
 describe("administrative journeys", () => {
-  it("redirects signed-out administrative routes without opening live Identity", () => {
-    cy.intercept("GET", "**/api/admin/contentful/**", { forceNetworkError: true }).as("unexpectedAdminRequest");
-    for (const path of ["/admin", "/admin/articles/new", "/admin/profile", "/admin/tags"]) {
+  for (const path of ["/admin", "/admin/articles/new", "/admin/profile", "/admin/tags"]) {
+    it(`redirects the signed-out route ${path} without opening live Identity`, () => {
+      cy.intercept("GET", "**/api/admin/contentful/**", { forceNetworkError: true }).as("unexpectedAdminRequest");
       cy.visit(path, { onBeforeLoad: (windowRef) => { windowRef.__ADMIN_PREVIEW_DISABLED__ = true; } });
       cy.location("pathname").should("equal", "/");
       cy.contains("Editorial dashboard").should("not.exist");
-    }
-  });
+    });
+  }
 
   it("lets a writer filter owned work while hiding owner-only actions", () => {
     cy.fixture("admin-content.json").then(({ articles }) => stubDashboard(articles));
@@ -57,6 +57,49 @@ describe("administrative journeys", () => {
     cy.contains("button", "Save draft").click();
     cy.wait("@createDraft");
     cy.location("pathname").should("equal", "/admin");
+  });
+
+  it("inserts a searched emoji through keyboard interaction without persisting provider data", () => {
+    let unexpectedMutations = 0;
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+      cy.intercept(method, "**/api/admin/contentful/**", (request) => {
+        unexpectedMutations += 1;
+        request.reply({ statusCode: 503, body: { error: "Unexpected test mutation" } });
+      });
+    }
+    cy.fixture("admin-content.json").then(({ articles, tags }) => {
+      stubDashboard(articles);
+      cy.interceptJson("GET", "**/api/admin/contentful/tags", tags, "tags");
+    });
+    visitAsPreview("/admin/articles/draft-1/edit", "writer");
+
+    cy.get('textarea[aria-label="Body"]').should("have.value", "Draft body").then(($textarea) => {
+      const textarea = $textarea[0];
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    });
+    cy.get('button[aria-label="Insert emoji"]').focus().type("{enter}");
+    cy.get("#body-emoji-picker").should("be.visible");
+    cy.get('button[aria-label="Insert emoji"]').should("have.attr", "aria-expanded", "true");
+    cy.get("emoji-picker").shadow().find('input#search[type="search"][role="combobox"]')
+      .should("be.focused")
+      .type("girassol")
+      .should("have.attr", "aria-expanded", "true");
+    cy.press(Cypress.Keyboard.Keys.DOWN);
+    cy.get("emoji-picker").shadow().find("input#search")
+      .invoke("attr", "aria-activedescendant")
+      .should("match", /^emo-/);
+    cy.press(Cypress.Keyboard.Keys.ENTER);
+    cy.get('textarea[aria-label="Body"]')
+      .should("have.value", "Draft body🌻")
+      .and("be.focused")
+      .then(($textarea) => {
+        expect($textarea[0].selectionStart).to.equal(12);
+        expect($textarea[0].selectionEnd).to.equal(12);
+      });
+    cy.get("#body-emoji-picker").should("not.exist");
+    cy.get('button[aria-label="Insert emoji"]').should("have.attr", "aria-expanded", "false");
+    cy.then(() => expect(unexpectedMutations).to.equal(0));
   });
 
   it("submits a writer draft and protects unsaved navigation", () => {

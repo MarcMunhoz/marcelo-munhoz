@@ -4,16 +4,38 @@ const stubArticle = (article, navigation) => {
 };
 
 describe("article and author journeys", () => {
-  it("renders a direct article entry with safe body, metadata, tags, image, and author navigation", () => {
-    cy.fixture("public-content.json").then(({ article, navigation, author }) => {
-      stubArticle(article, navigation);
+  it("renders formatted article content and a standalone full-width player without viewport overflow", () => {
+    cy.fixture("public-content.json").then(({ article, navigation, author, formattedArticleBody }) => {
+      stubArticle({ ...article, fields: { ...article.fields, body: formattedArticleBody } }, navigation);
       cy.interceptJson("GET", "**/api/contentful/author/*", author, "author");
+      cy.intercept("GET", "https://www.youtube-nocookie.com/embed/bovBQtB_PDo", "<title>Test player</title>");
     });
 
     cy.visit("/blog/reliable-browser-journeys");
     cy.acceptCookieNotice();
     cy.contains("Behavior-first end-to-end testing.").should("be.visible");
-    cy.get(".rendered-text").should("have.text", "Rendered as inert article text.").find("script").should("not.exist");
+    cy.get(".rendered-text").within(() => {
+      cy.contains("h2", "Formatted reader content").should("be.visible");
+      cy.contains("strong", "important").should("be.visible");
+      cy.contains("a", "documented")
+        .should("have.attr", "href", "https://example.test/reference")
+        .and("have.attr", "rel", "noopener noreferrer");
+      cy.contains("👩🏽‍💻").should("be.visible");
+      cy.get(".article-video iframe")
+        .should("have.attr", "src", "https://www.youtube-nocookie.com/embed/bovBQtB_PDo")
+        .and("have.attr", "title", "YouTube video: Reliable browser journeys");
+    });
+    cy.get(".rendered-text").then(($content) => {
+      cy.get(".article-video").then(($video) => {
+        const content = $content[0].getBoundingClientRect();
+        const video = $video[0].getBoundingClientRect();
+        expect(Math.abs(video.width - content.width)).to.be.lessThan(1);
+        expect(Math.abs(video.width / video.height - 16 / 9)).to.be.lessThan(0.02);
+      });
+    });
+    cy.document().then((documentRef) => {
+      expect(documentRef.documentElement.scrollWidth).to.be.at.most(documentRef.documentElement.clientWidth);
+    });
     cy.get('img[alt="A browser test diagram"]').should("have.attr", "src", "https://images.example.test/article.jpg");
     cy.contains("#testing").should("be.visible");
     cy.contains("a", "Ada Lovelace").click();

@@ -43,8 +43,9 @@ const mountArticle = async ({ initialPath = "/blog/first", fetchImpl }) => {
   return { router, wrapper };
 };
 
-afterEach(() => {
+afterEach(async () => {
   cleanups.splice(0).reverse().forEach((cleanup) => cleanup());
+  await new Promise((resolve) => setTimeout(resolve, 60));
   vi.restoreAllMocks();
 });
 
