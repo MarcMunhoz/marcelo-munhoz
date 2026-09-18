@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviewed technical coverage exclusions",
+  "type": "object",
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "const": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "line", "directive", "rationale", "reviewedBy"],
+        "properties": {
+          "file": { "type": "string", "pattern": "^(src|middleware|netlify/functions|scripts)/.+" },
+          "line": { "type": "integer", "minimum": 1 },
+          "directive": { "enum": ["v8 ignore next", "istanbul ignore next"] },
+          "rationale": { "type": "string", "minLength": 20 },
+          "reviewedBy": { "type": "string", "minLength": 3 }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

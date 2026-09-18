@@ -1,0 +1,73 @@
+{
+  "formattedArticleBody": "## Formatted reader content\n\nThis is **important** and [documented](https://example.test/reference). 👩🏽‍💻\n\nhttps://www.youtube.com/embed/bovBQtB_PDo",
+  "years": { "years": ["2026", "2025"] },
+  "tags": { "items": [{ "sys": { "id": "testing" }, "name": "Testing" }] },
+  "archive": {
+    "featured": [
+      {
+        "sys": { "id": "featured-1", "createdAt": "2026-08-20T12:00:00.000Z" },
+        "metadata": { "tags": [{ "sys": { "id": "testing" } }] },
+        "fields": {
+          "title": "Featured testing article",
+          "slug": "featured-testing",
+          "description": "A featured article used by deterministic browser tests.",
+          "createAt": "2026-08-20T12:00:00.000Z",
+          "author": { "fields": { "name": "Ada Lovelace", "slug": "ada-lovelace" } }
+        }
+      }
+    ],
+    "items": [
+      {
+        "sys": { "id": "article-1", "createdAt": "2026-08-19T12:00:00.000Z" },
+        "metadata": { "tags": [{ "sys": { "id": "testing" } }] },
+        "fields": {
+          "title": "Reliable browser journeys",
+          "slug": "reliable-browser-journeys",
+          "description": "Behavior-first end-to-end testing.",
+          "createAt": "2026-08-19T12:00:00.000Z",
+          "author": { "fields": { "name": "Ada Lovelace", "slug": "ada-lovelace" } }
+        }
+      }
+    ],
+    "total": 25,
+    "page": 1,
+    "pageSize": 12,
+    "totalPages": 3
+  },
+  "emptyArchive": { "featured": [], "items": [], "total": 0, "page": 1, "pageSize": 12, "totalPages": 1 },
+  "article": {
+    "sys": { "id": "article-1", "createdAt": "2026-08-19T12:00:00.000Z" },
+    "metadata": { "tags": [{ "sys": { "id": "testing" } }] },
+    "fields": {
+      "title": "Reliable browser journeys",
+      "slug": "reliable-browser-journeys",
+      "description": "Behavior-first end-to-end testing.",
+      "body": "Rendered as inert article text.",
+      "locale": "en-US",
+      "createAt": "2026-08-19T12:00:00.000Z",
+      "updatedAt": "2026-08-20T12:00:00.000Z",
+      "alt": "A browser test diagram",
+      "thumbnail": { "secure_url": "https://images.example.test/article.jpg" },
+      "author": { "sys": { "id": "author-1" }, "fields": { "name": "Ada Lovelace", "slug": "ada-lovelace" } }
+    }
+  },
+  "navigation": {
+    "previous": { "title": "Earlier article", "slug": "earlier-article" },
+    "next": { "title": "Later article", "slug": "later-article" }
+  },
+  "author": {
+    "author": { "sys": { "id": "author-1" }, "fields": { "name": "Ada Lovelace", "slug": "ada-lovelace", "biography": "Computing pioneer." } },
+    "articles": [
+      { "sys": { "id": "a1" }, "fields": { "title": "Article 1", "slug": "article-1", "description": "One", "body": "body" } },
+      { "sys": { "id": "a2" }, "fields": { "title": "Article 2", "slug": "article-2", "description": "Two", "body": "body" } },
+      { "sys": { "id": "a3" }, "fields": { "title": "Article 3", "slug": "article-3", "description": "Three", "body": "body" } },
+      { "sys": { "id": "a4" }, "fields": { "title": "Article 4", "slug": "article-4", "description": "Four", "body": "body" } },
+      { "sys": { "id": "a5" }, "fields": { "title": "Article 5", "slug": "article-5", "description": "Five", "body": "body" } },
+      { "sys": { "id": "a6" }, "fields": { "title": "Article 6", "slug": "article-6", "description": "Six", "body": "body" } },
+      { "sys": { "id": "a7" }, "fields": { "title": "Article 7", "slug": "article-7", "description": "Seven", "body": "body" } },
+      { "sys": { "id": "a8" }, "fields": { "title": "Article 8", "slug": "article-8", "description": "Eight", "body": "body" } },
+      { "sys": { "id": "a9" }, "fields": { "title": "Article 9", "slug": "article-9", "description": "Nine", "body": "body" } },
+      { "sys": { "id": "a10" }, "fields": { "title": "Article 10", "slug": "article-10", "description": "Ten", "body": "body" } }
+    ]
+  }
+}

@@ -59,6 +59,11 @@ export const createPreviewSession = ({ role = "owner" } = {}) => ({
   preview: true,
 });
 
+export const adminPreviewAllowed = ({
+  isDevelopment = import.meta.env?.DEV,
+  previewDisabled = globalThis.__ADMIN_PREVIEW_DISABLED__,
+} = {}) => Boolean(isDevelopment && previewDisabled !== true);
+
 const rolesFromUser = (user = {}) => {
   const roles = user.app_metadata?.roles || user.app_metadata?.role || user.user_metadata?.roles || [];
   return (Array.isArray(roles) ? roles : [roles]).map((role) => String(role || "").trim().toLowerCase()).filter(Boolean);
@@ -90,7 +95,7 @@ export { createAdminSessionLifecycle };
 export const getAdminSession = async ({
   identity = globalThis.netlifyIdentity,
   lifecycle = adminSessionLifecycle,
-  allowPreview = import.meta.env?.DEV,
+  allowPreview = adminPreviewAllowed(),
   retryOnLifecycleChange = true,
 } = {}) => {
   const user = typeof identity?.currentUser === "function" ? identity.currentUser() : null;

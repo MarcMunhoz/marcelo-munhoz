@@ -1,0 +1,88 @@
+{
+  "articles": [
+    {
+      "id": "draft-1",
+      "title": "Writer draft",
+      "slug": "writer-draft",
+      "description": "Draft description",
+      "body": "Draft body",
+      "status": "draft",
+      "lifecycleStatus": "draft",
+      "version": 3,
+      "writerSubject": "local-preview-writer",
+      "authorEntryId": "author-1",
+      "authorName": "Writer Preview",
+      "createAt": "2026-08-20T12:00:00.000Z",
+      "tags": ["testing"]
+    },
+    {
+      "id": "review-1",
+      "title": "Review candidate",
+      "slug": "review-candidate",
+      "description": "Ready for review",
+      "body": "Review body",
+      "status": "review",
+      "lifecycleStatus": "review",
+      "version": 4,
+      "writerSubject": "local-preview-writer",
+      "authorEntryId": "author-1",
+      "authorName": "Writer Preview",
+      "createAt": "2026-08-19T12:00:00.000Z",
+      "tags": ["testing"],
+      "requestId": "request-1",
+      "requestVersion": 1
+    },
+    {
+      "id": "published-1",
+      "title": "Published article",
+      "slug": "published-article",
+      "description": "Published description",
+      "body": "Published body",
+      "status": "published",
+      "lifecycleStatus": "published",
+      "version": 5,
+      "writerSubject": "local-preview-writer",
+      "authorEntryId": "author-1",
+      "authorName": "Writer Preview",
+      "createAt": "2026-08-18T12:00:00.000Z",
+      "tags": ["testing"]
+    },
+    {
+      "id": "archived-1",
+      "title": "Archived article",
+      "slug": "archived-article",
+      "description": "Archived description",
+      "body": "Archived body",
+      "status": "archived",
+      "lifecycleStatus": "archived",
+      "version": 6,
+      "writerSubject": "another-writer",
+      "authorEntryId": "author-2",
+      "authorName": "Another Writer",
+      "createAt": "2026-08-17T12:00:00.000Z",
+      "tags": []
+    }
+  ],
+  "profile": {
+    "profile": { "id": "author-1", "name": "Writer Preview", "slug": "writer-preview", "biography": "Test biography", "version": 2 },
+    "session": { "authorEntryId": "author-1" }
+  },
+  "tags": { "tags": [{ "id": "testing", "label": "Testing" }] },
+  "managedTags": {
+    "tags": [
+      { "id": "testing", "label": "Testing", "articleCount": 1 },
+      { "id": "unused", "label": "Unused", "articleCount": 0 }
+    ]
+  },
+  "media": {
+    "assets": [
+      {
+        "public_id": "articles/cover",
+        "secure_url": "https://images.example.test/cover.jpg",
+        "display_name": "Test cover",
+        "width": 1200,
+        "height": 630
+      }
+    ]
+  }
+}

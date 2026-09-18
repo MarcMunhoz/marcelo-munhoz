@@ -98,9 +98,11 @@
                 </q-btn-dropdown>
               </div>
               <div class="markdown-mode-actions">
+                <q-btn ref="emojiTrigger" flat dense icon="sentiment_satisfied_alt" aria-label="Insert emoji" aria-controls="body-emoji-picker" :aria-expanded="emojiPickerOpen" :disable="bodyEditorMode === 'preview'" @click="toggleEmojiPicker" />
                 <q-btn-toggle v-model="bodyEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bodyEditorModeOptions" />
               </div>
             </div>
+            <EditorEmojiPicker v-if="emojiPickerOpen" @select="insertEmoji" @close="closeEmojiPicker(true)" />
             <textarea
               v-show="bodyEditorMode === 'editor'"
               ref="bodyEditor"
@@ -109,7 +111,12 @@
               rows="14"
               aria-label="Body"
             ></textarea>
-            <pre v-show="bodyEditorMode === 'preview'" class="markdown-editor-preview article-markdown-preview">{{ articleBodyPreview }}</pre>
+            <ArticleContent
+              v-if="bodyEditorMode === 'preview'"
+              class="markdown-editor-preview article-markdown-preview"
+              :source="articleForm.body"
+              :title="articleForm.title"
+            />
             <p v-if="errors.body" class="markdown-editor-error">{{ errors.body }}</p>
           </div>
 
@@ -314,8 +321,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs, watch } from "vue"
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router"
+import ArticleContent from "../components/ArticleContent.vue";
+import EditorEmojiPicker from "../components/EditorEmojiPicker.vue";
+import { replaceEmojiSelection } from "../utils/emojiSelection.js";
 import {
   createArticleDraft,
   createContentfulTag,
@@ -353,6 +363,26 @@ import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from
 const route = useRoute();
 const router = useRouter();
 const bodyEditor = ref(null);
+const emojiTrigger = ref(null);
+const emojiPickerOpen = ref(false);
+let emojiSelection = {};
+function closeEmojiPicker(restoreFocus = false) {
+  emojiPickerOpen.value = false;
+  if (restoreFocus) nextTick(() => emojiTrigger.value?.$el?.focus());
+}
+function toggleEmojiPicker() {
+  if (emojiPickerOpen.value) return closeEmojiPicker(true);
+  emojiSelection = { selectionStart: bodyEditor.value?.selectionStart, selectionEnd: bodyEditor.value?.selectionEnd };
+  emojiPickerOpen.value = true;
+}
+async function insertEmoji(emoji) {
+  const result = replaceEmojiSelection({ value: state.articleForm.body, ...emojiSelection, emoji });
+  state.articleForm.body = result.value;
+  closeEmojiPicker();
+  await nextTick();
+  bodyEditor.value?.focus();
+  bodyEditor.value?.setSelectionRange(result.selectionStart, result.selectionEnd);
+}
 const templateRefs = { bodyEditor };
 let active = true;
 let editorRequestId = 0;
@@ -365,6 +395,7 @@ const state = reactive({
   statusMessage: "", feedbackMessage: "", feedbackTone: "info", dashboardError: "", loadingAction: "", editorLoading: false,
 });
 const canWrite = computed(() => isWriterSession(state.session));
+watch(() => [state.bodyEditorMode, state.editorLoading, canWrite.value, route.fullPath], () => closeEmojiPicker());
 const showEditorSurface = computed(() => state.sessionResolved);
 const isNewArticle = computed(() => route.name === "Admin Article New");
 const hasUnsavedChanges = computed(() => state.originalFormSnapshot !== JSON.stringify(state.articleForm));
@@ -375,8 +406,7 @@ const canSubmitArticleForReview = computed(() => canPrepareReviewAction(state.lo
 const canRequestArticleUnpublication = computed(() => canRequestUnpublicationAction(state.loadedArticle, state.session));
 const canOwnerUnpublishArticle = computed(() => canOwnerUnpublishAction(state.loadedArticle, state.session));
 const saveButtonLabel = computed(() => ["published", "changed"].includes(state.loadedArticle?.status) ? "Save" : "Save draft");
-const articleBodyPreview = computed(() => state.articleForm.body || "");
-Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel, articleBodyPreview });
+Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel });
 const methods = {
 redirectSignedOutVisitor() {
   if (!state.session) {
@@ -886,10 +916,10 @@ showFeedback(message, tone = "info") {
 };
 Object.entries(methods).forEach(([name, method]) => { state[name] = method.bind(state); });
 const exposed = { ...toRefs(state), bodyEditor };
-onBeforeRouteLeave((_to, _from, next) => {
-  if (isAdminSignOutNavigation()) return next();
-  if (hasUnsavedChanges.value && !globalThis.confirm?.("Leave the article editor and discard unsaved changes?")) return next(false);
-  next();
+onBeforeRouteLeave(() => {
+  if (isAdminSignOutNavigation()) return true;
+  if (hasUnsavedChanges.value && !globalThis.confirm?.("Leave the article editor and discard unsaved changes?")) return false;
+  return true;
 });
 onMounted(async () => {
   const initialSession = await getAdminSession();
@@ -1121,6 +1151,9 @@ const {
 
 .markdown-editor-preview {
   background: #fbfcfc;
+  font: inherit;
+  max-width: 100%;
+  overflow-x: hidden;
   overflow-wrap: anywhere;
 }
 

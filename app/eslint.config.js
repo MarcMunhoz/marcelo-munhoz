@@ -3,7 +3,7 @@ import prettier from "eslint-config-prettier";
 
 export default [
   {
-    ignores: ["dist/**", "src-capacitor/**", "src-cordova/**", ".quasar/**", "node_modules/**"],
+    ignores: ["coverage/**", "dist/**", "src-capacitor/**", "src-cordova/**", ".quasar/**", "node_modules/**"],
   },
   ...vue.configs["flat/essential"],
   prettier,
@@ -36,6 +36,19 @@ export default [
           message: "Use declarative Quasar components or native browser APIs instead of the $q injection.",
         },
       ],
+    },
+  },
+  {
+    files: ["cypress/**/*.js"],
+    languageOptions: {
+      globals: {
+        beforeEach: "readonly",
+        cy: "readonly",
+        Cypress: "readonly",
+        describe: "readonly",
+        expect: "readonly",
+        it: "readonly",
+      },
     },
   },
 ];

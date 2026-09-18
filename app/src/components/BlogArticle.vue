@@ -1,8 +1,13 @@
 <template>
   <q-page class="q-pa-md row items-start">
-    <q-circular-progress v-if="progress" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
+    <div v-if="articleError" class="article-load-error m-auto" role="alert">
+      <p>We could not load this article.</p>
+      <q-btn outline no-caps color="blue-grey-7" label="Try again" @click="loadArticle()" />
+    </div>
 
-    <article class="article-content w-full" :class="progress && 'hidden'">
+    <q-circular-progress v-else-if="progress" indeterminate rounded size="50px" color="blue-grey-5" class="q-ma-md text-[10em] m-auto" />
+
+    <article v-else class="article-content w-full">
       <router-link :to="archiveLocation" class="article-return">
         <q-icon name="fa-solid fa-arrow-left" aria-hidden="true" />
         <span>{{ navigationLabels.all }}</span>
@@ -87,7 +92,7 @@
         </q-btn>
       </section>
 
-      <div class="rendered-text"></div>
+      <ArticleContent class="rendered-text" :source="article.body" :title="article.title" />
 
       <section class="my-4">
         <ul class="article-tags">
@@ -128,6 +133,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { useMeta } from "quasar";
+import ArticleContent from "./ArticleContent.vue";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { articleBylineLabels, articleLocaleFromArticle, articleNavigationLabels, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
 import { articleAuthorProfile } from "../utils/authorProfiles.js";
@@ -151,6 +157,7 @@ const createAt = ref(null);
 const articleLocale = ref("pt-BR");
 const articleNavigation = ref({ previous: null, next: null });
 const progress = ref(true);
+const articleError = ref(false);
 let articleRequestId = 0;
 let navigationRequestId = 0;
 
@@ -261,6 +268,7 @@ const loadArticle = async (slug = route.params.slug) => {
   navigationRequestId += 1;
   articleNavigation.value = { previous: null, next: null };
   progress.value = true;
+  articleError.value = false;
 
   try {
     const res = await fetch(buildApiUrl(`/api/contentful/article/${encodeURIComponent(requestedSlug)}`));
@@ -289,8 +297,6 @@ const loadArticle = async (slug = route.params.slug) => {
     articleAuthorSlug.value = author.slug;
     articleImg.value = articleHeroImageUrl(loadedArticle.fields);
 
-    document.querySelector(".rendered-text").textContent = loadedArticle.fields.body || "";
-
     const hashtags = loadedArticle.metadata?.tags || [];
     articleTags.value = hashtags.map((tag) => tag.sys.id).filter((tag) => !isArticleLanguageTag(tag));
 
@@ -305,6 +311,8 @@ const loadArticle = async (slug = route.params.slug) => {
   } catch (loadError) {
     if (requestId === articleRequestId) {
       console.error("Erro ao carregar artigo:", loadError);
+      progress.value = false;
+      articleError.value = true;
     }
   }
 };
