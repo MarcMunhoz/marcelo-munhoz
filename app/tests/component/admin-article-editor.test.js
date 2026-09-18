@@ -170,6 +170,83 @@ describe("rendered article editor", () => {
     expect(confirm).toHaveBeenCalled();
   });
 
+  it("inserts at a selection moved while the floating picker remains open", async () => {
+    const { wrapper } = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const textarea = wrapper.get("textarea[aria-label='Body']");
+    const original = textarea.element.value;
+    textarea.element.setSelectionRange(2, 2);
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+
+    const movedCaret = original.length - 2;
+    textarea.element.focus();
+    textarea.element.setSelectionRange(movedCaret, movedCaret);
+    await textarea.trigger("select");
+    wrapper.get("[data-test-picker]").element.dispatchEvent(new CustomEvent("emoji-click", { detail: { unicode: "🌻" } }));
+    await flushPromises();
+
+    expect(textarea.element.value).toBe(`${original.slice(0, movedCaret)}🌻${original.slice(movedCaret)}`);
+    expect(textarea.element.selectionStart).toBe(movedCaret + 2);
+  });
+
+  it("moves the floating picker by its handle and keeps it inside the body editor", async () => {
+    window.happyDOM.setWindowSize({ width: 1280, height: 800 });
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+    const editor = wrapper.get(".markdown-editor");
+    const panel = wrapper.get(".emoji-picker-panel");
+    editor.element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 });
+    panel.element.getBoundingClientRect = () => ({ left: 432, top: 80, right: 792, bottom: 480, width: 360, height: 400 });
+
+    await wrapper.get("button[aria-label='Move emoji picker']").trigger("pointerdown", { clientX: 450, clientY: 100, pointerId: 1 });
+    window.dispatchEvent(Object.assign(new Event("pointermove"), { clientX: 1000, clientY: 900, pointerId: 1 }));
+    window.dispatchEvent(Object.assign(new Event("pointerup"), { pointerId: 1 }));
+    await flushPromises();
+
+    expect(panel.attributes("style")).toContain("left: 432px");
+    expect(panel.attributes("style")).toContain("top: 192px");
+  });
+
+  it("moves the floating picker from its focused handle with arrow keys", async () => {
+    window.happyDOM.setWindowSize({ width: 1280, height: 800 });
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+    const editor = wrapper.get(".markdown-editor");
+    const panel = wrapper.get(".emoji-picker-panel");
+    editor.element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 });
+    panel.element.getBoundingClientRect = () => ({ left: 400, top: 80, right: 760, bottom: 480, width: 360, height: 400 });
+
+    const handle = wrapper.get("button[aria-label='Move emoji picker']");
+    await handle.trigger("keydown", { key: "ArrowLeft" });
+    await handle.trigger("keydown", { key: "ArrowDown" });
+
+    expect(panel.attributes("style")).toContain("left: 384px");
+    expect(panel.attributes("style")).toContain("top: 96px");
+  });
+
+  it("resets a dragged position and disables movement when the viewport becomes compact", async () => {
+    window.happyDOM.setWindowSize({ width: 1280, height: 800 });
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+    const editor = wrapper.get(".markdown-editor");
+    const panel = wrapper.get(".emoji-picker-panel");
+    editor.element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 });
+    panel.element.getBoundingClientRect = () => ({ left: 432, top: 80, right: 792, bottom: 480, width: 360, height: 400 });
+    const handle = wrapper.get("button[aria-label='Move emoji picker']");
+    await handle.trigger("keydown", { key: "ArrowLeft" });
+    expect(panel.attributes("style")).toContain("left: 416px");
+
+    window.happyDOM.setWindowSize({ width: 600, height: 800 });
+    window.dispatchEvent(new Event("resize"));
+    await flushPromises();
+
+    expect(panel.attributes("style")).toBeUndefined();
+    expect(handle.attributes("disabled")).toBeDefined();
+  });
+
   it("dismisses by Escape or close without changing source and disables emoji in preview", async () => {
     const { wrapper, router } = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
     const trigger = wrapper.get("button[aria-label='Insert emoji']");

@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe("emoji picker responsive styles", () => {
-  it.each([320, 375, 1440])("applies scrolling and compact category styles at %spx", (width) => {
+  it.each([320, 375, 600, 1440])("applies scrolling and compact category styles at %spx", (width) => {
     window.happyDOM.setWindowSize({ width, height: 812 });
     const { descriptor } = parse(source);
     const { code, errors } = compileStyle({ source: descriptor.styles[0].content, id: "data-v-emoji-test", scoped: true });
@@ -29,6 +29,13 @@ describe("emoji picker responsive styles", () => {
 
     const panelStyle = getComputedStyle(panel);
     expect(panelStyle.overflow).toBe("auto");
+    expect(panelStyle.position).toBe("absolute");
+    expect(Number(panelStyle.zIndex)).toBeGreaterThan(0);
+    expect(panelStyle.maxWidth).toBe("calc(100% - 16px)");
+    if (width <= 720) {
+      expect(panelStyle.left).toBe("8px");
+      expect(panelStyle.right).toBe("8px");
+    }
     const pickerStyle = getComputedStyle(picker);
     expect(pickerStyle.width).toBe("100%");
     expect(pickerStyle.maxHeight).toBe("60dvh");
