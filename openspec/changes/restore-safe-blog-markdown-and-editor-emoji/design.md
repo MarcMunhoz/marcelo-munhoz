@@ -58,6 +58,8 @@ The implementation will use a reviewed, repository-pinned picker that provides U
 
 The editor will preserve its textarea selection before focus enters the picker. Selecting an emoji will replace the saved selection through the same model update path used by typing, restore focus, position the caret after the inserted Unicode sequence, and participate in existing dirty-state and navigation guards. The picker will be lazy-mounted or opened on demand to limit initial editor cost.
 
+The picker will use a non-modal floating panel owned by the body editor instead of participating in its document flow. On wide viewports, authors can drag the panel by an explicit handle, with pointer coordinates clamped to the body-editor boundary. While the panel remains open, deliberate selection changes in the focused textarea refresh the insertion target. Compact viewports use a contained full-width placement without requiring drag interaction.
+
 Alternatives considered:
 
 - A curated static list is smaller but does not satisfy comprehensive search, categories, variants, or evolving Unicode coverage.

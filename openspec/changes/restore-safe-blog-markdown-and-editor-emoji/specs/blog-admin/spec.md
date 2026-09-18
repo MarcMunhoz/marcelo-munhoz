@@ -35,6 +35,12 @@ The system SHALL provide authenticated authors with an accessible emoji picker t
 - **WHEN** an author navigates the editor without a pointing device
 - **THEN** the emoji control, search, categories, variants, choices, and dismissal are keyboard operable with visible focus
 
+#### Scenario: Author repositions the emoji picker while editing
+- **WHEN** an author opens the picker on a wide viewport and moves it within the article-body editor
+- **THEN** the picker floats above the editing surface without displacing the body content
+- **AND** it remains constrained to the editor while the author scrolls or moves the insertion point to another paragraph
+- **AND** compact viewports keep the picker contained without requiring drag interaction
+
 #### Scenario: Existing article contains emoji
 - **WHEN** an author loads, previews, edits, saves, or publishes an article that already contains Unicode emoji
 - **THEN** those characters remain unchanged through the established editorial workflow

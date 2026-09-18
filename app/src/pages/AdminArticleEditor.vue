@@ -110,6 +110,9 @@
               class="markdown-editor-textarea"
               rows="14"
               aria-label="Body"
+              @click="captureEmojiSelection"
+              @keyup="captureEmojiSelection"
+              @select="captureEmojiSelection"
             ></textarea>
             <ArticleContent
               v-if="bodyEditorMode === 'preview'"
@@ -374,6 +377,10 @@ function toggleEmojiPicker() {
   if (emojiPickerOpen.value) return closeEmojiPicker(true);
   emojiSelection = { selectionStart: bodyEditor.value?.selectionStart, selectionEnd: bodyEditor.value?.selectionEnd };
   emojiPickerOpen.value = true;
+}
+function captureEmojiSelection() {
+  if (!emojiPickerOpen.value || document.activeElement !== bodyEditor.value) return;
+  emojiSelection = { selectionStart: bodyEditor.value?.selectionStart, selectionEnd: bodyEditor.value?.selectionEnd };
 }
 async function insertEmoji(emoji) {
   const result = replaceEmojiSelection({ value: state.articleForm.body, ...emojiSelection, emoji });
@@ -1089,6 +1096,7 @@ const {
   background: #ffffff;
   border: 1px solid #b0bec5;
   display: grid;
+  position: relative;
 }
 
 .markdown-editor.has-error {
