@@ -151,6 +151,7 @@ const markdownBlock = (source) => {
 
 export const articleContentBlocks = (source) => {
   const tokens = articleMarkdown.lexer(String(source || ""));
+  const definitionSource = tokens.filter((token) => token.type === "def").map((token) => token.raw).join("");
   const blocks = [];
   let markdownTokens = [];
 
@@ -159,7 +160,8 @@ export const articleContentBlocks = (source) => {
       return;
     }
 
-    const block = markdownBlock(markdownTokens.map((token) => token.raw).join(""));
+    const markdownSource = markdownTokens.map((token) => token.raw).join("");
+    const block = markdownBlock(definitionSource ? `${markdownSource}\n${definitionSource}` : markdownSource);
     if (block) {
       blocks.push(block);
     }
@@ -167,6 +169,10 @@ export const articleContentBlocks = (source) => {
   };
 
   for (const token of tokens) {
+    if (token.type === "def") {
+      continue;
+    }
+
     const standaloneSource = token.type === "paragraph" ? token.raw.trim() : "";
     const videoSrc = standaloneSource && standaloneSource === token.text.trim() ? canonicalYoutubeEmbedUrl(standaloneSource) : null;
 

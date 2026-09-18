@@ -259,6 +259,9 @@ describe("rendered article editor", () => {
     textarea.element.focus();
     textarea.element.setSelectionRange(5, 20);
 
+    expect(mounted.wrapper.find(".markdown-editor-preview").exists()).toBe(false);
+    expect(mounted.wrapper.find(".article-video iframe").exists()).toBe(false);
+
     mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "preview");
     await flushPromises();
     const preview = mounted.wrapper.get(".markdown-editor-preview");
@@ -275,6 +278,8 @@ describe("rendered article editor", () => {
 
     mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "editor");
     await flushPromises();
+    expect(mounted.wrapper.find(".markdown-editor-preview").exists()).toBe(false);
+    expect(mounted.wrapper.find(".article-video iframe").exists()).toBe(false);
     expect(textarea.element.value).toBe(markdownFixture.markdown);
     expect(textarea.element.selectionStart).toBe(5);
     expect(textarea.element.selectionEnd).toBe(20);

@@ -107,6 +107,23 @@ describe("safe article content", () => {
     ]);
   });
 
+  it("preserves document-scoped reference definitions across a trusted video", () => {
+    const source = [
+      "Read the [documentation][reference].",
+      "",
+      "![Architecture][diagram]",
+      "",
+      fixture.standaloneVideoUrl,
+      "",
+      "[reference]: https://example.test/reference",
+      "[diagram]: https://res.cloudinary.com/demo/image/upload/diagram.png",
+    ].join("\n");
+    const rendered = renderedMarkdown(source);
+
+    expect(rendered.querySelector('a[href="https://example.test/reference"]')?.textContent).toBe("documentation");
+    expect(rendered.querySelector('img[src="https://res.cloudinary.com/demo/image/upload/diagram.png"]')?.getAttribute("alt")).toBe("Architecture");
+  });
+
   it.each([
     ["https://www.youtube.com/embed/bovBQtB_PDo", "https://www.youtube-nocookie.com/embed/bovBQtB_PDo"],
     ["https://youtube.com/watch?v=bovBQtB_PDo", "https://www.youtube-nocookie.com/embed/bovBQtB_PDo"],

@@ -112,7 +112,7 @@
               aria-label="Body"
             ></textarea>
             <ArticleContent
-              v-show="bodyEditorMode === 'preview'"
+              v-if="bodyEditorMode === 'preview'"
               class="markdown-editor-preview article-markdown-preview"
               :source="articleForm.body"
               :title="articleForm.title"
