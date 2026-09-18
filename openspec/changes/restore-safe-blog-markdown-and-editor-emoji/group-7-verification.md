@@ -4,7 +4,7 @@ The deterministic public journey now covers semantic Markdown, safe external-lin
 
 ### Local verification
 
-- The complete containerized Vitest suite passed: 46 files and 438 tests.
+- The complete containerized Vitest suite passed: 46 files and 439 tests.
 - Coverage passed the configured thresholds: 91.06% statements, 83.34% branches, 86.61% functions, and 92.53% lines.
 - Lint completed with zero errors and six warnings from pre-existing generated coverage artifacts.
 - The production build and built-asset credential scan passed. The emoji picker remains split into lazy-loaded picker, locale, and data assets.

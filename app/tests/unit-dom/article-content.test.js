@@ -124,6 +124,19 @@ describe("safe article content", () => {
     expect(rendered.querySelector('img[src="https://res.cloudinary.com/demo/image/upload/diagram.png"]')?.getAttribute("alt")).toBe("Architecture");
   });
 
+  it("preserves definitions declared before a trusted video and used after it", () => {
+    const source = [
+      "[reference]: https://example.test/reference",
+      "",
+      fixture.standaloneVideoUrl,
+      "",
+      "Read the [documentation][reference].",
+    ].join("\n");
+    const rendered = renderedMarkdown(source);
+
+    expect(rendered.querySelector('a[href="https://example.test/reference"]')?.textContent).toBe("documentation");
+  });
+
   it.each([
     ["https://www.youtube.com/embed/bovBQtB_PDo", "https://www.youtube-nocookie.com/embed/bovBQtB_PDo"],
     ["https://youtube.com/watch?v=bovBQtB_PDo", "https://www.youtube-nocookie.com/embed/bovBQtB_PDo"],

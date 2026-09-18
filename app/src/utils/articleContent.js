@@ -161,7 +161,7 @@ export const articleContentBlocks = (source) => {
     }
 
     const markdownSource = markdownTokens.map((token) => token.raw).join("");
-    const block = markdownBlock(definitionSource ? `${markdownSource}\n${definitionSource}` : markdownSource);
+    const block = markdownBlock(definitionSource ? `${markdownSource}\n\n${definitionSource}` : markdownSource);
     if (block) {
       blocks.push(block);
     }
