@@ -83,14 +83,14 @@ The system MUST use Contentful Management API credentials only from server-side 
 - **THEN** the bundle does not contain the configured Contentful Management API credential
 
 ### Requirement: Writers Can Draft And Submit Articles
-The system SHALL allow authenticated writers to create and edit article drafts or submissions through the admin area and return them to the dashboard after a successful terminal editor action.
+The system SHALL allow authenticated writers to create and edit non-live article drafts or submissions through the admin area and return them to the dashboard after a successful terminal editor action.
 
 #### Scenario: Writer creates article draft
 - **WHEN** an authenticated writer submits valid new article content
 - **THEN** the system creates a draft or submission without publishing it to the public blog
 
 #### Scenario: Writer edits permitted draft
-- **WHEN** an authenticated writer edits an article draft or submission they are allowed to modify
+- **WHEN** an authenticated writer edits a non-live article draft or submission they are allowed to modify
 - **THEN** the system saves the changes without publishing them to the public blog
 
 #### Scenario: Writer submits article for review
@@ -108,12 +108,12 @@ The system SHALL allow authenticated writers to create and edit article drafts o
 - **AND** the browser Back action does not reopen a stale editor state
 
 #### Scenario: Writer requests unpublication
-- **WHEN** an authenticated writer successfully requests unpublication from the focused editor
-- **THEN** the system replaces the current route with `/admin`
-- **AND** the browser Back action does not reopen a stale editor state
+- **WHEN** an authenticated writer successfully requests unpublication for a live article from the dashboard
+- **THEN** the system keeps the article unavailable for editing until unpublication is completed
+- **AND** the dashboard reports the pending request state
 
 #### Scenario: Writer edits article fields
-- **WHEN** an authenticated writer creates or edits an article
+- **WHEN** an authenticated writer creates or edits a non-live article
 - **THEN** the system provides inputs for create date, title, slug, description, body, thumbnail, alt text, author, and Contentful tags
 
 #### Scenario: Writer edits technical state
@@ -122,8 +122,8 @@ The system SHALL allow authenticated writers to create and edit article drafts o
 
 #### Scenario: Writer terminal action fails
 - **WHEN** a writer save, review submission, or unpublication request fails
-- **THEN** the system remains in the editor
-- **AND** it preserves current form values and error feedback without navigating
+- **THEN** the system remains in its current surface
+- **AND** it preserves current form values or dashboard context and displays error feedback without navigating incorrectly
 
 ### Requirement: Article Images Use Cloudinary
 The system SHALL allow authenticated writers to manage article thumbnail images through Cloudinary without exposing Cloudinary credentials to the browser.
@@ -279,7 +279,7 @@ The system SHALL render article table rows using human-readable editorial values
 - **AND** the system displays tags as readable chips or labels instead of an unstructured raw ID string
 
 ### Requirement: Admin Actions Match Role And Article State
-The system SHALL show article actions that match the current admin role and article state.
+The system SHALL show article actions that match the current admin role and authoritative article lifecycle state.
 
 #### Scenario: Writer views draft article actions
 - **WHEN** an authenticated writer views an editable draft or submission
@@ -288,7 +288,7 @@ The system SHALL show article actions that match the current admin role and arti
 
 #### Scenario: Writer views published article actions
 - **WHEN** an authenticated writer views an eligible published article
-- **THEN** the system may offer a request-unpublication action
+- **THEN** the system offers a request-unpublication action instead of editing
 - **AND** the system does not offer a request-publication action for the already published article
 
 #### Scenario: Owner views review article actions
@@ -299,30 +299,30 @@ The system SHALL show article actions that match the current admin role and arti
 #### Scenario: Owner views published article actions
 - **WHEN** an authenticated owner views a published article
 - **THEN** the system offers direct owner moderation actions such as unpublish, archive, or permanent delete where eligible
-- **AND** the system does not require the owner to request unpublication
+- **AND** the system does not offer editing until unpublication is complete
 
 #### Scenario: Admin views unpublished changes to a published article
 - **WHEN** Contentful reports a published version and a newer draft version for the same article
 - **THEN** the admin labels the article as having unpublished changes instead of fully published
-- **AND** the public version remains live until the newer draft is explicitly published
+- **AND** the system does not offer editing or publish-changes actions while the public version remains live
 
 #### Scenario: Owner republishes changed article
-- **WHEN** an owner views an eligible article with unpublished changes
-- **THEN** the system offers a publish-changes action using the latest Contentful entry version
-- **AND** the action does not require unpublishing the currently live version first
+- **WHEN** an owner views an article with unpublished changes over a published version
+- **THEN** the system requires the owner to unpublish the live article before continuing the editorial workflow
+- **AND** the system does not offer a direct publish-changes action while the public version remains live
 
 #### Scenario: Writer submits changed article
-- **WHEN** a writer saves changes to an article they own that already has a published version
-- **THEN** the system allows the writer to submit those changes for owner review
-- **AND** the writer cannot publish the changes directly
+- **WHEN** a writer views an article with unpublished changes over a published version
+- **THEN** the system prevents further editing or review submission while the public version remains live
+- **AND** the writer can request unpublication instead of changing or publishing the article directly
 
 #### Scenario: Writer submits a specific article version
-- **WHEN** a writer submits an article for publication review
+- **WHEN** a writer submits a non-live article for publication review
 - **THEN** the editorial request records the current Contentful article version in `articleVersion`
 - **AND** the request applies only to that submitted version
 
 #### Scenario: Writer changes an article after submission
-- **WHEN** the current article version no longer matches the open request's `articleVersion`
+- **WHEN** the current non-live article version no longer matches the open request's `articleVersion`
 - **THEN** the admin treats the request as stale and does not present the newer draft as reviewed
 
 #### Scenario: Owner publishes a reviewed version
@@ -336,7 +336,7 @@ The system SHALL show article actions that match the current admin role and arti
 - **AND** owner moderation actions remain available where the owner role and article state allow them
 
 #### Scenario: Admin edits an article they created
-- **WHEN** an authenticated owner or writer views an article with a trusted creator match to their account
+- **WHEN** an authenticated owner or writer views a non-live article with a trusted creator match to their account
 - **THEN** the system may offer article editing where the article state supports editing
 
 ### Requirement: Article Editing Opens In A Focused Surface
@@ -369,7 +369,7 @@ The system SHALL persist article creation and update timestamps as timezone-safe
 - **AND** the stored value preserves the intended editorial calendar date regardless of the author's browser timezone, Netlify runtime timezone, or Contentful storage timezone
 
 #### Scenario: Admin saves an edited article
-- **WHEN** an authenticated author saves changes to an existing article
+- **WHEN** an authenticated author saves changes to an existing non-live article
 - **THEN** the system stores or updates an article update timestamp as an unambiguous instant when the content model supports it
 - **AND** the update timestamp does not replace the original creation timestamp
 
@@ -390,7 +390,7 @@ The system SHALL persist article creation and update timestamps as timezone-safe
 - **AND** an English article does not render Portuguese byline labels
 
 #### Scenario: Admin selects article language
-- **WHEN** an authenticated author creates or edits an article
+- **WHEN** an authenticated author creates or edits a non-live article
 - **THEN** the focused article editor provides an explicit article language control for Portuguese and English content
 - **AND** the system stores the selected editorial language when the Contentful Article model supports it
 - **AND** public byline labels prefer the selected editorial language over legacy Contentful technical locale defaults
@@ -406,14 +406,14 @@ The system SHALL persist article creation and update timestamps as timezone-safe
 - **AND** language metadata tags do not override an explicit Contentful `locale` field
 
 #### Scenario: Published article has saved changes
-- **WHEN** an authenticated author saves changes to an already published Contentful entry
-- **THEN** the admin reports that the article has unpublished changes
-- **AND** the public article remains unchanged until an authorized owner publishes the new entry version
+- **WHEN** Contentful reports saved draft changes over an already published article
+- **THEN** the admin treats the article as live and prevents further saves until it is unpublished
+- **AND** the public article remains unchanged while the live version continues to be served
 
 #### Scenario: Owner publishes saved changes
-- **WHEN** an owner publishes an article with unpublished changes
-- **THEN** the latest saved editorial locale and content become publicly visible together
-- **AND** the admin reports the article as published after reloading its Contentful state
+- **WHEN** an owner views saved changes over an already published article
+- **THEN** the system does not offer direct publication of those changes while the public version remains live
+- **AND** the owner must unpublish and complete the non-live editorial workflow before publishing again
 
 ### Requirement: Article Editor Hides Technical Contentful And Cloudinary Fields
 The system SHALL keep technical Contentful and Cloudinary identifiers out of primary article editing controls.
@@ -743,3 +743,35 @@ The system MUST keep production authorization server-side and MUST keep developm
 - **WHEN** the application creates a development-only preview session
 - **THEN** the preview workflow remains available for local testing
 - **AND** it is not represented as a production authenticated session or persisted as production session proof
+
+### Requirement: Live Articles Must Be Unpublished Before Editing
+The system SHALL prevent article content from being edited while the authoritative Contentful lifecycle reports a published version, including an entry with unpublished changes over a published version.
+
+#### Scenario: Admin opens a live article editor route directly
+- **WHEN** an authenticated owner or writer navigates directly to the edit route for an article whose lifecycle is published or changed
+- **THEN** the system displays guidance that the article must be unpublished before editing
+- **AND** the system does not display mutable article fields or a save action
+
+#### Scenario: Owner prepares a published article for editing
+- **WHEN** an owner needs to change a published article
+- **THEN** the owner can explicitly unpublish it before opening the editor
+- **AND** editing becomes available only after the authoritative lifecycle reports the article as unpublished
+
+#### Scenario: Writer prepares a published article for editing
+- **WHEN** a writer needs to change an eligible published article
+- **THEN** the writer can request unpublication without receiving direct unpublish authority
+- **AND** editing remains unavailable until an owner completes unpublication and the authoritative lifecycle reports the article as unpublished
+
+#### Scenario: Client attempts to save a live article
+- **WHEN** the admin client attempts to save an existing article whose loaded authoritative lifecycle is published or changed
+- **THEN** the client refuses the save and explains that unpublication is required first
+
+#### Scenario: Management API receives an update for a live article
+- **WHEN** an authenticated update request targets an entry whose current authoritative Contentful state is published or changed
+- **THEN** the server rejects the update with a stable lifecycle error
+- **AND** no article fields are written
+
+#### Scenario: Author edits a non-live article
+- **WHEN** an authorized author opens a new, draft, review, or unpublished article whose ownership and role permit editing
+- **THEN** the established editing and review workflow remains available
+
