@@ -119,48 +119,70 @@ describe("administrative journeys", () => {
     cy.location("pathname").should("equal", "/admin");
   });
 
-  it("uploads and clears a thumbnail before requesting unpublication", () => {
-    cy.fixture("admin-content.json").then(({ articles, tags }) => {
-      const published = {
-        ...articles.find((article) => article.id === "published-1"),
-        thumbnailPublicId: "articles/original",
-        thumbnailUrl: "https://images.example.test/original.jpg",
-        alt: "Original thumbnail",
-      };
-      stubDashboard([published]);
-      cy.interceptJson("GET", "**/api/admin/contentful/tags", tags, "tags");
-      cy.intercept("POST", "**/api/admin/contentful/media/upload", (request) => {
-        expect(request.body.filename).to.equal("replacement.png");
-        expect(request.body.file).to.match(/^data:image\/png;base64,/);
-        request.reply({
-          statusCode: 200,
-          body: {
-            asset: {
-              public_id: "articles/replacement",
-              secure_url: "https://images.example.test/replacement.png",
-              display_name: "Replacement",
-              width: 32,
-              height: 32,
-            },
-          },
-        });
-      }).as("uploadMedia");
+  it("requires a writer to request unpublication from the dashboard before editing", () => {
+    cy.fixture("admin-content.json").then(({ articles }) => {
+      stubDashboard([articles.find((article) => article.id === "published-1")]);
       cy.interceptJson("POST", "**/api/admin/contentful/articles/published-1/unpublication-requests", { ok: true }, "requestUnpublication");
     });
-    visitAsPreview("/admin/articles/published-1/edit", "writer");
+    visitAsPreview("/admin", "writer");
 
-    cy.contains(".q-field", "Upload image").find('input[type="file"]').selectFile({
-      contents: Cypress.Buffer.from("browser-thumbnail"),
-      fileName: "replacement.png",
-      mimeType: "image/png",
+    cy.contains("tr, .admin-article-card", "Published article").within(() => {
+      cy.get('button[aria-label="Edit"]').should("not.exist");
+      cy.get('button[aria-label="Request unpublication"]').click();
     });
-    cy.wait("@uploadMedia");
-    cy.get('img[src="https://images.example.test/replacement.png"]').should("be.visible");
-    cy.contains("button", "Clear image").click();
-    cy.contains("No thumbnail selected").should("be.visible");
-    cy.contains("button", "Request unpublication").click();
     cy.wait("@requestUnpublication").its("request.body").should("deep.equal", { version: 5, notes: "" });
   });
+
+  it("lets an owner unpublish a live article before opening its editor", () => {
+    cy.fixture("admin-content.json").then(({ articles, tags }) => {
+      const published = articles.find((article) => article.id === "published-1");
+      let unpublished = false;
+      cy.intercept("GET", "**/api/admin/contentful/articles", (request) => request.reply({
+        statusCode: 200,
+        body: {
+          articles: [{ ...published, status: unpublished ? "unpublished" : "published", lifecycleStatus: unpublished ? "unpublished" : "published" }],
+          session: { authorEntryId: "author-1" },
+        },
+      })).as("articles");
+      cy.intercept("POST", "**/api/admin/contentful/articles/published-1/unpublish", (request) => {
+        unpublished = true;
+        request.reply({ statusCode: 200, body: { ok: true } });
+      }).as("unpublishBeforeEdit");
+      cy.interceptJson("GET", "**/api/admin/contentful/tags", tags, "tags");
+    });
+    visitAsPreview("/admin", "owner");
+
+    cy.contains("tr, .admin-article-card", "Published article").find('button[aria-label="Unpublish"]').click();
+    cy.wait("@unpublishBeforeEdit").its("request.body.version").should("equal", 5);
+    cy.contains("tr, .admin-article-card", "Published article").find('button[aria-label="Edit"]').click();
+    cy.location("pathname").should("equal", "/admin/articles/published-article/edit");
+    cy.contains("h1", "Edit article").should("be.visible");
+  });
+
+  for (const lifecycleStatus of ["published", "changed"]) {
+    it(`blocks direct ${lifecycleStatus} editor routes without sending updates`, () => {
+      let updateRequests = 0;
+      cy.fixture("admin-content.json").then(({ articles, tags }) => {
+        const liveArticle = {
+          ...articles.find((article) => article.id === "published-1"),
+          status: lifecycleStatus === "changed" ? "review" : "published",
+          lifecycleStatus,
+        };
+        stubDashboard([liveArticle]);
+        cy.interceptJson("GET", "**/api/admin/contentful/tags", tags, "tags");
+        cy.intercept("PUT", "**/api/admin/contentful/articles/published-1", (request) => {
+          updateRequests += 1;
+          request.reply({ statusCode: 500, body: { error: "Unexpected update" } });
+        });
+      });
+      visitAsPreview("/admin/articles/published-1/edit", "writer");
+
+      cy.contains("h2", "Unpublish before editing").should("be.visible");
+      cy.get("form").should("not.exist");
+      cy.contains("button", "Save").should("not.exist");
+      cy.then(() => expect(updateRequests).to.equal(0));
+    });
+  }
 
   it("executes owner lifecycle actions with versioned requests", () => {
     cy.fixture("admin-content.json").then(({ articles }) => {

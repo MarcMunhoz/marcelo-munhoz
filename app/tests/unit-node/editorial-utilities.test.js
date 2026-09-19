@@ -4,6 +4,7 @@ import { describe, it } from "vitest";
 import { adminUserMessage, AdminApiError } from "../../src/utils/adminApi.js";
 import {
   applyArticleResponseToForm,
+  articleDateTimeValue,
   articleToForm,
   authorProfileToForm,
   buildAuthorProfilePayload,
@@ -18,8 +19,10 @@ import {
   canUnarchiveArticleAction,
   createEmptyArticleForm,
   createEmptyAuthorProfileForm,
+  displayArticleDate,
   filterAdminArticles,
   formatMarkdownSelection,
+  isLiveArticleLifecycle,
   mediaLibraryState,
   normalizeAdminArticleDisplay,
   normalizeMediaAssetDisplay,
@@ -39,6 +42,17 @@ import { articleBylineLabels, publicArticleDates } from "../../src/utils/article
 import { articleCardImageUrl, articleHeroImageUrl } from "../../src/utils/contentfulImages.js";
 
 describe("editorial utilities", () => {
+  it("treats missing lifecycle data as non-live", () => {
+    assert.equal(isLiveArticleLifecycle(null), false);
+  });
+
+  it("normalizes invalid and empty article dates", () => {
+    assert.equal(displayArticleDate("not-a-date"), "No date");
+    assert.equal(articleDateTimeValue(""), "");
+    assert.equal(articleDateTimeValue("not-a-date"), "");
+    assert.equal(articleDateTimeValue("2026-09-19T12:00:00.000Z"), "2026-09-19T12:00:00.000Z");
+  });
+
   it("normalizes empty admin dashboard responses into stable frontend state", () => {
     assert.deepEqual(reconcileAdminDashboardData({}), {
       articles: [],
@@ -154,6 +168,8 @@ describe("editorial utilities", () => {
       { id: "review-1", title: "Ready article", status: "review", version: 4 },
       { id: "take-down-1", title: "Published article", status: "unpublicationRequested", version: 9 },
       { id: "draft-1", title: "Draft article", status: "draft", version: 2 },
+      { id: "changed-1", title: "Live changes", status: "changed", lifecycleStatus: "changed", version: 5 },
+      { id: "changed-review-1", title: "Live review overlay", status: "review", lifecycleStatus: "changed", version: 6 },
     ]);
 
     assert.deepEqual(queues, {
@@ -558,10 +574,12 @@ describe("editorial utilities", () => {
     assert.equal(canRequestUnpublicationAction(null, writer), false);
     assert.equal(canPrepareReviewAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), true);
     assert.equal(canPrepareReviewAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), false);
-    assert.equal(canPrepareReviewAction({ id: "changed-1", status: "changed", writerSubject: "writer-1" }, writer), true);
+    assert.equal(canPrepareReviewAction({ id: "changed-1", status: "changed", writerSubject: "writer-1" }, writer), false);
     assert.equal(canPrepareReviewAction({ id: "", status: "draft", writerSubject: "writer-1" }, writer), false);
 
     assert.equal(canRequestUnpublicationAction({ id: "published-1", status: "published", writerSubject: "writer-1" }, writer), true);
+    assert.equal(canRequestUnpublicationAction({ id: "changed-1", status: "changed", lifecycleStatus: "changed", writerSubject: "writer-1" }, writer), true);
+    assert.equal(canRequestUnpublicationAction({ id: "changed-review-1", status: "review", lifecycleStatus: "changed", writerSubject: "writer-1" }, writer), true);
     assert.equal(canRequestUnpublicationAction({ id: "draft-1", status: "draft", writerSubject: "writer-1" }, writer), false);
     assert.equal(canRequestUnpublicationAction({ id: "review-1", status: "review", writerSubject: "writer-1" }, writer), false);
   });
@@ -582,17 +600,40 @@ describe("editorial utilities", () => {
     assert.equal(canArchiveArticleAction({ id: "draft-1", status: "draft" }, writer), false);
   });
 
+  it("allows editing only for owned articles whose authoritative lifecycle is not live", () => {
+    const writer = { subject: "writer-1", roles: ["writer"], authorEntryId: "author-1" };
+    const states = [
+      { status: "draft", lifecycleStatus: "draft", expected: true },
+      { status: "review", lifecycleStatus: "draft", expected: true },
+      { status: "unpublished", lifecycleStatus: "unpublished", expected: true },
+      { status: "published", lifecycleStatus: "published", expected: false },
+      { status: "changed", lifecycleStatus: "changed", expected: false },
+      { status: "review", lifecycleStatus: "published", expected: false },
+      { status: "unpublicationRequested", lifecycleStatus: "published", expected: false },
+    ];
+
+    assert.deepEqual(
+      states.map(({ status, lifecycleStatus }) => canEditArticleAction({
+        id: `${status}-${lifecycleStatus}`,
+        status,
+        lifecycleStatus,
+        writerSubject: "writer-1",
+      }, writer)),
+      states.map(({ expected }) => expected)
+    );
+  });
+
   it("keeps owner body editing scoped to owned articles while preserving moderation", () => {
     const owner = { subject: "owner-1", roles: ["owner"], authorEntryId: "author-1" };
     const identityOwner = { subject: "owner-1", roles: ["Owner"], authorEntryId: "author-1" };
 
     assert.equal(canEditArticleAction({ id: "draft-1", status: "draft", writerSubject: "owner-1" }, owner), true);
-    assert.equal(canEditArticleAction({ id: "published-1", status: "published", authorEntryId: "author-1" }, owner), true);
-    assert.equal(canEditArticleAction({ id: "changed-1", status: "changed", authorEntryId: "author-1" }, owner), true);
+    assert.equal(canEditArticleAction({ id: "published-1", status: "published", authorEntryId: "author-1" }, owner), false);
+    assert.equal(canEditArticleAction({ id: "changed-1", status: "changed", authorEntryId: "author-1" }, owner), false);
     assert.equal(canEditArticleAction({ id: "published-2", status: "published", authorEntryId: "author-2" }, owner), false);
     assert.equal(canOwnerPublishAction({ id: "review-1", status: "review" }, owner), true);
-    assert.equal(canOwnerPublishAction({ id: "changed-1", status: "changed" }, owner), true);
-    assert.equal(canOwnerPublishAction({ id: "changed-review-1", status: "review", lifecycleStatus: "changed" }, owner), true);
+    assert.equal(canOwnerPublishAction({ id: "changed-1", status: "changed" }, owner), false);
+    assert.equal(canOwnerPublishAction({ id: "changed-review-1", status: "review", lifecycleStatus: "changed" }, owner), false);
     assert.equal(canOwnerUnpublishAction({ id: "published-1", status: "published" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "changed-1", status: "changed" }, owner), true);
     assert.equal(canOwnerUnpublishAction({ id: "changed-review-1", status: "review", lifecycleStatus: "changed" }, owner), true);
@@ -634,7 +675,7 @@ describe("editorial utilities", () => {
       [
         { id: "own-draft", edit: true, review: true, requestUnpublication: false },
         { id: "own-review", edit: true, review: false, requestUnpublication: false },
-        { id: "own-published", edit: true, review: false, requestUnpublication: true },
+        { id: "own-published", edit: false, review: false, requestUnpublication: true },
         { id: "archived", edit: false, review: false, requestUnpublication: false },
         { id: "other-draft", edit: false, review: false, requestUnpublication: false },
       ]

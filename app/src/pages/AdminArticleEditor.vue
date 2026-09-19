@@ -8,7 +8,7 @@
           <p>{{ articleForm.id ? articleForm.title : "Create a new draft for review." }}</p>
         </div>
         <div class="editor-heading-actions">
-          <div class="article-language-switch" role="group" aria-label="Article language">
+          <div v-if="!liveArticleBlocked" class="article-language-switch" role="group" aria-label="Article language">
             <button
               v-for="option in articleLocaleOptions"
               :key="option.value"
@@ -28,6 +28,7 @@
       </header>
 
       <q-banner v-if="dashboardError" class="feedback-error editor-feedback" rounded>{{ dashboardError }}</q-banner>
+      <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
 
       <section v-if="!canWrite" class="editor-blocked">
         <q-icon name="lock" size="30px" />
@@ -42,6 +43,14 @@
           <q-spinner size="42px" color="blue-grey-6" />
           <p>Loading article editor</p>
         </q-inner-loading>
+      </section>
+
+      <section v-else-if="liveArticleBlocked" class="editor-blocked editor-live-blocked">
+        <q-icon name="visibility_off" size="30px" />
+        <div>
+          <h2>Unpublish before editing</h2>
+          <p>Return to the dashboard and unpublish this article, or request unpublication, before changing its content.</p>
+        </div>
       </section>
 
       <q-form v-else class="editor-form-page" @submit.prevent="saveDraft">
@@ -224,8 +233,6 @@
           </q-select>
         </section>
 
-        <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
-
         <div class="editor-actions">
           <q-btn v-if="canSaveArticle" class="editor-action editor-action-primary" unelevated color="blue-grey-8" icon="save" :label="saveButtonLabel" dense no-caps type="submit" :loading="loadingAction === 'save'" />
           <q-btn
@@ -355,6 +362,7 @@ import {
   canRequestUnpublicationAction,
   createEmptyArticleForm,
   formatMarkdownSelection,
+  isLiveArticleLifecycle,
   mediaLibraryState,
   reconcileAdminDashboardData,
   runTerminalAdminAction,
@@ -409,11 +417,12 @@ const hasUnsavedChanges = computed(() => state.originalFormSnapshot !== JSON.str
 const mediaState = computed(() => mediaLibraryState({ assets: state.mediaAssets, error: state.mediaError, isLoading: state.loadingAction === "media-list" }));
 const feedbackClass = computed(() => ({ "feedback-success": state.feedbackTone === "success", "feedback-error": state.feedbackTone === "error", "feedback-info": state.feedbackTone === "info" }));
 const canSaveArticle = computed(() => isNewArticle.value || canEditArticleAction(state.loadedArticle, state.session));
+const liveArticleBlocked = computed(() => !isNewArticle.value && isLiveArticleLifecycle(state.loadedArticle));
 const canSubmitArticleForReview = computed(() => canPrepareReviewAction(state.loadedArticle, state.session));
 const canRequestArticleUnpublication = computed(() => canRequestUnpublicationAction(state.loadedArticle, state.session));
 const canOwnerUnpublishArticle = computed(() => canOwnerUnpublishAction(state.loadedArticle, state.session));
 const saveButtonLabel = computed(() => ["published", "changed"].includes(state.loadedArticle?.status) ? "Save" : "Save draft");
-Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel });
+Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, liveArticleBlocked, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel });
 const methods = {
 redirectSignedOutVisitor() {
   if (!state.session) {
@@ -458,6 +467,15 @@ async loadEditor() {
 
     if (!article) {
       state.dashboardError = "Article not found or not editable by this account.";
+      return;
+    }
+
+    if (isLiveArticleLifecycle(article)) {
+      state.loadedArticle = article;
+      state.articleForm = articleToForm(article);
+      state.statusMessage = "Editing blocked";
+      state.slugTouched = true;
+      state.snapshotForm();
       return;
     }
 
@@ -624,6 +642,11 @@ validateArticleForm() {
   return Object.keys(errors).length === 0;
 },
 async saveDraft() {
+  if (!state.isNewArticle && isLiveArticleLifecycle(state.loadedArticle)) {
+    state.showFeedback("Unpublish this article before editing.", "error");
+    return;
+  }
+
   if (!state.canSaveArticle) {
     state.showFeedback("This article belongs to another author. Use moderation actions from the dashboard.", "error");
     return;

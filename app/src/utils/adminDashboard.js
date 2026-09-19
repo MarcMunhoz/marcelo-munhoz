@@ -12,6 +12,8 @@ const ownsArticle = (article = {}, session = {}) =>
       (article.authorEntryId && session.authorEntryId && article.authorEntryId === session.authorEntryId)
   );
 const articleLifecycleStatus = (article = {}) => {
+  article = article || {};
+
   if (article.lifecycleStatus) {
     return normalize(article.lifecycleStatus);
   }
@@ -19,6 +21,8 @@ const articleLifecycleStatus = (article = {}) => {
   const status = normalize(article.status);
   return status === "review" ? "draft" : status === "unpublicationrequested" ? "published" : status;
 };
+
+export const isLiveArticleLifecycle = (article = {}) => ["published", "changed"].includes(articleLifecycleStatus(article));
 
 export const slugFromTitle = (title = "") =>
   String(title || "")
@@ -397,7 +401,9 @@ export const filterAdminArticles = (articles = [], filters = {}) => {
 };
 
 export const ownerReviewQueues = (articles = []) => ({
-  submissions: articles.filter((article) => ["draft", "changed", "review"].includes(normalize(article.status))),
+  submissions: articles.filter((article) =>
+    ["draft", "review"].includes(normalize(article.status)) && !["published", "changed"].includes(articleLifecycleStatus(article))
+  ),
   unpublicationRequests: articles.filter((article) => normalize(article.status) === "unpublicationrequested"),
 });
 
@@ -452,7 +458,7 @@ export const canEditArticleAction = (article = {}, session) => {
     return false;
   }
 
-  return ["draft", "changed", "review", "published", "unpublished", "unpublicationrequested"].includes(normalize(article.status));
+  return !isLiveArticleLifecycle(article) && ["draft", "review", "unpublished"].includes(articleLifecycleStatus(article));
 };
 
 export const canPrepareReviewAction = (article = {}, session = { roles: ["writer"] }) => {
@@ -462,19 +468,31 @@ export const canPrepareReviewAction = (article = {}, session = { roles: ["writer
     return false;
   }
 
-  return ["draft", "changed", "unpublished"].includes(normalize(article.status));
+  return ["draft", "unpublished"].includes(normalize(article.status)) && ["draft", "unpublished"].includes(articleLifecycleStatus(article));
 };
 
 export const canRequestUnpublicationAction = (article = {}, session = { roles: ["writer"] }) => {
   article = article || {};
 
-  return Boolean(article.id && isWriter(session) && !isOwner(session) && ownsArticle(article, session) && normalize(article.status) === "published");
+  return Boolean(
+    article.id &&
+      isWriter(session) &&
+      !isOwner(session) &&
+      ownsArticle(article, session) &&
+      ["published", "changed"].includes(articleLifecycleStatus(article)) &&
+      normalize(article.status) !== "unpublicationrequested"
+  );
 };
 
 export const canOwnerPublishAction = (article = {}, session) => {
   article = article || {};
 
-  return Boolean(article.id && isOwner(session) && (normalize(article.status) === "review" || articleLifecycleStatus(article) === "changed"));
+  return Boolean(
+    article.id &&
+      isOwner(session) &&
+      normalize(article.status) === "review" &&
+      !["published", "changed"].includes(articleLifecycleStatus(article))
+  );
 };
 
 export const canOwnerUnpublishAction = (article = {}, session) => {
