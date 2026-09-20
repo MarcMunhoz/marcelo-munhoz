@@ -1,0 +1,13 @@
+{
+  "markdown": "## Safe formatting\n\nThis is _boring_, **important**, and [documented](https://example.test/reference). 👩🏽‍💻\n\n> A safe quotation.\n\n- First item\n- Second item\n\n`const safe = true;`\n\n| Capability | State |\n| --- | --- |\n| Markdown | restored |\n\n![A test diagram](https://res.cloudinary.com/demo/image/upload/diagram.png)\n\nhttps://www.youtube.com/embed/bovBQtB_PDo\n\n<script>globalThis.fixtureCompromised = true</script>\n\n[Unsafe link](javascript:alert('fixture'))\n\n<img src=x onerror=\"globalThis.fixtureCompromised = true\">\n\n<iframe src=\"https://attacker.example.test/embed/fixture\"></iframe>",
+  "standaloneVideoUrl": "https://www.youtube.com/embed/bovBQtB_PDo",
+  "expectedVideoUrl": "https://www.youtube-nocookie.com/embed/bovBQtB_PDo",
+  "inlineVideoMarkdown": "Keep this URL in the sentence: https://www.youtube.com/embed/bovBQtB_PDo instead of creating a player.",
+  "existingEmoji": "👩🏽‍💻",
+  "unsafeUrls": [
+    "javascript:alert('fixture')",
+    "https://www.youtube.com.attacker.example.test/embed/bovBQtB_PDo",
+    "http://www.youtube.com/embed/bovBQtB_PDo",
+    "https://attacker.example.test/embed/bovBQtB_PDo"
+  ]
+}

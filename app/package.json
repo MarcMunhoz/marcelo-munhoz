@@ -1,6 +1,6 @@
 {
   "name": "marcelo-munhoz-website",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "productName": "Marcelo Munhoz Website",
   "author": "Marcelo Munhoz",
   "private": true,
@@ -28,6 +28,9 @@
     "@types/marked": "^5.0.2",
     "axios": "^1.18.1",
     "cors": "^2.8.5",
+    "dompurify": "3.4.15",
+    "emoji-picker-element": "1.29.1",
+    "emoji-picker-element-data": "1.8.0",
     "express": "^5.1.0",
     "marked": "^18.0.5",
     "quasar": "^2.23.5",

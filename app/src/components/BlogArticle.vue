@@ -92,7 +92,7 @@
         </q-btn>
       </section>
 
-      <div class="rendered-text">{{ article.body }}</div>
+      <ArticleContent class="rendered-text" :source="article.body" :title="article.title" />
 
       <section class="my-4">
         <ul class="article-tags">
@@ -133,6 +133,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
 import { useMeta } from "quasar";
+import ArticleContent from "./ArticleContent.vue";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { articleBylineLabels, articleLocaleFromArticle, articleNavigationLabels, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
 import { articleAuthorProfile } from "../utils/authorProfiles.js";

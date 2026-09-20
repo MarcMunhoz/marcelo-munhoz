@@ -1,4 +1,5 @@
 {
+  "formattedArticleBody": "## Formatted reader content\n\nThis is **important** and [documented](https://example.test/reference). 👩🏽‍💻\n\nhttps://www.youtube.com/embed/bovBQtB_PDo",
   "years": { "years": ["2026", "2025"] },
   "tags": { "items": [{ "sys": { "id": "testing" }, "name": "Testing" }] },
   "archive": {

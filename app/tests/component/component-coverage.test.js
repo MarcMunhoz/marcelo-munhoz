@@ -83,6 +83,7 @@ describe("component coverage boundaries", () => {
     const published = createTestMount({ router: router() })(AdminArticleCard, {
       props: { article: article({ status: "published", lifecycleStatus: "published" }), session: writer },
     });
+    expect(published.text()).not.toContain("Edit");
     expect(published.text()).toContain("Request unpublication");
     await buttonByLabel(published, "Request unpublication").trigger("click");
     expect(published.emitted("request-unpublication")).toEqual([[expect.objectContaining({ status: "published" })]]);
@@ -91,13 +92,21 @@ describe("component coverage boundaries", () => {
     const privileged = createTestMount({ router: router() })(AdminArticleCard, {
       props: { article: article({ status: "review", lifecycleStatus: "changed" }), session: owner },
     });
-    expect(privileged.text()).toContain("Publish changes");
+    expect(privileged.text()).not.toContain("Edit");
+    expect(privileged.text()).not.toContain("Publish changes");
     expect(privileged.text()).toContain("Unpublish");
-    await buttonByLabel(privileged, "Publish changes").trigger("click");
     await buttonByLabel(privileged, "Unpublish").trigger("click");
-    expect(privileged.emitted("publish")).toEqual([[expect.objectContaining({ status: "review" })]]);
+    expect(privileged.emitted("publish")).toBeUndefined();
     expect(privileged.emitted("unpublish")).toEqual([[expect.objectContaining({ status: "review" })]]);
     privileged.unmount();
+
+    const changedWriter = createTestMount({ router: router() })(AdminArticleCard, {
+      props: { article: article({ status: "review", lifecycleStatus: "changed" }), session: writer },
+    });
+    expect(changedWriter.text()).not.toContain("Edit");
+    expect(changedWriter.text()).not.toContain("Review");
+    expect(changedWriter.text()).toContain("Request unpublication");
+    changedWriter.unmount();
 
     const archivable = createTestMount({ router: router() })(AdminArticleCard, {
       props: { article: article({ status: "draft", lifecycleStatus: "draft" }), session: owner },

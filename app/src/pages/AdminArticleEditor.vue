@@ -8,7 +8,7 @@
           <p>{{ articleForm.id ? articleForm.title : "Create a new draft for review." }}</p>
         </div>
         <div class="editor-heading-actions">
-          <div class="article-language-switch" role="group" aria-label="Article language">
+          <div v-if="!liveArticleBlocked" class="article-language-switch" role="group" aria-label="Article language">
             <button
               v-for="option in articleLocaleOptions"
               :key="option.value"
@@ -28,6 +28,7 @@
       </header>
 
       <q-banner v-if="dashboardError" class="feedback-error editor-feedback" rounded>{{ dashboardError }}</q-banner>
+      <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
 
       <section v-if="!canWrite" class="editor-blocked">
         <q-icon name="lock" size="30px" />
@@ -42,6 +43,14 @@
           <q-spinner size="42px" color="blue-grey-6" />
           <p>Loading article editor</p>
         </q-inner-loading>
+      </section>
+
+      <section v-else-if="liveArticleBlocked" class="editor-blocked editor-live-blocked">
+        <q-icon name="visibility_off" size="30px" />
+        <div>
+          <h2>Unpublish before editing</h2>
+          <p>Return to the dashboard and unpublish this article, or request unpublication, before changing its content.</p>
+        </div>
       </section>
 
       <q-form v-else class="editor-form-page" @submit.prevent="saveDraft">
@@ -98,9 +107,11 @@
                 </q-btn-dropdown>
               </div>
               <div class="markdown-mode-actions">
+                <q-btn ref="emojiTrigger" flat dense icon="sentiment_satisfied_alt" aria-label="Insert emoji" aria-controls="body-emoji-picker" :aria-expanded="emojiPickerOpen" :disable="bodyEditorMode === 'preview'" @click="toggleEmojiPicker" />
                 <q-btn-toggle v-model="bodyEditorMode" dense no-caps toggle-color="blue-grey-7" :options="bodyEditorModeOptions" />
               </div>
             </div>
+            <EditorEmojiPicker v-if="emojiPickerOpen" @select="insertEmoji" @close="closeEmojiPicker(true)" />
             <textarea
               v-show="bodyEditorMode === 'editor'"
               ref="bodyEditor"
@@ -108,8 +119,16 @@
               class="markdown-editor-textarea"
               rows="14"
               aria-label="Body"
+              @click="captureEmojiSelection"
+              @keyup="captureEmojiSelection"
+              @select="captureEmojiSelection"
             ></textarea>
-            <pre v-show="bodyEditorMode === 'preview'" class="markdown-editor-preview article-markdown-preview">{{ articleBodyPreview }}</pre>
+            <ArticleContent
+              v-if="bodyEditorMode === 'preview'"
+              class="markdown-editor-preview article-markdown-preview"
+              :source="articleForm.body"
+              :title="articleForm.title"
+            />
             <p v-if="errors.body" class="markdown-editor-error">{{ errors.body }}</p>
           </div>
 
@@ -214,8 +233,6 @@
           </q-select>
         </section>
 
-        <q-banner v-if="feedbackMessage" :class="feedbackClass" rounded>{{ feedbackMessage }}</q-banner>
-
         <div class="editor-actions">
           <q-btn v-if="canSaveArticle" class="editor-action editor-action-primary" unelevated color="blue-grey-8" icon="save" :label="saveButtonLabel" dense no-caps type="submit" :loading="loadingAction === 'save'" />
           <q-btn
@@ -314,8 +331,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs, watch } from "vue"
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router"
+import ArticleContent from "../components/ArticleContent.vue";
+import EditorEmojiPicker from "../components/EditorEmojiPicker.vue";
+import { replaceEmojiSelection } from "../utils/emojiSelection.js";
 import {
   createArticleDraft,
   createContentfulTag,
@@ -342,6 +362,7 @@ import {
   canRequestUnpublicationAction,
   createEmptyArticleForm,
   formatMarkdownSelection,
+  isLiveArticleLifecycle,
   mediaLibraryState,
   reconcileAdminDashboardData,
   runTerminalAdminAction,
@@ -353,6 +374,30 @@ import { CloudinaryMediaEditorUnavailableError, openCloudinaryMediaEditor } from
 const route = useRoute();
 const router = useRouter();
 const bodyEditor = ref(null);
+const emojiTrigger = ref(null);
+const emojiPickerOpen = ref(false);
+let emojiSelection = {};
+function closeEmojiPicker(restoreFocus = false) {
+  emojiPickerOpen.value = false;
+  if (restoreFocus) nextTick(() => emojiTrigger.value?.$el?.focus());
+}
+function toggleEmojiPicker() {
+  if (emojiPickerOpen.value) return closeEmojiPicker(true);
+  emojiSelection = { selectionStart: bodyEditor.value?.selectionStart, selectionEnd: bodyEditor.value?.selectionEnd };
+  emojiPickerOpen.value = true;
+}
+function captureEmojiSelection() {
+  if (!emojiPickerOpen.value || document.activeElement !== bodyEditor.value) return;
+  emojiSelection = { selectionStart: bodyEditor.value?.selectionStart, selectionEnd: bodyEditor.value?.selectionEnd };
+}
+async function insertEmoji(emoji) {
+  const result = replaceEmojiSelection({ value: state.articleForm.body, ...emojiSelection, emoji });
+  state.articleForm.body = result.value;
+  closeEmojiPicker();
+  await nextTick();
+  bodyEditor.value?.focus();
+  bodyEditor.value?.setSelectionRange(result.selectionStart, result.selectionEnd);
+}
 const templateRefs = { bodyEditor };
 let active = true;
 let editorRequestId = 0;
@@ -365,18 +410,19 @@ const state = reactive({
   statusMessage: "", feedbackMessage: "", feedbackTone: "info", dashboardError: "", loadingAction: "", editorLoading: false,
 });
 const canWrite = computed(() => isWriterSession(state.session));
+watch(() => [state.bodyEditorMode, state.editorLoading, canWrite.value, route.fullPath], () => closeEmojiPicker());
 const showEditorSurface = computed(() => state.sessionResolved);
 const isNewArticle = computed(() => route.name === "Admin Article New");
 const hasUnsavedChanges = computed(() => state.originalFormSnapshot !== JSON.stringify(state.articleForm));
 const mediaState = computed(() => mediaLibraryState({ assets: state.mediaAssets, error: state.mediaError, isLoading: state.loadingAction === "media-list" }));
 const feedbackClass = computed(() => ({ "feedback-success": state.feedbackTone === "success", "feedback-error": state.feedbackTone === "error", "feedback-info": state.feedbackTone === "info" }));
 const canSaveArticle = computed(() => isNewArticle.value || canEditArticleAction(state.loadedArticle, state.session));
+const liveArticleBlocked = computed(() => !isNewArticle.value && isLiveArticleLifecycle(state.loadedArticle));
 const canSubmitArticleForReview = computed(() => canPrepareReviewAction(state.loadedArticle, state.session));
 const canRequestArticleUnpublication = computed(() => canRequestUnpublicationAction(state.loadedArticle, state.session));
 const canOwnerUnpublishArticle = computed(() => canOwnerUnpublishAction(state.loadedArticle, state.session));
 const saveButtonLabel = computed(() => ["published", "changed"].includes(state.loadedArticle?.status) ? "Save" : "Save draft");
-const articleBodyPreview = computed(() => state.articleForm.body || "");
-Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel, articleBodyPreview });
+Object.assign(state, { canWrite, showEditorSurface, isNewArticle, hasUnsavedChanges, mediaState, feedbackClass, canSaveArticle, liveArticleBlocked, canSubmitArticleForReview, canRequestArticleUnpublication, canOwnerUnpublishArticle, saveButtonLabel });
 const methods = {
 redirectSignedOutVisitor() {
   if (!state.session) {
@@ -421,6 +467,15 @@ async loadEditor() {
 
     if (!article) {
       state.dashboardError = "Article not found or not editable by this account.";
+      return;
+    }
+
+    if (isLiveArticleLifecycle(article)) {
+      state.loadedArticle = article;
+      state.articleForm = articleToForm(article);
+      state.statusMessage = "Editing blocked";
+      state.slugTouched = true;
+      state.snapshotForm();
       return;
     }
 
@@ -587,6 +642,11 @@ validateArticleForm() {
   return Object.keys(errors).length === 0;
 },
 async saveDraft() {
+  if (!state.isNewArticle && isLiveArticleLifecycle(state.loadedArticle)) {
+    state.showFeedback("Unpublish this article before editing.", "error");
+    return;
+  }
+
   if (!state.canSaveArticle) {
     state.showFeedback("This article belongs to another author. Use moderation actions from the dashboard.", "error");
     return;
@@ -1059,6 +1119,7 @@ const {
   background: #ffffff;
   border: 1px solid #b0bec5;
   display: grid;
+  position: relative;
 }
 
 .markdown-editor.has-error {
@@ -1121,6 +1182,9 @@ const {
 
 .markdown-editor-preview {
   background: #fbfcfc;
+  font: inherit;
+  max-width: 100%;
+  overflow-x: hidden;
   overflow-wrap: anywhere;
 }
 
