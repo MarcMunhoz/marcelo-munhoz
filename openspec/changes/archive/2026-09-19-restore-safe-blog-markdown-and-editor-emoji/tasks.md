@@ -46,5 +46,5 @@
 - [x] 7.2 Add Cypress coverage for keyboard opening, searching, selecting, and inserting emoji in the administrative editor without mutating external provider data.
 - [x] 7.3 Run the focused and full containerized Vitest suites, coverage thresholds, lint, production build, built-asset credential scan, and Chrome and Firefox Cypress matrices.
 - [x] 7.4 Validate all OpenSpec specifications in strict mode and confirm the change artifacts contain no placeholders, contradictions, local paths, secrets, or private environment identifiers.
-- [ ] 7.5 Validate the affected article in an exact-commit Netlify Deploy Preview, confirming semantic Markdown, safe external links, the responsive player, CSP compatibility, emoji preservation, and no document-level overflow.
-- [ ] 7.6 Record sanitized completion evidence and prepare the change for review without merging a pull request or modifying production content automatically.
+- [x] 7.5 Validate the affected article in an exact-commit Netlify Deploy Preview, confirming semantic Markdown, safe external links, the responsive player, CSP compatibility, emoji preservation, and no document-level overflow.
+- [x] 7.6 Record sanitized completion evidence and prepare the change for review without merging a pull request or modifying production content automatically.

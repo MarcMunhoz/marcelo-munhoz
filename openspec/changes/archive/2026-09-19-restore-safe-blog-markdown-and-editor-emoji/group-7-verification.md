@@ -14,6 +14,10 @@ The deterministic public journey now covers semantic Markdown, safe external-lin
 - The focused change and all repository specifications passed strict OpenSpec validation: 11 of 11 items.
 - The diff whitespace check passed. The change-artifact audit found no placeholders, contradictory pending-group statements, local machine paths, private endpoints, private-key markers, or credential-like assignments.
 
-### Deploy Preview pending
+### Deploy Preview verification
 
-Exact-commit Netlify Deploy Preview validation remains pending. The current work has not been committed or published, so there is no immutable deployment SHA or affected published article URL against which to verify semantic rendering, CSP playback, responsive containment, and preserved emoji. No commit, push, pull request, production-content mutation, or deployment was performed automatically.
+- The affected published article was validated in the Netlify branch deploy for exact commit `80e057d` on September 19, 2026.
+- Wide and compact viewport checks confirmed semantic Markdown presentation, preserved Unicode emoji, safe external-link rendering, and no document-level horizontal overflow.
+- The approved player loaded successfully, remained contained at a responsive 16:9 ratio, and produced no Content Security Policy violation in the browser console.
+- The only visible console warning concerned unavailable media adapters and was unrelated to the Content Security Policy or article rendering.
+- The verification did not merge a pull request or modify production content.
