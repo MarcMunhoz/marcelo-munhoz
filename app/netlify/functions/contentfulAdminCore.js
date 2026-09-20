@@ -982,6 +982,12 @@ const ensureCanEditArticle = (article = {}, session = {}) => {
   }
 };
 
+const ensureArticleIsNotLive = (article = {}) => {
+  if (article.lifecycleStatus === "published" || article.lifecycleStatus === "changed") {
+    throw new ContentfulAdminLifecycleError("Unpublish this article before editing.");
+  }
+};
+
 const normalizedEditorialRequest = (entry = {}, locale) => {
   const fields = entry.fields || {};
 
@@ -1581,7 +1587,9 @@ export const createContentfulManagementFacade = ({
         throw error;
       }
 
-      ensureCanEditArticle(normalizedArticle(existingEntry, config.locale), authorResolution.session);
+      const existingArticle = normalizedArticle(existingEntry, config.locale);
+      ensureCanEditArticle(existingArticle, authorResolution.session);
+      ensureArticleIsNotLive(existingArticle);
 
       return request({
         method: "PUT",

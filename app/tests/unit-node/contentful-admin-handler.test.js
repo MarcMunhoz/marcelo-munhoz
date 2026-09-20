@@ -6,6 +6,7 @@ import {
   CloudinaryMediaRequestError,
   ContentfulAdminAuthorizationError,
   ContentfulAdminConfigurationError,
+  ContentfulAdminLifecycleError,
   ContentfulAuthorProfileResolutionError,
   ContentfulManagementRequestError,
   ContentfulVersionConflictError,
@@ -532,6 +533,27 @@ describe("contentful admin handler", () => {
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(parse(response), { draft: { id: "draft-1" }, writer: "user-123" });
+  });
+
+  it("maps a live-article update rejection to a stable lifecycle response", async () => {
+    const handler = createContentfulAdminHandler({
+      getSession: () => createSession(["writer"]),
+      logger: { error() {} },
+      operations: {
+        async updateArticleDraft() {
+          throw new ContentfulAdminLifecycleError("Unpublish this article before editing.");
+        },
+      },
+    });
+
+    const response = await handler({
+      method: "PUT",
+      path: "/articles/article-1",
+      body: JSON.stringify({ version: 8, title: "Blocked update" }),
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(parse(response), { error: "Unpublish this article before editing." });
   });
 
   it("rejects authenticated users without writer role before writer operations run", async () => {

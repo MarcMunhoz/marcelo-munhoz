@@ -61,7 +61,6 @@ vi.mock("../../src/utils/cloudinaryMediaEditor.js", () => {
 import AdminArticleEditor from "../../src/pages/AdminArticleEditor.vue";
 
 const writer = { subject: "writer-1", authorEntryId: "author-1", name: "Writer One", roles: ["writer"], preview: true };
-const owner = { subject: "owner-1", authorEntryId: "author-owner", name: "Owner One", roles: ["owner"], preview: true };
 const editableArticle = (overrides = {}) => ({
   id: "article-1",
   title: "Existing article",
@@ -452,7 +451,7 @@ describe("rendered article editor", () => {
     expect(edited.router.currentRoute.value.path).toBe("/admin");
   });
 
-  it("guards unsaved navigation and exposes role-specific terminal actions", async () => {
+  it("guards unsaved navigation and preserves draft review actions", async () => {
     const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
     const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
     inputByLabel(mounted.wrapper, "Description").vm.$emit("update:modelValue", "Unsaved description");
@@ -471,22 +470,33 @@ describe("rendered article editor", () => {
     await buttonByText(review.wrapper, "Submit for review").trigger("click");
     await flushPromises();
     expect(controls.review).toHaveBeenCalledWith(expect.objectContaining({ articleId: "article-1", version: 7, session: writer }));
+  });
 
-    controls.listArticles.mockReset().mockResolvedValue({ articles: [editableArticle({ status: "published", lifecycleStatus: "published" })], session: {} });
-    const published = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
-    await buttonByText(published.wrapper, "Request unpublication").trigger("click");
-    await flushPromises();
-    expect(controls.requestUnpublication).toHaveBeenCalledWith(expect.objectContaining({ articleId: "article-1", version: 7, session: writer }));
-
-    controls.session = owner;
-    controls.listArticles.mockReset().mockResolvedValue({
-      articles: [editableArticle({ author: "Owner One", authorName: "Owner One", authorEntryId: "author-owner", writerSubject: "owner-1", status: "published", lifecycleStatus: "published" })],
+  it.each(["published", "changed"])("blocks direct editing when the authoritative lifecycle is %s", async (lifecycleStatus) => {
+    controls.listArticles.mockResolvedValue({
+      articles: [editableArticle({ status: lifecycleStatus === "changed" ? "review" : "published", lifecycleStatus })],
       session: {},
     });
-    const owned = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
-    await buttonByText(owned.wrapper, "Unpublish").trigger("click");
+    const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+
+    expect(mounted.wrapper.get(".editor-live-blocked").text()).toContain("Unpublish before editing");
+    expect(mounted.wrapper.find('[aria-label="Article language"]').exists()).toBe(false);
+    expect(mounted.wrapper.find("form").exists()).toBe(false);
+    expect(buttonByText(mounted.wrapper, "Save")).toBeUndefined();
+    expect(buttonByText(mounted.wrapper, "Request unpublication")).toBeUndefined();
+    expect(buttonByText(mounted.wrapper, "Unpublish")).toBeUndefined();
+    expect(controls.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale save when the loaded lifecycle becomes live", async () => {
+    const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const editor = mounted.wrapper.findComponent(AdminArticleEditor);
+    editor.vm.loadedArticle.lifecycleStatus = "published";
+    await editor.vm.saveDraft();
     await flushPromises();
-    expect(controls.unpublish).toHaveBeenCalledWith(expect.objectContaining({ articleId: "article-1", version: 7, session: owner }));
+
+    expect(controls.update).not.toHaveBeenCalled();
+    expect(mounted.wrapper.get(".feedback-error").text()).toBe("Unpublish this article before editing.");
   });
 
   it("handles media and tag edge cases without persisting incomplete editor state", async () => {

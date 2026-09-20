@@ -41,14 +41,14 @@ const writerSession = {
 };
 const ownerSession = { subject: "owner-1", name: "Owner One", roles: ["owner"], preview: true };
 
-const article = ({ id, title, status, author = "Writer One", authorEntryId = "author-1", tags = ["testing"], createAt = "2026-08-20" }) => ({
+const article = ({ id, title, status, lifecycleStatus, author = "Writer One", authorEntryId = "author-1", tags = ["testing"], createAt = "2026-08-20" }) => ({
   id,
   title,
   slug: title.toLowerCase().replace(/\s+/g, "-"),
   description: `${title} description`,
   body: `${title} body`,
   status,
-  lifecycleStatus: status === "review" ? "draft" : status === "unpublicationRequested" ? "published" : status,
+  lifecycleStatus: lifecycleStatus || (status === "review" ? "draft" : status === "unpublicationRequested" ? "published" : status),
   author,
   authorName: author,
   authorEntryId,
@@ -207,6 +207,26 @@ describe("rendered admin dashboard", () => {
     expect(mounted.wrapper.text()).toContain("Review");
     expect(mounted.wrapper.text()).toContain("Request unpublication");
     expect(mounted.wrapper.text()).not.toContain("Delete permanently");
+  });
+
+  it("keeps live article takedown actions while hiding edit and direct publish changes", async () => {
+    const changed = article({ id: "changed-1", title: "Live changes", status: "review", lifecycleStatus: "changed" });
+    controls.list.mockResolvedValue(dashboardPayload([fixtures[1], changed]));
+    const writerView = await mountAdmin({ media: { "(max-width: 720px)": true } });
+
+    for (const card of writerView.wrapper.findAllComponents({ name: "AdminArticleCard" })) {
+      expect(card.text()).not.toContain("Edit");
+      expect(card.text()).toContain("Request unpublication");
+    }
+
+    writerView.wrapper.unmount();
+    controls.session = { ...ownerSession, subject: "writer-1", authorEntryId: "author-1" };
+    const ownerView = await mountAdmin({ media: { "(max-width: 720px)": true } });
+    const changedCard = ownerView.wrapper.findAllComponents({ name: "AdminArticleCard" })
+      .find((card) => card.props("article").id === "changed-1");
+    expect(changedCard.text()).not.toContain("Edit");
+    expect(changedCard.text()).not.toContain("Publish changes");
+    expect(changedCard.text()).toContain("Unpublish");
   });
 
   it("routes owner lifecycle events from compact cards and keeps API failures visible", async () => {
