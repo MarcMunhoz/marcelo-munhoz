@@ -1,6 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBrowserState, createRouter, createTestMount, installBrowserPolyfills } from "../harness/index.js";
+import markdownFixture from "../fixtures/article-markdown-regression.json";
 
 const controls = vi.hoisted(() => ({
   session: null,
@@ -18,7 +19,10 @@ const controls = vi.hoisted(() => ({
   unpublish: vi.fn(),
   editorConfig: vi.fn(),
   openEditor: vi.fn(),
+  loadPicker: vi.fn(),
 }));
+
+vi.mock("../../src/utils/emojiPicker.js", () => ({ createEmojiPicker: (...args) => controls.loadPicker(...args) }));
 
 vi.mock("../../src/utils/adminAuth.js", () => ({
   getAdminSession: vi.fn(async () => controls.session),
@@ -57,7 +61,6 @@ vi.mock("../../src/utils/cloudinaryMediaEditor.js", () => {
 import AdminArticleEditor from "../../src/pages/AdminArticleEditor.vue";
 
 const writer = { subject: "writer-1", authorEntryId: "author-1", name: "Writer One", roles: ["writer"], preview: true };
-const owner = { subject: "owner-1", authorEntryId: "author-owner", name: "Owner One", roles: ["owner"], preview: true };
 const editableArticle = (overrides = {}) => ({
   id: "article-1",
   title: "Existing article",
@@ -127,6 +130,13 @@ beforeEach(() => {
   controls.unpublish.mockReset().mockResolvedValue({});
   controls.editorConfig.mockReset().mockResolvedValue({ mediaEditor: { cloudName: "demo" } });
   controls.openEditor.mockReset().mockResolvedValue(undefined);
+  controls.loadPicker.mockReset().mockImplementation(async (host) => {
+    const picker = document.createElement("div");
+    picker.dataset.testPicker = "true";
+    picker.attachShadow({ mode: "open" }).appendChild(document.createElement("input"));
+    host.appendChild(picker);
+    return picker;
+  });
 });
 
 afterEach(() => {
@@ -135,6 +145,165 @@ afterEach(() => {
 });
 
 describe("rendered article editor", () => {
+  it.each([[3, 3], [3, 11]])("inserts emoji at saved selection %s:%s, restores focus and guards dirty navigation", async (start, end) => {
+    const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const textarea = mounted.wrapper.get("textarea[aria-label='Body']");
+    const original = textarea.element.value;
+    textarea.element.focus();
+    textarea.element.setSelectionRange(start, end);
+    const trigger = mounted.wrapper.get("button[aria-label='Insert emoji']");
+    await trigger.trigger("click");
+    await flushPromises();
+    const picker = mounted.wrapper.get("[data-test-picker]");
+    expect(picker.element.shadowRoot.activeElement).toBe(picker.element.shadowRoot.querySelector("input"));
+    textarea.element.setSelectionRange(0, 0);
+    picker.element.dispatchEvent(new CustomEvent("emoji-click", { detail: { unicode: "👩🏽‍💻" } }));
+    await flushPromises();
+    expect(textarea.element.value).toBe(original.slice(0, start) + "👩🏽‍💻" + original.slice(end));
+    expect(document.activeElement).toBe(textarea.element);
+    expect(textarea.element.selectionStart).toBe(start + 7);
+    expect(textarea.element.selectionEnd).toBe(start + 7);
+    expect(trigger.attributes("aria-expanded")).toBe("false");
+    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
+    await mounted.router.push("/admin");
+    expect(confirm).toHaveBeenCalled();
+  });
+
+  it("inserts at a selection moved while the floating picker remains open", async () => {
+    const { wrapper } = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const textarea = wrapper.get("textarea[aria-label='Body']");
+    const original = textarea.element.value;
+    textarea.element.setSelectionRange(2, 2);
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+
+    const movedCaret = original.length - 2;
+    textarea.element.focus();
+    textarea.element.setSelectionRange(movedCaret, movedCaret);
+    await textarea.trigger("select");
+    wrapper.get("[data-test-picker]").element.dispatchEvent(new CustomEvent("emoji-click", { detail: { unicode: "🌻" } }));
+    await flushPromises();
+
+    expect(textarea.element.value).toBe(`${original.slice(0, movedCaret)}🌻${original.slice(movedCaret)}`);
+    expect(textarea.element.selectionStart).toBe(movedCaret + 2);
+  });
+
+  it("moves the floating picker by its handle and keeps it inside the body editor", async () => {
+    window.happyDOM.setWindowSize({ width: 1280, height: 800 });
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+    const editor = wrapper.get(".markdown-editor");
+    const panel = wrapper.get(".emoji-picker-panel");
+    editor.element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 });
+    panel.element.getBoundingClientRect = () => ({ left: 432, top: 80, right: 792, bottom: 480, width: 360, height: 400 });
+
+    await wrapper.get("button[aria-label='Move emoji picker']").trigger("pointerdown", { clientX: 450, clientY: 100, pointerId: 1 });
+    window.dispatchEvent(Object.assign(new Event("pointermove"), { clientX: 1000, clientY: 900, pointerId: 1 }));
+    window.dispatchEvent(Object.assign(new Event("pointerup"), { pointerId: 1 }));
+    await flushPromises();
+
+    expect(panel.attributes("style")).toContain("left: 432px");
+    expect(panel.attributes("style")).toContain("top: 192px");
+  });
+
+  it("moves the floating picker from its focused handle with arrow keys", async () => {
+    window.happyDOM.setWindowSize({ width: 1280, height: 800 });
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+    const editor = wrapper.get(".markdown-editor");
+    const panel = wrapper.get(".emoji-picker-panel");
+    editor.element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 });
+    panel.element.getBoundingClientRect = () => ({ left: 400, top: 80, right: 760, bottom: 480, width: 360, height: 400 });
+
+    const handle = wrapper.get("button[aria-label='Move emoji picker']");
+    await handle.trigger("keydown", { key: "ArrowLeft" });
+    await handle.trigger("keydown", { key: "ArrowDown" });
+
+    expect(panel.attributes("style")).toContain("left: 384px");
+    expect(panel.attributes("style")).toContain("top: 96px");
+  });
+
+  it("resets a dragged position and disables movement when the viewport becomes compact", async () => {
+    window.happyDOM.setWindowSize({ width: 1280, height: 800 });
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    await flushPromises();
+    const editor = wrapper.get(".markdown-editor");
+    const panel = wrapper.get(".emoji-picker-panel");
+    editor.element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 });
+    panel.element.getBoundingClientRect = () => ({ left: 432, top: 80, right: 792, bottom: 480, width: 360, height: 400 });
+    const handle = wrapper.get("button[aria-label='Move emoji picker']");
+    await handle.trigger("keydown", { key: "ArrowLeft" });
+    expect(panel.attributes("style")).toContain("left: 416px");
+
+    window.happyDOM.setWindowSize({ width: 600, height: 800 });
+    window.dispatchEvent(new Event("resize"));
+    await flushPromises();
+
+    expect(panel.attributes("style")).toBeUndefined();
+    expect(handle.attributes("disabled")).toBeDefined();
+  });
+
+  it("dismisses by Escape or close without changing source and disables emoji in preview", async () => {
+    const { wrapper, router } = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const trigger = wrapper.get("button[aria-label='Insert emoji']");
+    await trigger.trigger("click");
+    await flushPromises();
+    await wrapper.get(".emoji-picker-panel").trigger("keydown", { key: "Escape" });
+    expect(document.activeElement).toBe(trigger.element);
+    await trigger.trigger("click");
+    await flushPromises();
+    await wrapper.get("button[aria-label='Close emoji picker']").trigger("click");
+    expect(wrapper.find(".emoji-picker-panel").exists()).toBe(false);
+    wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "preview");
+    await flushPromises();
+    expect(trigger.attributes("disabled")).toBeDefined();
+    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
+    await router.push("/admin");
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("keeps typing available after picker failure and ignores a load completed after dismissal", async () => {
+    controls.loadPicker.mockRejectedValueOnce(new Error("Unavailable"));
+    const { wrapper } = await mountEditor();
+    const trigger = wrapper.get("button[aria-label='Insert emoji']");
+    await trigger.trigger("click");
+    await flushPromises();
+    expect(wrapper.get(".emoji-picker-panel [role='alert']").text()).toContain("unavailable");
+    await wrapper.get("button[aria-label='Close emoji picker']").trigger("click");
+    let resolve;
+    controls.loadPicker.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    await trigger.trigger("click");
+    const close = wrapper.get("button[aria-label='Close emoji picker']");
+    expect(document.activeElement).toBe(close.element);
+    await close.trigger("keydown", { key: "Escape" });
+    resolve(document.createElement("div"));
+    await flushPromises();
+    expect(wrapper.find(".emoji-picker-panel").exists()).toBe(false);
+    await wrapper.get("textarea[aria-label='Body']").setValue("Still editable 🌻");
+    expect(wrapper.get("textarea[aria-label='Body']").element.value).toBe("Still editable 🌻");
+  });
+
+  it("does not steal focus when delayed initialization finishes while the author types", async () => {
+    let complete;
+    controls.loadPicker.mockImplementationOnce((host) => new Promise((resolve) => {
+      complete = () => {
+        const picker = document.createElement("div");
+        picker.attachShadow({ mode: "open" }).appendChild(document.createElement("input"));
+        host.appendChild(picker);
+        resolve(picker);
+      };
+    }));
+    const { wrapper } = await mountEditor();
+    await wrapper.get("button[aria-label='Insert emoji']").trigger("click");
+    const textarea = wrapper.get("textarea[aria-label='Body']");
+    textarea.element.focus();
+    complete();
+    await flushPromises();
+    expect(document.activeElement).toBe(textarea.element);
+  });
   it("initializes create mode, derives the slug until touched, and switches locale and Markdown preview", async () => {
     const mounted = await mountEditor();
 
@@ -156,7 +325,40 @@ describe("rendered article editor", () => {
     await mounted.wrapper.get("textarea[aria-label='Body']").setValue("## Preview heading");
     mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "preview");
     await flushPromises();
-    expect(mounted.wrapper.get(".markdown-editor-preview").text()).toBe("## Preview heading");
+    expect(mounted.wrapper.get(".markdown-editor-preview h2").text()).toBe("Preview heading");
+  });
+
+  it("previews the public presentation safely and preserves source selection across mode changes", async () => {
+    const mounted = await mountEditor();
+    const textarea = mounted.wrapper.get("textarea[aria-label='Body']");
+    await textarea.setValue(markdownFixture.markdown);
+    textarea.element.focus();
+    textarea.element.setSelectionRange(5, 20);
+
+    expect(mounted.wrapper.find(".markdown-editor-preview").exists()).toBe(false);
+    expect(mounted.wrapper.find(".article-video iframe").exists()).toBe(false);
+
+    mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "preview");
+    await flushPromises();
+    const preview = mounted.wrapper.get(".markdown-editor-preview");
+    const player = preview.get(".article-video iframe");
+
+    expect(preview.get("h2").text()).toBe("Safe formatting");
+    expect(preview.get("em").text()).toBe("boring");
+    expect(preview.text()).toContain(markdownFixture.existingEmoji);
+    expect(preview.find("script").exists()).toBe(false);
+    expect(preview.find("[onerror]").exists()).toBe(false);
+    expect(preview.find("a[href^='javascript:']").exists()).toBe(false);
+    expect(player.attributes("src")).toBe(markdownFixture.expectedVideoUrl);
+    expect(preview.classes()).toContain("article-markdown-preview");
+
+    mounted.wrapper.findComponent({ name: "QBtnToggle" }).vm.$emit("update:modelValue", "editor");
+    await flushPromises();
+    expect(mounted.wrapper.find(".markdown-editor-preview").exists()).toBe(false);
+    expect(mounted.wrapper.find(".article-video iframe").exists()).toBe(false);
+    expect(textarea.element.value).toBe(markdownFixture.markdown);
+    expect(textarea.element.selectionStart).toBe(5);
+    expect(textarea.element.selectionEnd).toBe(20);
   });
 
   it("loads edit mode with locale, tags, image, and ownership restrictions", async () => {
@@ -249,7 +451,7 @@ describe("rendered article editor", () => {
     expect(edited.router.currentRoute.value.path).toBe("/admin");
   });
 
-  it("guards unsaved navigation and exposes role-specific terminal actions", async () => {
+  it("guards unsaved navigation and preserves draft review actions", async () => {
     const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
     const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
     inputByLabel(mounted.wrapper, "Description").vm.$emit("update:modelValue", "Unsaved description");
@@ -268,22 +470,33 @@ describe("rendered article editor", () => {
     await buttonByText(review.wrapper, "Submit for review").trigger("click");
     await flushPromises();
     expect(controls.review).toHaveBeenCalledWith(expect.objectContaining({ articleId: "article-1", version: 7, session: writer }));
+  });
 
-    controls.listArticles.mockReset().mockResolvedValue({ articles: [editableArticle({ status: "published", lifecycleStatus: "published" })], session: {} });
-    const published = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
-    await buttonByText(published.wrapper, "Request unpublication").trigger("click");
-    await flushPromises();
-    expect(controls.requestUnpublication).toHaveBeenCalledWith(expect.objectContaining({ articleId: "article-1", version: 7, session: writer }));
-
-    controls.session = owner;
-    controls.listArticles.mockReset().mockResolvedValue({
-      articles: [editableArticle({ author: "Owner One", authorName: "Owner One", authorEntryId: "author-owner", writerSubject: "owner-1", status: "published", lifecycleStatus: "published" })],
+  it.each(["published", "changed"])("blocks direct editing when the authoritative lifecycle is %s", async (lifecycleStatus) => {
+    controls.listArticles.mockResolvedValue({
+      articles: [editableArticle({ status: lifecycleStatus === "changed" ? "review" : "published", lifecycleStatus })],
       session: {},
     });
-    const owned = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
-    await buttonByText(owned.wrapper, "Unpublish").trigger("click");
+    const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+
+    expect(mounted.wrapper.get(".editor-live-blocked").text()).toContain("Unpublish before editing");
+    expect(mounted.wrapper.find('[aria-label="Article language"]').exists()).toBe(false);
+    expect(mounted.wrapper.find("form").exists()).toBe(false);
+    expect(buttonByText(mounted.wrapper, "Save")).toBeUndefined();
+    expect(buttonByText(mounted.wrapper, "Request unpublication")).toBeUndefined();
+    expect(buttonByText(mounted.wrapper, "Unpublish")).toBeUndefined();
+    expect(controls.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale save when the loaded lifecycle becomes live", async () => {
+    const mounted = await mountEditor({ initialPath: "/admin/articles/article-1/edit" });
+    const editor = mounted.wrapper.findComponent(AdminArticleEditor);
+    editor.vm.loadedArticle.lifecycleStatus = "published";
+    await editor.vm.saveDraft();
     await flushPromises();
-    expect(controls.unpublish).toHaveBeenCalledWith(expect.objectContaining({ articleId: "article-1", version: 7, session: owner }));
+
+    expect(controls.update).not.toHaveBeenCalled();
+    expect(mounted.wrapper.get(".feedback-error").text()).toBe("Unpublish this article before editing.");
   });
 
   it("handles media and tag edge cases without persisting incomplete editor state", async () => {
