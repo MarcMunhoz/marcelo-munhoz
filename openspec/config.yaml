@@ -1,20 +1,24 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  This repository contains a Node.js 22 application built with Vue 3, Quasar 2, and Vite.
+  Netlify Functions provide public and administrative boundaries around Contentful and Cloudinary integrations.
+  Run package-manager, dependency, build, lint, test, scan, and browser commands only inside the project container.
+  Never read or publish .env files, secrets, credentials, private keys, private URLs, local paths, or machine identifiers; use sanitized placeholders in artifacts.
+  Keep changes limited to the requested outcome and preserve unrelated application behavior, dependencies, main specifications, and archived changes.
+  Synchronize every change's delta specs into the main specifications before archiving it.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - State the requested scope, explicit non-goals, affected areas, and compatibility impact concisely.
+    - For tooling, documentation, or refactoring with no product requirement change, use skip_specs instead of inventing a capability.
+  specs:
+    - Describe only changed product behavior using normative MUST or SHALL requirements and concrete WHEN/THEN scenarios.
+    - Preserve requirements and scenarios unrelated to the requested change.
+  design:
+    - Record material alternatives, rationale, risks, migration order, and rollback when they affect implementation safety.
+    - Use repository-relative references and sanitized placeholders; never include sensitive or machine-specific information.
+  tasks:
+    - Order tasks by dependency and make each task independently verifiable with the smallest relevant validation.
+    - Run package-manager and validation commands only in the project container, and do not repeat a passing gate without a concrete technical reason.
+    - Include successful delta-spec synchronization as a required step before archival whenever delta specs exist.
