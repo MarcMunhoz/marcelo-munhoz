@@ -1,9 +1,9 @@
 ## 1. Baseline de dependências e segurança
 
-- [ ] 1.1 Registrar no relatório sanitizado os alertas Dependabot abertos, agrupando duplicidades entre manifesto e lockfile por advisory e pacote.
-- [ ] 1.2 Executar em container `npm audit`, `npm outdated` e a inspeção das versões resolvidas, salvando somente os resultados sanitizados necessários para o baseline.
-- [ ] 1.3 Mapear cada advisory do Dependabot e do audit local para pacote direto ou transitivo, cadeia de dependência, escopo de runtime ou desenvolvimento e primeira versão corrigida.
-- [ ] 1.4 Registrar engines, peer dependencies, pins exatos e overrides atuais, identificando incompatibilidades ou entradas sem correspondência na árvore resolvida.
+- [x] 1.1 Registrar no relatório sanitizado os alertas Dependabot abertos, agrupando duplicidades entre manifesto e lockfile por advisory e pacote.
+- [x] 1.2 Executar em container `npm audit`, `npm outdated` e a inspeção das versões resolvidas, salvando somente os resultados sanitizados necessários para o baseline.
+- [x] 1.3 Mapear cada advisory do Dependabot e do audit local para pacote direto ou transitivo, cadeia de dependência, escopo de runtime ou desenvolvimento e primeira versão corrigida.
+- [x] 1.4 Registrar engines, peer dependencies, pins exatos e overrides atuais, identificando incompatibilidades ou entradas sem correspondência na árvore resolvida.
 
 ## 2. Remediação das dependências de runtime
 

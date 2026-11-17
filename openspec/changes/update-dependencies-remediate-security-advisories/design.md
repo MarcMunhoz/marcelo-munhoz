@@ -1,6 +1,6 @@
 ## Contexto
 
-A aplicação usa Node.js 22, Vue 3, Quasar 2 e Vite, com Functions e middleware Express. A árvore atual contém 36 dependências diretas e 669 entradas no lockfile. O Dependabot registra 34 alertas abertos, equivalentes a 27 advisories distintos em 11 pacotes: 16 alertas atingem dependências de runtime e 18 atingem dependências de desenvolvimento.
+A aplicação usa Node.js 22, Vue 3, Quasar 2 e Vite, com Functions e middleware Express. A árvore atual contém 37 dependências diretas, sendo 16 de runtime e 21 de desenvolvimento, além de 669 entradas de pacotes no lockfile. O Dependabot registra 34 alertas abertos, equivalentes a 27 advisories distintos em 11 pacotes: 16 alertas atingem dependências de runtime e 18 atingem dependências de desenvolvimento.
 
 Os riscos imediatos concentram-se em DOMPurify, Quasar e transitivas de runtime como `follow-redirects`, `body-parser`, `qs` e `source-map-js`. A atualização de `happy-dom` cruza uma versão major, enquanto Vitest, Vite, Cypress e suas transitivas exigem alinhamento de engines e peer dependencies. O projeto já possui uma plataforma de validação containerizada e a capacidade `dependency-maintenance` estabelece reconciliação entre Dependabot e `npm audit`, atualização compatível, documentação de exceções e validação funcional.
 
