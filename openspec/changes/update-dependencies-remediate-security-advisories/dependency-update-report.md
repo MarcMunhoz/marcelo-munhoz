@@ -3,10 +3,10 @@
 ## Estado da passagem
 
 - Data do baseline: 2026-11-17.
-- Escopo concluído neste registro: grupo 1, baseline de dependências e segurança.
+- Escopo concluído neste registro: grupos 1, 2 e 3, baseline e remediação das dependências de runtime e desenvolvimento.
 - Manifestos analisados: `app/package.json` e `app/package-lock.json`.
-- Nenhuma dependência foi instalada ou atualizada e nenhum manifesto foi alterado durante o baseline.
-- Toda operação npm foi executada em container efêmero e somente leitura; nenhuma operação npm foi executada no host.
+- O baseline não alterou dependências; os grupos 2 e 3 atualizaram somente os manifestos e as resoluções necessárias às cadeias selecionadas.
+- Toda operação npm, instalação limpa, inspeção, teste e build foi executada em container; nenhuma operação npm foi executada no host.
 
 ## Fronteira e metodologia
 
@@ -36,7 +36,102 @@ docker run --rm --read-only --tmpfs /tmp --tmpfs /npm-cache -w /workspace \
 
 Os preloads acima representam os controles efêmeros efetivamente injetados no container: `<preload-bulk-only>` rejeitou o fallback Quick Audit, e `<preload-virtual-tree>` direcionou o comando `outdated` ao lockfile. Eles não fazem parte da aplicação nem permaneceram no workspace.
 
-## Resumo reconciliado
+## Remediação de runtime — grupo 2
+
+O lockfile foi regenerado em workspace sanitizado dentro de `node:22.22.2-alpine`, sem `.npmrc`, arquivos `.env`, código-fonte ou scripts de pacote. A atualização seletiva preservou o restante da árvore e alterou somente dependências diretas selecionadas, seus ramos necessários e transitivas vulneráveis identificadas no baseline.
+
+### Versões diretas atualizadas
+
+| Pacote | Versão anterior | Versão final | Motivo |
+| --- | --- | --- | --- |
+| `axios` | `1.20.0` | `1.21.1` | Permitir a resolução corrigida de `follow-redirects` e manter o cliente HTTP na versão compatível mais recente. |
+| `dompurify` | `3.4.15` | `3.4.18` | Corrigir os cinco advisories conhecidos de sanitização, incluindo o advisory adicional encontrado pelo audit local. |
+| `express` | `5.2.1` | `5.3.0` | Atualizar os ramos de `body-parser`, `proxy-addr` e `qs` para versões corrigidas. |
+| `quasar` | `2.27.0` | `2.35.5` | Corrigir GHSA-89vp-x45c-52cq e permanecer dentro dos peers dos plugins atuais. |
+| `vue` | `3.5.41` | `3.5.45` | Corrigir `@vue/server-renderer` e manter todos os pacotes Vue alinhados. |
+
+### Resoluções transitivas verificadas
+
+| Pacote | Versão anterior | Versão final | Situação |
+| --- | --- | --- | --- |
+| `follow-redirects` | `1.16.0` | `1.16.3` | Acima das primeiras versões corrigidas dos três advisories conhecidos. |
+| `body-parser` | `2.3.0` | `2.4.0` | Corrige GHSA-27r3-jxmh-p828. |
+| `proxy-addr` | `2.0.7` | `2.0.8` | Corrige GHSA-jqcg-44mw-7w3h. |
+| `qs` | `6.15.3` | `6.17.1` | Corrige os três advisories conhecidos e é compartilhado pelos ramos Express e Cypress. |
+| `source-map-js` | `1.2.1` | `1.2.2` | Corrige GHSA-68fv-2mgg-jv7q. |
+| `@vue/server-renderer` | `3.5.41` | `3.5.45` | Corrige GHSA-g2v6-rqmx-r4w6 e permanece alinhado a `vue`. |
+
+As atualizações de compiladores Vue, parser Babel e PostCSS presentes no diff são consequências das faixas das dependências diretas atualizadas e mantêm versões únicas coerentes na árvore. Nenhum override foi adicionado ou alterado neste grupo.
+
+### Compatibilidade e validação
+
+- A instalação limpa por `npm ci --ignore-scripts` concluiu com 592 pacotes instalados e lockfile sincronizado.
+- A árvore efetiva foi verificada com `npm ls --all`, sem dependências inválidas; Quasar `2.35.5` continua dentro dos peers `^2.24.0` de `@quasar/app-vite` e `@quasar/vite-plugin`.
+- Os testes direcionados de DOMPurify, conteúdo editorial e previews concluíram com 3 arquivos e 46 testes aprovados.
+- Os testes direcionados de middleware, contratos, router, shell, layout e páginas públicas concluíram com 7 arquivos e 129 testes aprovados.
+- O build SPA de produção concluiu com sucesso usando Quasar `2.35.5`, `@quasar/app-vite` `3.8.1` e Vite `8.2.2`.
+- Nenhuma alteração de código-fonte, configuração ou teste foi necessária: os contratos observáveis permaneceram válidos com as novas versões.
+
+### Exceção e audit do grupo
+
+`picomatch@4.0.7` permanece na árvore por `vue-router`, `@quasar/app-vite`, Vitest e seus utilitários. Em 2026-11-18, `4.0.7` ainda era a versão mais recente publicada e o advisory GHSA-fc5q-39xc-vjpf não informava uma versão corrigida; forçar downgrade de pais ou override sem release segura não é uma remediação válida.
+
+O `npm ci` informou 27 vulnerabilidades agregadas na árvore completa, incluindo dependências de desenvolvimento ainda reservadas aos próximos grupos. Duas tentativas de `npm audit --omit=dev --json` falharam por indisponibilidade de DNS do registry e não produziram resultado utilizável. O audit final permanece pendente na tarefa 5.1; a conclusão deste grupo se apoia nas versões corrigidas conferidas na árvore, nos advisories mapeados e nos gates funcionais direcionados.
+
+## Remediação de desenvolvimento — grupo 3
+
+O grupo atualizou somente dependências diretas necessárias aos advisories e transitivas permitidas pelos intervalos dos pais existentes. Cypress, sua imagem de navegadores e os pacotes opcionais sem benefício de segurança permaneceram inalterados.
+
+### Versões diretas atualizadas
+
+| Pacote | Versão anterior | Versão final | Motivo |
+| --- | --- | --- | --- |
+| `vitest` | `4.1.11` | `4.1.12` | Manter a linha 4 e alinhar os pacotes internos com as correções de `@vitest/mocker`. |
+| `@vitest/coverage-v8` | `4.1.11` | `4.1.12` | Preservar o peer exato de Vitest e a instrumentação V8. |
+| `happy-dom` | `20.12.0` | `21.0.4` | Menor versão que corrige conjuntamente GHSA-5fpq-26gf-qwcr, GHSA-c8p4-j97h-3vg8 e GHSA-834v-8h66-3h79. |
+| `eslint` | `10.9.1` | `10.15.0` | Primeiro pai seguro que substitui o ramo vulnerável de `minimatch` 10 pelo ramo 11. |
+| `eslint-plugin-vue` | `10.10.0` | `10.12.1` | Elevar o piso corrigido de `postcss-selector-parser` e preservar os peers de ESLint e Vue parser. |
+| `concurrently` | `10.0.5` | `10.0.7` | Substituir o pin vulnerável de `shell-quote` por uma resolução corrigida. |
+
+### Resoluções transitivas verificadas
+
+| Pacote | Versão anterior | Versão final | Situação |
+| --- | --- | --- | --- |
+| `@vitest/mocker` e demais pacotes internos | `4.1.11` | `4.1.12` | Corrigem GHSA-qxg6-89mg-rqv8 e GHSA-xp26-3454-mjgp mantendo versões alinhadas. |
+| `vite` | `8.2.2` | `8.3.8` | Acima da primeira versão corrigida `8.2.4` para os seis advisories conhecidos da linha 8.2. |
+| `systeminformation` | `5.33.7` | `5.33.23` | Corrige os três advisories conhecidos sem atualizar Cypress, cujo intervalo `^5.31.1` aceita a resolução. |
+| `postcss-selector-parser` | `7.1.5` | `7.2.1` | Corrige GHSA-rj75-hqrm-r3gf e permanece no ramo 7 aceito pelo plugin Vue. |
+| `shell-quote` | `1.9.0` | `1.12.0` | Corrige GHSA-pqg4-j6r4-53mv pelo pacote pai `concurrently`. |
+| `serialize-javascript` | `7.1.0` | `7.1.4` | Corrige GHSA-m5mm-p8h7-m29v dentro do intervalo de `@quasar/app-vite`. |
+| `minimatch` no ramo ESLint | `10.2.6` | `11.0.9` | Corrige GHSA-g3hv-75wg-m249; o ramo separado de `@vue/test-utils` permanece documentado como exceção. |
+| `brace-expansion` | `5.0.9` | `5.0.13` | Corrige os três advisories conhecidos e atende aos ramos 10 e 11 de `minimatch`. |
+
+### Compatibilidade, geração e validação
+
+- O npm `10.9.7` encontrou um erro interno do Arborist ao montar peers opcionais de Vitest (`Cannot read properties of null (reading 'edgesOut')`). A geração temporária ignorou peers somente durante o refresh do lockfile; a aceitação exigiu depois `npm ci` normal, sem essa opção, concluído com 602 pacotes.
+- `npm ls --all` confirmou a árvore válida, os peers exatos de Vitest/coverage, Vite compartilhado e todas as resoluções acima sem dependências inválidas.
+- O contrato de configuração do Vitest concluiu com 1 arquivo e 2 testes aprovados; a descoberta listou com sucesso os projetos `unit-node`, `unit-dom` e `component`.
+- Os projetos completos `unit-dom` e `component` concluíram com 21 arquivos e 161 testes aprovados.
+- A instrumentação V8 direcionada concluiu com 1 arquivo e 3 testes aprovados e cobertura integral de `src/App.vue` no recorte executado.
+- O lint completo concluiu sem erros, e o lint localizado permaneceu válido durante a investigação de compatibilidade.
+- O build SPA concluiu com sucesso usando Vite `8.3.8`, Quasar `2.35.5` e `@quasar/app-vite` `3.8.1`.
+- A CLI consumidora Cypress iniciou no container Node compatível e retornou a versão `16.0.0`, validando a inicialização da ferramenta com `systeminformation@5.33.23` sem executar navegador.
+- O `happy-dom` 21 bloqueia por padrão o carregamento externo de páginas de iframe. Os testes que renderizam players confiáveis permanecem aprovados; a mensagem `NotSupportedError` observada no console confirma o bloqueio de rede esperado. Os opt-ins de carregamento não foram habilitados e nenhuma supressão global de erros foi mantida.
+
+### Atualizações avaliadas e exceções
+
+- `@quasar/app-vite`, `@vitejs/plugin-vue`, `@quasar/extras`, Tailwind, Marked, Prettier, Sass, `sass-loader`, `vue-eslint-parser` e `@vue/test-utils` possuem atualizações compatíveis, mas não corrigem advisory adicional desta passagem. Elas foram mantidas para evitar ampliar desnecessariamente a superfície visual, de build ou runtime.
+- Cypress permanece em `16.0.0`; sua transitive `systeminformation` foi corrigida independentemente, evitando misturar a atualização com a imagem de navegadores que ainda possui incompatibilidade conhecida de Node.
+- O `npm ci` passou a informar 18 vulnerabilidades agregadas, 5 moderadas e 13 altas, contra 27 no grupo 2, sem vulnerabilidades críticas. A tentativa de `npm audit --json` voltou a falhar por DNS no endpoint Quick Audit; o detalhamento final permanece reservado à tarefa 5.1.
+
+Riscos adiados conforme `SECURITY.md`:
+
+| Cadeia | Impacto sanitizado | Mitigação | Racional do adiamento | Responsável | Acompanhamento |
+| --- | --- | --- | --- | --- | --- |
+| `@vue/test-utils@2.5.0 → js-beautify@2.0.3 → glob@13.0.6 → minimatch@10.2.6` | Ramo exclusivo de desenvolvimento; não foi demonstrado caminho de entrada não confiável até os padrões usados pelos testes. | Testes operam sobre paths controlados pelo repositório em containers isolados; `brace-expansion` foi atualizado para `5.0.13`. | `@vue/test-utils@2.6.0` conserva a mesma cadeia, e forçar `glob` 14 ou `minimatch` 11 ultrapassa as majors declaradas sem evidência de compatibilidade. | Mantenedor do repositório. | Reavaliar na tarefa 5.1 e quando `@vue/test-utils` ou `js-beautify` publicar uma cadeia corrigida. |
+| `picomatch@4.0.7` por Vite, Vitest, Vue Router e utilitários | Advisory alto no scanner, sem caminho fonte-destino alcançável confirmado para padrões controlados por usuário na aplicação. | Build e testes executam em container; nenhuma API de glob da aplicação é exposta a entrada não confiável; versão mais recente publicada foi mantida. | Não existe versão corrigida publicada, e os pais atuais e mais recentes continuam solicitando `^4.0.7`; downgrade não remove o risco com segurança. | Mantenedor do repositório. | Reavaliar na tarefa 5.1 e após publicação de correção no registry ou atualização dos pacotes pais. |
+
+## Resumo reconciliado do baseline
 
 | Fonte | Resultado | Interpretação |
 | --- | --- | --- |
@@ -50,7 +145,7 @@ Os preloads acima representam os controles efêmeros efetivamente injetados no c
 
 As contagens não são equivalentes: Dependabot mantém alertas separados por manifesto, enquanto npm agrupa advisories por pacote e propaga vulnerabilidade pelos consumidores. Os sete pares duplicados do Dependabot são quatro advisories de `dompurify` e três de `happy-dom` presentes simultaneamente em `package.json` e `package-lock.json`.
 
-## Alertas Dependabot abertos
+## Alertas Dependabot abertos no baseline
 
 | Alertas | Pacote | Severidade | GHSA / CVE | Faixa vulnerável | Primeira correção | Relação | Escopo |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -82,11 +177,11 @@ As contagens não são equivalentes: Dependabot mantém alertas separados por ma
 | #172 | `qs` | Moderada | GHSA-4mjr-xmp4-gh2g / CVE-2026-82417 | `>=2.2.5 <6.16.0` | `6.16.0` | Transitiva | Runtime |
 | #171 | `qs` | Moderada | GHSA-x5fp-wj9c-mxmx / CVE-2026-82562 | `>=6.14.2 <=6.15.3` | `6.16.0` | Transitiva | Runtime |
 
-Todos os 34 alertas informam uma primeira versão corrigida. O snapshot atual mantém as mesmas contagens, pacotes e correções mínimas agregadas registradas na issue #66; a issue não contém os IDs individuais anteriores, portanto não comprova identidade alerta a alerta.
+Todos os 34 alertas informam uma primeira versão corrigida. O snapshot consultado no baseline mantém as mesmas contagens, pacotes e correções mínimas agregadas registradas na issue #66; a issue não contém os IDs individuais anteriores, portanto não comprova identidade alerta a alerta.
 
-## Advisories adicionais encontrados pelo audit local
+## Advisories adicionais encontrados pelo audit local no baseline
 
-| Pacote | Severidade | GHSA / CVE | Versão atual | Faixa vulnerável | Primeira correção | Relação | Escopo | Cadeia principal |
+| Pacote | Severidade | GHSA / CVE | Versão no baseline | Faixa vulnerável | Primeira correção | Relação | Escopo | Cadeia principal |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `@vue/server-renderer` | Alta | GHSA-g2v6-rqmx-r4w6 | `3.5.41` | `<3.5.42` | `3.5.42` | Transitiva | Runtime | `vue → @vue/server-renderer` |
 | `brace-expansion` | Moderada | GHSA-q2hr-2g5m-vwhr / CVE-2026-102277 | `5.0.9` | `<5.0.12` | `5.0.12` | Transitiva | Desenvolvimento | `eslint → minimatch`; `@vue/test-utils → js-beautify → editorconfig → minimatch` |
@@ -103,7 +198,7 @@ Todos os 34 alertas informam uma primeira versão corrigida. O snapshot atual ma
 
 O GitHub ainda não publica `first_patched_version` para `picomatch`. O audit informa uma correção disponível por pacote pai, mas a versão sugerida precisa ser validada contra os peers atuais antes de qualquer alteração.
 
-## Pacotes afetados por metapropagação do audit
+## Pacotes afetados por metapropagação do audit no baseline
 
 Os 19 pacotes com advisory próprio propagam o resultado para outros 17 consumidores. Essa soma explica os 36 nós informados em `metadata.vulnerabilities`.
 
@@ -127,7 +222,7 @@ Os 19 pacotes com advisory próprio propagam o resultado para outros 17 consumid
 | `vue@3.5.41` | Alta | Direta / runtime | `@vue/server-renderer` |
 | `vue-router@5.2.0` | Alta | Direta / runtime | `@vue-macros/common`, `picomatch`, `tinyglobby`, `unplugin` e `unplugin-utils` |
 
-## Cadeias dos pacotes já presentes no Dependabot
+## Cadeias dos pacotes presentes no Dependabot no baseline
 
 | Pacote vulnerável | Versão | Cadeia ou consumidor principal |
 | --- | --- | --- |
@@ -143,9 +238,9 @@ Os 19 pacotes com advisory próprio propagam o resultado para outros 17 consumid
 | `systeminformation` | `5.33.7` | `cypress → systeminformation` |
 | `postcss-selector-parser` | `7.1.5` | `eslint-plugin-vue → postcss-selector-parser` |
 
-## Dependências diretas desatualizadas
+## Dependências diretas desatualizadas no baseline
 
-| Pacote | Atual | Wanted | Latest | Observação inicial |
+| Pacote | Atual no baseline | Wanted | Latest | Observação inicial |
 | --- | --- | --- | --- | --- |
 | `@quasar/app-vite` | `3.8.1` | `3.10.4` | `3.10.4` | Atualização compatível; coordenar com Quasar/Vite |
 | `@quasar/extras` | `2.0.4` | `2.1.0` | `2.1.0` | Atualização compatível; validar ícones/assets |
@@ -175,25 +270,25 @@ Os 19 pacotes com advisory próprio propagam o resultado para outros 17 consumid
 | `vue-eslint-parser` | `10.4.1` | `10.4.2` | `10.4.2` | Atualização compatível |
 | `vue-router` | `5.2.0` | `5.5.1` | `5.5.1` | Atualização compatível; validar peers e transitivas |
 
-## Engines e peer dependencies
+## Engines e peer dependencies registradas no baseline
 
 - `app/package.json` declara Node `>=22.22.0`, mas a árvore atual exige pelo menos `22.22.2` na linha Node 22 por `nopt@10.0.1` e `abbrev@5.0.0`.
 - O estágio de testes usa Node `22.22.2` e satisfaz as engines.
 - A imagem Cypress usa Node `22.21.0` e viola as engines do projeto, de `@quasar/app-vite`, `nopt` e `abbrev`.
 - O estágio base usa `node:22.22-alpine`; a tag não fixa o patch exato exigido pela árvore.
 - Foram encontrados 25 peers obrigatórios e 20 peers opcionais presentes, todos dentro das faixas declaradas. Outros 43 peers opcionais estão ausentes, sem tornar a árvore inválida.
-- `@vitest/coverage-v8@4.1.11` exige exatamente `vitest@4.1.11`; qualquer atualização deve manter o par alinhado.
-- `@quasar/app-vite@3.8.1` e `@quasar/vite-plugin@2.0.2` exigem Quasar `^2.24.0`; o lock atual resolve `2.27.0` dentro da faixa.
-- O grupo Quasar/Vite/Router/Plugin Vue está válido nas versões atuais. Vite 9 ficaria fora das faixas declaradas por Router, Vitest e plugins, portanto não é candidato automático desta passagem.
-- `happy-dom` 20 → 21 cruza major e é usado pelos projetos `unit-dom` e `component` de Vitest.
+- `@vitest/coverage-v8@4.1.12` exige exatamente `vitest@4.1.12`; o par permanece alinhado após o grupo 3.
+- `@quasar/app-vite@3.8.1` e `@quasar/vite-plugin@2.0.2` exigem Quasar `^2.24.0`; após o grupo 2, o lock resolve `2.35.5` dentro da faixa.
+- O grupo Quasar/Vite/Router/Plugin Vue está válido com Vite `8.3.8`. Vite 9 ficaria fora das faixas declaradas por Router, Vitest e plugins, portanto não é candidato automático desta passagem.
+- `happy-dom@21.0.4` foi validado nos projetos `unit-dom` e `component` de Vitest.
 - Cypress está pinado e acoplado à imagem de browser; atualizar apenas o pacote não prova compatibilidade do runner.
 
-## Pins exatos e overrides
+## Pins exatos e overrides após o grupo 3
 
 Pins exatos atuais:
 
-- Runtime: `dompurify@3.4.15`, `emoji-picker-element@1.29.1` e `emoji-picker-element-data@1.8.0`.
-- Desenvolvimento: `@quasar/vite-plugin@2.0.2`, `@vitejs/plugin-vue@6.0.8`, `@vitest/coverage-v8@4.1.11`, `@vue/test-utils@2.5.0`, `cypress@16.0.0`, `happy-dom@20.12.0` e `vitest@4.1.11`.
+- Runtime: `dompurify@3.4.18`, `emoji-picker-element@1.29.1` e `emoji-picker-element-data@1.8.0`.
+- Desenvolvimento: `@quasar/vite-plugin@2.0.2`, `@vitejs/plugin-vue@6.0.8`, `@vitest/coverage-v8@4.1.12`, `@vue/test-utils@2.5.0`, `cypress@16.0.0`, `happy-dom@21.0.4` e `vitest@4.1.12`.
 
 Estado dos overrides:
 
@@ -208,8 +303,6 @@ O `Dockerfile` também instala `@quasar/cli` e `contentful-cli` globalmente sem 
 
 ## Limitações e decisões para os próximos grupos
 
-- O `fixAvailable` do npm sugere `happy-dom@20.14.6`, mas essa versão permanece vulnerável a dois advisories altos; o alvo mínimo agregado é `21.0.4`.
-- Para metapropagações de `glob`/`minimatch` e `picomatch`, o npm sugere downgrades de `@vue/test-utils`, `vue-router` ou `@quasar/app-vite`. Esses downgrades contradizem a arquitetura atual e não serão aplicados sem análise do pacote pai atualizado.
-- O advisory de `picomatch` não publica primeira versão corrigida no GitHub; a remediação deverá ser comprovada por atualização segura dos pais e novo audit.
+- O ramo `glob`/`minimatch` de `@vue/test-utils` e `picomatch` permanece adiado com impacto, mitigação, racional, responsável e acompanhamento registrados na seção do grupo 3.
 - A incompatibilidade Node da imagem Cypress é um blocker de validação conhecido e deverá ser corrigida antes do gate de navegador.
-- Este baseline não afirma remediação. Os resultados serão atualizados após cada grupo e reconciliados novamente no audit final.
+- As contagens e tabelas identificadas como baseline preservam o snapshot anterior às alterações. As remediações dos grupos 2 e 3 estão registradas nas seções próprias e serão reconciliadas com os grupos seguintes no audit final.

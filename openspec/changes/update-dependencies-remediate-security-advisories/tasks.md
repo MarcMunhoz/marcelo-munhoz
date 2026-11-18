@@ -7,18 +7,18 @@
 
 ## 2. Remediação das dependências de runtime
 
-- [ ] 2.1 Atualizar DOMPurify para uma versão que corrija todos os advisories atuais e validar de forma direcionada sanitização, Markdown, URLs e conteúdo editorial não confiável.
-- [ ] 2.2 Atualizar Quasar para a versão segura compatível e validar de forma direcionada build, aliases, roteamento, ícones, assets e inicialização do frontend.
-- [ ] 2.3 Atualizar os pacotes pais ou o lockfile para corrigir `follow-redirects`, `body-parser`, `qs` e `source-map-js`, verificando a resolução final e os caminhos de runtime afetados.
-- [ ] 2.4 Aplicar somente os ajustes de código ou configuração exigidos pelas atualizações de runtime e adicionar ou adaptar testes quando um contrato observável precisar ser preservado.
+- [x] 2.1 Atualizar DOMPurify para uma versão que corrija todos os advisories atuais e validar de forma direcionada sanitização, Markdown, URLs e conteúdo editorial não confiável.
+- [x] 2.2 Atualizar Quasar para a versão segura compatível e validar de forma direcionada build, aliases, roteamento, ícones, assets e inicialização do frontend.
+- [x] 2.3 Atualizar os pacotes pais ou o lockfile para corrigir `follow-redirects`, `body-parser`, `qs`, `source-map-js`, `@vue/server-renderer` e `proxy-addr`, verificando a resolução final, os caminhos de runtime afetados e documentando advisories sem correção publicada.
+- [x] 2.4 Aplicar somente os ajustes de código ou configuração exigidos pelas atualizações de runtime e adicionar ou adaptar testes quando um contrato observável precisar ser preservado.
 
 ## 3. Remediação das dependências de desenvolvimento
 
-- [ ] 3.1 Atualizar de forma coordenada Vitest, coverage, Vite e plugins relacionados para versões compatíveis que eliminem os advisories do grupo.
-- [ ] 3.2 Executar os projetos Vitest diretamente afetados pelo grupo e confirmar configuração, descoberta de testes, transforms e instrumentação de cobertura.
-- [ ] 3.3 Atualizar `happy-dom` isoladamente para a linha corrigida, revisar incompatibilidades da major e executar os testes DOM e de componentes afetados.
-- [ ] 3.4 Atualizar os pacotes pais necessários para corrigir `systeminformation` e `postcss-selector-parser`, validando a árvore e a ferramenta consumidora correspondente.
-- [ ] 3.5 Avaliar as demais atualizações compatíveis encontradas no baseline e aplicar somente aquelas que preservem engines, peers e o escopo de manutenção.
+- [x] 3.1 Atualizar de forma coordenada Vitest, coverage, Vite e plugins relacionados para versões compatíveis que eliminem os advisories do grupo.
+- [x] 3.2 Executar os projetos Vitest diretamente afetados pelo grupo e confirmar configuração, descoberta de testes, transforms e instrumentação de cobertura.
+- [x] 3.3 Atualizar `happy-dom` isoladamente para a linha corrigida, revisar incompatibilidades da major e executar os testes DOM e de componentes afetados.
+- [x] 3.4 Atualizar os pacotes pais necessários para corrigir `systeminformation` e `postcss-selector-parser`, validando a árvore e a ferramenta consumidora correspondente.
+- [x] 3.5 Avaliar as demais atualizações compatíveis encontradas no baseline e aplicar somente aquelas que preservem engines, peers e o escopo de manutenção.
 
 ## 4. Lockfile, overrides e reprodutibilidade
 
