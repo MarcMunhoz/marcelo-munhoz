@@ -1,5 +1,5 @@
 # Development stage
-FROM node:22.22-alpine AS base
+FROM node:22.22.2-alpine AS base
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
   version="2.4.0" \
@@ -11,8 +11,7 @@ WORKDIR /app
 COPY ["./app/package*.json", "./"]
 
 RUN apk add --no-cache eza \
-  && npm i -g @quasar/cli contentful-cli \
-  && npm install
+  && npm ci --ignore-scripts
 
 COPY ./app .
 
@@ -51,7 +50,7 @@ ENV NODE_ENV=test
 
 # Cypress provides the exact Chrome and Firefox versions selected in the
 # OpenSpec compatibility record. Cypress itself is installed only in-image.
-FROM cypress/browsers:node-22.21.0-chrome-141.0.7390.107-1-ff-144.0-edge-141.0.3537.92-1 AS test-browser-runtime
+FROM cypress/browsers:node-26.13.1-chrome-157.0.8103.50-1-ff-160.0-edge-157.0.4341.46-1 AS test-browser-runtime
 
 WORKDIR /app
 ENV CYPRESS_CACHE_FOLDER=/opt/cypress-cache
