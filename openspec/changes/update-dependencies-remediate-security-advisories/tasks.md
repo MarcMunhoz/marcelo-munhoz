@@ -22,11 +22,11 @@
 
 ## 4. Lockfile, overrides e reprodutibilidade
 
-- [ ] 4.1 Atualizar `app/package.json` e `app/package-lock.json` exclusivamente no container e revisar o diff para impedir mudanças não explicadas de resolução.
-- [ ] 4.2 Verificar os overrides de `form-data` e `nanoid` contra seus consumidores e mantê-los ou ajustá-los conforme a árvore segura final exigir.
-- [ ] 4.3 Remover os overrides sem correspondência de `esbuild` e `js-yaml` somente se uma instalação limpa e `npm ls` confirmarem que não são necessários.
-- [ ] 4.4 Verificar se os CLIs globais sem pin no `Dockerfile` interferem no build reproduzível e alterar sua configuração somente se isso for necessário para a atualização solicitada.
-- [ ] 4.5 Executar uma instalação limpa a partir do lockfile no container e confirmar manifesto sincronizado, engines compatíveis, peers válidos e ausência de dependências inválidas.
+- [x] 4.1 Atualizar `app/package.json` e `app/package-lock.json` exclusivamente no container e revisar o diff para impedir mudanças não explicadas de resolução.
+- [x] 4.2 Verificar os overrides de `form-data` e `nanoid` contra seus consumidores e mantê-los ou ajustá-los conforme a árvore segura final exigir.
+- [x] 4.3 Remover os overrides sem correspondência de `esbuild` e `js-yaml` somente se uma instalação limpa e `npm ls` confirmarem que não são necessários.
+- [x] 4.4 Verificar se os CLIs globais sem pin no `Dockerfile` interferem no build reproduzível e alterar sua configuração somente se isso for necessário para a atualização solicitada.
+- [x] 4.5 Executar uma instalação limpa a partir do lockfile no container e confirmar manifesto sincronizado, engines compatíveis, peers válidos e ausência de dependências inválidas.
 
 ## 5. Validação funcional e de segurança
 

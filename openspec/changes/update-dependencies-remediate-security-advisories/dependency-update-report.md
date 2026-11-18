@@ -3,9 +3,9 @@
 ## Estado da passagem
 
 - Data do baseline: 2026-11-17.
-- Escopo concluído neste registro: grupos 1, 2 e 3, baseline e remediação das dependências de runtime e desenvolvimento.
+- Escopo concluído neste registro: grupos 1, 2, 3 e 4, incluindo baseline, remediação das dependências e reprodutibilidade do ambiente.
 - Manifestos analisados: `app/package.json` e `app/package-lock.json`.
-- O baseline não alterou dependências; os grupos 2 e 3 atualizaram somente os manifestos e as resoluções necessárias às cadeias selecionadas.
+- O baseline não alterou dependências; os grupos 2, 3 e 4 atualizaram somente os manifestos, as resoluções necessárias e as imagens de container vinculadas às cadeias selecionadas.
 - Toda operação npm, instalação limpa, inspeção, teste e build foi executada em container; nenhuma operação npm foi executada no host.
 
 ## Fronteira e metodologia
@@ -130,6 +130,38 @@ Riscos adiados conforme `SECURITY.md`:
 | --- | --- | --- | --- | --- | --- |
 | `@vue/test-utils@2.5.0 → js-beautify@2.0.3 → glob@13.0.6 → minimatch@10.2.6` | Ramo exclusivo de desenvolvimento; não foi demonstrado caminho de entrada não confiável até os padrões usados pelos testes. | Testes operam sobre paths controlados pelo repositório em containers isolados; `brace-expansion` foi atualizado para `5.0.13`. | `@vue/test-utils@2.6.0` conserva a mesma cadeia, e forçar `glob` 14 ou `minimatch` 11 ultrapassa as majors declaradas sem evidência de compatibilidade. | Mantenedor do repositório. | Reavaliar na tarefa 5.1 e quando `@vue/test-utils` ou `js-beautify` publicar uma cadeia corrigida. |
 | `picomatch@4.0.7` por Vite, Vitest, Vue Router e utilitários | Advisory alto no scanner, sem caminho fonte-destino alcançável confirmado para padrões controlados por usuário na aplicação. | Build e testes executam em container; nenhuma API de glob da aplicação é exposta a entrada não confiável; versão mais recente publicada foi mantida. | Não existe versão corrigida publicada, e os pais atuais e mais recentes continuam solicitando `^4.0.7`; downgrade não remove o risco com segurança. | Mantenedor do repositório. | Reavaliar na tarefa 5.1 e após publicação de correção no registry ou atualização dos pacotes pais. |
+
+## Lockfile, overrides e reprodutibilidade — grupo 4
+
+O lockfile foi regenerado em workspace sanitizado dentro de `node:22.22.2-alpine`, sem código-fonte, `.npmrc`, arquivos `.env` ou execução de scripts. A revisão comparativa confirmou apenas duas mudanças de versão: Cypress passou de `16.0.0` para `16.3.0`, e Nano ID passou de `3.3.18` para `3.3.20`. O npm também recalculou 18 marcadores de nós compartilhados de `dev` para `devOptional`, sem alterar suas versões, integridades ou consumidores; essa classificação representa pacotes alcançáveis simultaneamente por dependências de desenvolvimento e pares opcionais. As demais alterações do lockfile refletem o manifesto atualizado e a remoção dos overrides.
+
+### Overrides e consumidores
+
+- O override de `form-data` foi removido porque Axios e `@cypress/request` já aceitam `4.0.6`, que permaneceu como resolução natural da árvore.
+- O override de `nanoid` foi removido porque PostCSS exige `^3.3.20`; a resolução natural `3.3.20` é superior ao piso artificial anterior e permanece compatível.
+- Os overrides de `esbuild` e `js-yaml` foram removidos por não possuírem nós correspondentes. O pin de Esbuild ainda poderia conflitar com o peer opcional de Vite se esse peer fosse instalado.
+- A instalação limpa e `npm ls --all` confirmaram que nenhum dos quatro overrides é necessário e que `esbuild` e `js-yaml` continuam ausentes.
+
+### Engines, imagens e ferramentas
+
+| Item | Estado final | Evidência |
+| --- | --- | --- |
+| Engine do projeto | `^22.22.2 || ^24.15.0 || ^26 || ^28 || ^30` | Combina os pisos efetivos de `nopt` e `abbrev` com as linhas pares aceitas por `@quasar/app-vite`. |
+| Estágios base e de testes | `node:22.22.2-alpine` | O patch exato atende `nopt@10.0.1` e `abbrev@5.0.0` e elimina a flutuação da tag anterior. |
+| Imagem de navegador | Node `26.13.1`, Chrome `157.0.8103.50`, Firefox `160.0` e Edge `157.0.4341.46` | A imagem oficial correspondente foi construída e os runtimes disponíveis foram inspecionados no container. |
+| Cypress | `16.3.0` | Pacote e binário retornaram a mesma versão na imagem de navegador. |
+| Quasar CLI | Binário local de `@quasar/app-vite@3.8.1` | O build e a consulta de versão funcionaram sem instalação global. |
+| Contentful CLI | Removido da imagem | Nenhum uso foi encontrado no repositório; sua instalação global sem pin não participava do build. |
+
+O estágio base passou a usar `npm ci --ignore-scripts`, tornando a instalação dependente do lockfile. As instalações globais de `@quasar/cli` e `contentful-cli` foram removidas; a imagem de produção confirmou que nenhum dos comandos está no PATH global, enquanto o binário Quasar local continua funcional.
+
+### Validação do grupo
+
+- A instalação limpa com engine estrita concluiu com 602 pacotes, e `npm ls --all` retornou zero problemas de dependência, peer ou engine.
+- Os targets Docker de produção, dependências de teste e navegador foram construídos com sucesso a partir do lockfile atualizado.
+- O build SPA do target de produção concluiu com Quasar `2.35.5`, `@quasar/app-vite` `3.8.1` e Vite `8.3.8`.
+- A imagem de navegador confirmou Node `26.13.1`, Cypress `16.3.0`, Chrome `157.0.8103.50` e Firefox `160.0`.
+- O `npm ci` das imagens de teste passou a informar 5 vulnerabilidades moderadas, contra 18 vulnerabilidades ao fim do grupo 3. O detalhamento e a decisão sobre as exceções restantes permanecem reservados ao audit final da tarefa 5.1.
 
 ## Resumo reconciliado do baseline
 
@@ -283,26 +315,17 @@ Os 19 pacotes com advisory próprio propagam o resultado para outros 17 consumid
 - `happy-dom@21.0.4` foi validado nos projetos `unit-dom` e `component` de Vitest.
 - Cypress está pinado e acoplado à imagem de browser; atualizar apenas o pacote não prova compatibilidade do runner.
 
-## Pins exatos e overrides após o grupo 3
+## Pins exatos e overrides após o grupo 4
 
 Pins exatos atuais:
 
 - Runtime: `dompurify@3.4.18`, `emoji-picker-element@1.29.1` e `emoji-picker-element-data@1.8.0`.
-- Desenvolvimento: `@quasar/vite-plugin@2.0.2`, `@vitejs/plugin-vue@6.0.8`, `@vitest/coverage-v8@4.1.12`, `@vue/test-utils@2.5.0`, `cypress@16.0.0`, `happy-dom@21.0.4` e `vitest@4.1.12`.
+- Desenvolvimento: `@quasar/vite-plugin@2.0.2`, `@vitejs/plugin-vue@6.0.8`, `@vitest/coverage-v8@4.1.12`, `@vue/test-utils@2.5.0`, `cypress@16.3.0`, `happy-dom@21.0.4` e `vitest@4.1.12`.
 
-Estado dos overrides:
-
-| Override | Resolução atual | Consumidores / risco |
-| --- | --- | --- |
-| `form-data: ^4.0.6` | `4.0.6` | Usado por Axios e `@cypress/request`; ambos aceitam a resolução |
-| `nanoid: ^3.3.18` | `3.3.18` | Usado por PostCSS em ramos de runtime e build |
-| `esbuild: 0.25.12` | Sem entrada no lock | Pin fora do peer opcional `^0.27.0 || ^0.28.0` de Vite; pode conflitar se o peer passar a ser instalado |
-| `js-yaml: ^5.1.0` | Sem entrada no lock | Nenhum consumidor atual; Vite usa o pacote distinto `yaml@2.9.0` |
-
-O `Dockerfile` também instala `@quasar/cli` e `contentful-cli` globalmente sem versão e fora do lockfile. O projeto já possui o binário Quasar local fornecido por `@quasar/app-vite`; não foi encontrada referência equivalente ao Contentful CLI nas entradas analisadas.
+O manifesto não possui mais overrides. `form-data@4.0.6` e `nanoid@3.3.20` são resolvidos naturalmente pelos consumidores, enquanto `esbuild` e `js-yaml` não integram a árvore. O `Dockerfile` também não instala CLIs globais sem pin; o build usa o binário Quasar local fornecido por `@quasar/app-vite`.
 
 ## Limitações e decisões para os próximos grupos
 
 - O ramo `glob`/`minimatch` de `@vue/test-utils` e `picomatch` permanece adiado com impacto, mitigação, racional, responsável e acompanhamento registrados na seção do grupo 3.
-- A incompatibilidade Node da imagem Cypress é um blocker de validação conhecido e deverá ser corrigida antes do gate de navegador.
-- As contagens e tabelas identificadas como baseline preservam o snapshot anterior às alterações. As remediações dos grupos 2 e 3 estão registradas nas seções próprias e serão reconciliadas com os grupos seguintes no audit final.
+- A incompatibilidade Node da imagem Cypress foi eliminada no grupo 4; a execução funcional dos fluxos de navegador permanece no grupo 5.
+- As contagens e tabelas identificadas como baseline preservam o snapshot anterior às alterações. As remediações dos grupos 2, 3 e 4 estão registradas nas seções próprias e serão reconciliadas com os grupos seguintes no audit final.
