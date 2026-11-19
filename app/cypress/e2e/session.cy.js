@@ -4,7 +4,8 @@ const sessionId = "browser-session-e2e";
 const visitWithIdentity = (path = "/admin") => {
   cy.interceptJson("GET", "**/api/admin/contentful/articles", { articles: [] }, "articles");
   cy.interceptJson("GET", "**/api/admin/contentful/author-profile", { profile: null }, "profile");
-  cy.setCookie("admin_browser_session", sessionId, { secure: true, sameSite: "strict" });
+  const secure = new URL(Cypress.config("baseUrl")).protocol === "https:";
+  cy.setCookie("admin_browser_session", sessionId, { secure, sameSite: "strict" });
   cy.visit(path, {
     onBeforeLoad(windowRef) {
       windowRef.localStorage.setItem("admin.sessionLifecycle", JSON.stringify({
