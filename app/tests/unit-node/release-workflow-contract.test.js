@@ -40,11 +40,12 @@ describe("release workflow contract", () => {
     assert.equal(bump.steps[0].uses, "actions/checkout@v5");
     assert.equal(bump.steps[0].with.ref, "${{ github.event.pull_request.head.sha }}");
     assert.equal(bump.steps[0].with["persist-credentials"], false);
+    assert.equal(bump.steps[0].with["fetch-depth"], 0);
 
     const updateStep = bump.steps.find((step) => step.run?.includes("release-version.js"));
-    assert.match(updateStep.run, /git fetch origin main --depth=1/);
+    assert.match(updateStep.run, /git fetch origin main/);
     assert.match(updateStep.run, /git show origin\/main:app\/package\.json/);
-    assert.match(updateStep.run, /git log origin\/main\.\.HEAD/);
+    assert.match(updateStep.run, /git log -z --format=%B origin\/main\.\.HEAD/);
     assert.match(updateStep.run, /git add app\/package\.json app\/package-lock\.json Dockerfile/);
     assert.doesNotMatch(updateStep.run, /git push/);
     assert.doesNotMatch(updateStep.run, /CHANGELOG/);

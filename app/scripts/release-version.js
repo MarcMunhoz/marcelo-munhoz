@@ -22,15 +22,17 @@ export const deriveBump = (commitMessages = []) => {
   let selected = null;
   for (const message of commitMessages) {
     if (/(?:^|\r?\n)BREAKING(?: |-)CHANGE:/m.test(message)) return "major";
-    const match = /^([a-z]+)(\([^\r\n]+\))?(!)?:/.exec(message);
+    const match = /^([a-z]+)(\([^\r\n)]+\))?(!)?:/.exec(message);
     if (!match) continue;
-    const [, type, , breakingMark] = match;
+    const [, type, scope, breakingMark] = match;
     const candidate = breakingMark
       ? "major"
       : type === "feat"
         ? "minor"
         : type === "fix" || type === "perf"
           ? "patch"
+          : type === "chore" && scope === "(dependencies)"
+            ? "patch"
           : null;
     if (candidate && (!selected || BUMP_PRIORITY[candidate] > BUMP_PRIORITY[selected])) selected = candidate;
   }

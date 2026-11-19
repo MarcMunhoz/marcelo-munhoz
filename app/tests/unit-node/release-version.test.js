@@ -46,6 +46,9 @@ describe("release version", () => {
     assert.equal(deriveBump(["docs: Updates guidance", "fix(api): Fixes response", "feat(ui): Adds search"]), "minor");
     assert.equal(deriveBump(["feat: Adds search", "refactor(core)!: Changes the public contract"]), "major");
     assert.equal(deriveBump(["perf: Improves rendering"]), "patch");
+    assert.equal(deriveBump(["chore(dependencies): Updates secure dependency versions"]), "patch");
+    assert.equal(deriveBump(["chore(dependencies): Updates tooling (CI): fixes warnings"]), "patch");
+    assert.equal(deriveBump(["chore(dependencies): Updates secure dependency versions", "docs: Updates guidance"]), "patch");
     assert.equal(deriveBump(["chore: Updates tooling", "docs: Updates guidance"]), null);
   });
 

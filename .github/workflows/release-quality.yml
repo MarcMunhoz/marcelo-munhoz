@@ -197,12 +197,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - name: Apply and commit the semantic version bump
         id: release-head
         run: |
-          git fetch origin main --depth=1
+          git fetch origin main
           git show origin/main:app/package.json > /tmp/base-package.json
-          git log origin/main..HEAD --format=%B%x00 > /tmp/commit-messages.raw
+          git log -z --format=%B origin/main..HEAD > /tmp/commit-messages.raw
           node -e 'const fs = require("fs"); const messages = fs.readFileSync("/tmp/commit-messages.raw", "utf8").split("\0").filter(Boolean); fs.writeFileSync("/tmp/commit-messages.json", JSON.stringify(messages))'
 
           RESULT=$(BASE_PACKAGE_JSON=/tmp/base-package.json COMMIT_MESSAGES_FILE=/tmp/commit-messages.json node app/scripts/release-version.js)
