@@ -43,7 +43,7 @@ export const validateReleaseWorkflow = (workflow = {}) => {
     || !conditionIncludes(versionBump.if, "github.event.pull_request.head.repo.full_name == github.repository")) {
     throw new Error("Version bump must directly restrict the trusted source repository and branch.");
   }
-  if (JSON.stringify(versionBump.permissions) !== JSON.stringify({ contents: "write" })) {
+  if (JSON.stringify(versionBump.permissions) !== JSON.stringify({ contents: "read" })) {
     throw new Error("Version bump must use least-privilege release permissions.");
   }
   const bumpCheckout = versionBump.steps?.find((step) => step.uses === "actions/checkout@v5");
