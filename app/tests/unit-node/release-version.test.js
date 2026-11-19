@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "vitest";
 
-import { deriveBump, incrementVersion, updateReleaseVersion } from "../../scripts/release-version.js";
+import { deriveBump, executeReleaseVersionCli, incrementVersion, updateReleaseVersion } from "../../scripts/release-version.js";
 
 const temporaryDirectories = [];
 
@@ -101,5 +101,63 @@ describe("release version", () => {
     const idempotentPaths = createFixture();
     assert.deepEqual(updateReleaseVersion(idempotentPaths), { changed: true, version: "2.4.1" });
     assert.deepEqual(updateReleaseVersion(idempotentPaths), { changed: false, version: "2.4.1" });
+  });
+
+  it("rejects malformed commit metadata and package lock structure before writing", () => {
+    const invalidCommits = createFixture();
+    writeFileSync(invalidCommits.commitMessagesPath, JSON.stringify({ message: "fix: Invalid container" }));
+    assert.throws(() => updateReleaseVersion(invalidCommits), /array of strings/);
+
+    const invalidLock = createFixture();
+    writeFileSync(invalidLock.lockPath, `${JSON.stringify({ name: "example", version: "2.4.0", packages: {} }, null, 2)}\n`);
+    assert.throws(() => updateReleaseVersion(invalidLock), /root package entry/);
+
+    const invalidJson = createFixture();
+    writeFileSync(invalidJson.basePackagePath, "not-json\n");
+    assert.throws(() => updateReleaseVersion(invalidJson), /valid base package JSON/);
+  });
+
+  it("reports CLI changes, no-op runs, and validation failures", () => {
+    const changedPaths = createFixture();
+    const changedLogs = [];
+    const changedProcess = { exitCode: 0 };
+    assert.deepEqual(
+      executeReleaseVersionCli({
+        env: {
+          BASE_PACKAGE_JSON: changedPaths.basePackagePath,
+          PACKAGE_JSON: changedPaths.packagePath,
+          PACKAGE_LOCK_JSON: changedPaths.lockPath,
+          DOCKERFILE: changedPaths.dockerfilePath,
+          COMMIT_MESSAGES_FILE: changedPaths.commitMessagesPath,
+        },
+        log: (message) => changedLogs.push(message),
+        processRef: changedProcess,
+      }),
+      { changed: true, version: "2.4.1" },
+    );
+    assert.deepEqual(changedLogs, ["2.4.1"]);
+    assert.equal(changedProcess.exitCode, 0);
+
+    const noOpPaths = createFixture({ commits: ["docs: Updates guidance"] });
+    assert.deepEqual(executeReleaseVersionCli({
+      env: {
+        BASE_PACKAGE_JSON: noOpPaths.basePackagePath,
+        PACKAGE_JSON: noOpPaths.packagePath,
+        PACKAGE_LOCK_JSON: noOpPaths.lockPath,
+        DOCKERFILE: noOpPaths.dockerfilePath,
+        COMMIT_MESSAGES_FILE: noOpPaths.commitMessagesPath,
+      },
+      log: () => assert.fail("A no-op CLI run must not log a version."),
+    }), { changed: false, version: null });
+
+    const errors = [];
+    const failedProcess = { exitCode: 0 };
+    assert.equal(executeReleaseVersionCli({
+      env: {},
+      error: (message) => errors.push(message),
+      processRef: failedProcess,
+    }), null);
+    assert.equal(failedProcess.exitCode, 1);
+    assert.equal(errors.length, 1);
   });
 });
