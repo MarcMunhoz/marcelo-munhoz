@@ -12,12 +12,58 @@ const clone = (value) => structuredClone(value);
 describe("release workflow contract", () => {
   it("orchestrates the complete main release gate through containers", () => {
     const workflow = loadWorkflow();
-    assert.deepEqual(validateReleaseWorkflow(workflow), { jobs: 9, artifactUploads: 4 });
+    assert.deepEqual(validateReleaseWorkflow(workflow), { jobs: 10, artifactUploads: 4 });
 
     const coverageRun = workflow.jobs.coverage.steps.find((step) => step.run?.includes("test:vitest:coverage")).run;
     assert.match(coverageRun, /-v \.\/app\/artifacts:\/app\/artifacts/);
     assert.match(coverageRun, /--coverage\.reportsDirectory=artifacts\/coverage-raw/);
     assert.doesNotMatch(coverageRun, /\/app\/coverage/);
+  });
+
+  it("uses Node 24 actions and applies an idempotent version bump to develop", () => {
+    const workflow = loadWorkflow();
+    const allSteps = Object.values(workflow.jobs).flatMap((job) => job.steps || []);
+    const checkoutSteps = allSteps.filter((step) => step.uses?.startsWith("actions/checkout@"));
+    const uploadSteps = allSteps.filter((step) => step.uses?.startsWith("actions/upload-artifact@"));
+    assert.ok(checkoutSteps.length > 0);
+    assert.ok(checkoutSteps.every((step) => step.uses === "actions/checkout@v5"));
+    assert.equal(uploadSteps.length, 4);
+    assert.ok(uploadSteps.every((step) => step.uses === "actions/upload-artifact@v5"));
+
+    const bump = workflow.jobs["version-bump"];
+    assert.equal(bump.needs, "source-policy");
+    assert.match(bump.if, /needs\.source-policy\.result == 'success'/);
+    assert.match(bump.if, /github\.event\.pull_request\.head\.ref == 'develop'/);
+    assert.match(bump.if, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+    assert.deepEqual(bump.permissions, { contents: "write" });
+    assert.equal(bump.outputs["head-sha"], "${{ steps.release-head.outputs.sha }}");
+    assert.equal(bump.steps[0].uses, "actions/checkout@v5");
+    assert.equal(bump.steps[0].with.ref, "${{ github.event.pull_request.head.sha }}");
+    assert.equal(bump.steps[0].with["persist-credentials"], false);
+
+    const updateStep = bump.steps.find((step) => step.run?.includes("release-version.js"));
+    assert.match(updateStep.run, /git fetch origin main --depth=1/);
+    assert.match(updateStep.run, /git show origin\/main:app\/package\.json/);
+    assert.match(updateStep.run, /git log origin\/main\.\.HEAD/);
+    assert.match(updateStep.run, /git add app\/package\.json app\/package-lock\.json Dockerfile/);
+    assert.doesNotMatch(updateStep.run, /git push/);
+    assert.doesNotMatch(updateStep.run, /CHANGELOG/);
+
+    const pushStep = bump.steps.find((step) => step.run?.includes("git push"));
+    assert.deepEqual(pushStep.env, {
+      GITHUB_TOKEN: "${{ github.token }}",
+      HEAD_REF: "${{ github.event.pull_request.head.ref }}",
+      EXPECTED_HEAD_SHA: "${{ steps.release-head.outputs.sha }}",
+    });
+    assert.match(pushStep.run, /git rev-parse HEAD.*EXPECTED_HEAD_SHA/);
+
+    for (const name of ["lint", "build", "credential-scan", "coverage", "e2e-chrome", "e2e-firefox", "remote-smoke"]) {
+      assert.equal(workflow.jobs[name].needs, "version-bump");
+      assert.match(workflow.jobs[name].if, /needs\.version-bump\.result == 'success'/);
+      assert.equal(workflow.jobs[name].steps[0].with.ref, "${{ needs.version-bump.outputs.head-sha }}");
+    }
+    assert.equal(workflow.jobs.build.steps.find((step) => step.env?.COMMIT_REF).env.COMMIT_REF, "${{ needs.version-bump.outputs.head-sha }}");
+    assert.equal(workflow.jobs["remote-smoke"].env.EXPECTED_COMMIT_SHA, "${{ needs.version-bump.outputs.head-sha }}");
   });
 
   it("rejects trigger, concurrency, dependency, and fail-open regressions", () => {

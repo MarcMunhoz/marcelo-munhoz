@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Validate the production source
         env:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -30,46 +30,54 @@ jobs:
           test node scripts/release-quality-policy.js source
 
   lint:
-    needs: source-policy
-    if: "${{ needs.source-policy.result == 'success' }}"
+    needs: version-bump
+    if: "${{ needs.version-bump.result == 'success' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version-bump.outputs.head-sha }}
       - run: docker compose --env-file /dev/null run --build --rm --no-deps test npm run lint
 
   build:
-    needs: source-policy
-    if: "${{ needs.source-policy.result == 'success' }}"
+    needs: version-bump
+    if: "${{ needs.version-bump.result == 'success' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version-bump.outputs.head-sha }}
       - env:
-          COMMIT_REF: ${{ github.event.pull_request.head.sha }}
+          COMMIT_REF: ${{ needs.version-bump.outputs.head-sha }}
         run: >-
           docker compose --env-file /dev/null run --build --rm --no-deps
           -e NODE_ENV=production -e COMMIT_REF test npm run build:netlify
 
   credential-scan:
-    needs: source-policy
-    if: "${{ needs.source-policy.result == 'success' }}"
+    needs: version-bump
+    if: "${{ needs.version-bump.result == 'success' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version-bump.outputs.head-sha }}
       - run: >-
           docker compose --env-file /dev/null run --build --rm --no-deps
           -e NODE_ENV=production test sh -ec
           "npm run build && npm run scan:build-credentials"
 
   coverage:
-    needs: source-policy
-    if: "${{ needs.source-policy.result == 'success' }}"
+    needs: version-bump
+    if: "${{ needs.version-bump.result == 'success' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version-bump.outputs.head-sha }}
       - run: >-
           docker compose --env-file /dev/null run --build --rm --no-deps --user root
           -v ./app/artifacts:/app/artifacts test npm run test:vitest:coverage --
@@ -82,7 +90,7 @@ jobs:
           artifacts/coverage-raw artifacts/coverage-sanitized
       - name: Upload sanitized coverage
         if: "${{ always() }}"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-sanitized
           path: app/artifacts/coverage-sanitized
@@ -90,12 +98,14 @@ jobs:
           retention-days: 14
 
   e2e-chrome:
-    needs: source-policy
-    if: "${{ needs.source-policy.result == 'success' }}"
+    needs: version-bump
+    if: "${{ needs.version-bump.result == 'success' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version-bump.outputs.head-sha }}
       - run: >-
           docker compose --env-file /dev/null --profile chrome run --build --rm
           -v ./app/artifacts:/app/artifacts cypress-chrome
@@ -109,7 +119,7 @@ jobs:
           node scripts/sanitize-remote-smoke-artifacts.js artifacts/cypress artifacts/cypress-sanitized
       - name: Upload sanitized Chrome diagnostics
         if: "${{ always() }}"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cypress-chrome-sanitized
           path: app/artifacts/cypress-sanitized
@@ -117,12 +127,14 @@ jobs:
           retention-days: 7
 
   e2e-firefox:
-    needs: source-policy
-    if: "${{ needs.source-policy.result == 'success' }}"
+    needs: version-bump
+    if: "${{ needs.version-bump.result == 'success' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version-bump.outputs.head-sha }}
       - run: >-
           docker compose --env-file /dev/null --profile firefox run --build --rm
           -v ./app/artifacts:/app/artifacts cypress-firefox
@@ -136,7 +148,7 @@ jobs:
           node scripts/sanitize-remote-smoke-artifacts.js artifacts/cypress artifacts/cypress-sanitized
       - name: Upload sanitized Firefox diagnostics
         if: "${{ always() }}"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cypress-firefox-sanitized
           path: app/artifacts/cypress-sanitized
@@ -144,27 +156,76 @@ jobs:
           retention-days: 7
 
   remote-smoke:
-    needs: source-policy
-    if: "${{ needs.source-policy.result == 'success' }}"
+    needs: version-bump
+    if: "${{ needs.version-bump.result == 'success' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       DEPLOY_PREVIEW_URL: https://deploy-preview-${{ github.event.pull_request.number }}--${{ vars.NETLIFY_SITE_NAME }}.netlify.app
-      EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_COMMIT_SHA: ${{ needs.version-bump.outputs.head-sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version-bump.outputs.head-sha }}
       - run: >-
           docker compose --env-file /dev/null --profile remote-smoke run --build --rm
           -v ./app/artifacts:/app/artifacts
           -e DEPLOY_PREVIEW_URL -e EXPECTED_COMMIT_SHA cypress-remote
       - name: Upload sanitized remote diagnostics
         if: "${{ always() }}"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: remote-smoke-sanitized
           path: app/artifacts/remote-smoke/sanitized
           if-no-files-found: error
           retention-days: 7
+
+  version-bump:
+    needs: source-policy
+    if: >-
+      ${{ needs.source-policy.result == 'success' &&
+          github.event.pull_request.head.ref == 'develop' &&
+          github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      head-sha: ${{ steps.release-head.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Apply and commit the semantic version bump
+        id: release-head
+        run: |
+          git fetch origin main --depth=1
+          git show origin/main:app/package.json > /tmp/base-package.json
+          git log origin/main..HEAD --format=%B%x00 > /tmp/commit-messages.raw
+          node -e 'const fs = require("fs"); const messages = fs.readFileSync("/tmp/commit-messages.raw", "utf8").split("\0").filter(Boolean); fs.writeFileSync("/tmp/commit-messages.json", JSON.stringify(messages))'
+
+          RESULT=$(BASE_PACKAGE_JSON=/tmp/base-package.json COMMIT_MESSAGES_FILE=/tmp/commit-messages.json node app/scripts/release-version.js)
+          if [ -z "$RESULT" ]; then
+            echo "Release version is already correct or no release bump is required."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add app/package.json app/package-lock.json Dockerfile
+            git commit -m "chore(release): Updates version to $RESULT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Push the versioned release head
+        if: "${{ steps.release-head.outputs.changed == 'true' }}"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          EXPECTED_HEAD_SHA: ${{ steps.release-head.outputs.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:$HEAD_REF"
 
   quality-gate:
     name: quality-gate
@@ -173,7 +234,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Fail closed on every required result
         env:
           RESULT_SOURCE_POLICY: ${{ needs.source-policy.result }}
