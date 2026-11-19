@@ -30,15 +30,15 @@
 
 ## 5. Validação funcional e de segurança
 
-- [ ] 5.1 Executar no container o audit final e confirmar ausência de vulnerabilidades acionáveis ou documentar individualmente qualquer exceção com bloqueio e mitigação.
-- [ ] 5.2 Executar lint, build de produção e scan de credenciais dos assets gerados, corrigindo somente regressões causadas pelas dependências.
-- [ ] 5.3 Executar a suíte Vitest completa com os thresholds configurados de cobertura e registrar o resultado consolidado.
-- [ ] 5.4 Executar as jornadas críticas em Chrome e Firefox nos viewports desktop e mobile usando os perfis isolados do projeto.
-- [ ] 5.5 Executar os smokes de inicialização do frontend e do middleware Express e verificar rotas públicas, healthcheck e segurança do admin deslogado.
-- [ ] 5.6 Realizar verificação visual representativa das áreas pública e administrativa se as atualizações alterarem framework, DOM, CSS, ícones, assets ou baseline de navegador.
+- [x] 5.1 Executar no container o audit final e confirmar ausência de vulnerabilidades acionáveis ou documentar individualmente qualquer exceção com bloqueio e mitigação.
+- [x] 5.2 Executar lint, build de produção e scan de credenciais dos assets gerados, corrigindo somente regressões causadas pelas dependências.
+- [x] 5.3 Executar a suíte Vitest completa com os thresholds configurados de cobertura e registrar o resultado consolidado.
+- [x] 5.4 Executar as jornadas críticas em Chrome e Firefox nos viewports desktop e mobile usando os perfis isolados do projeto.
+- [x] 5.5 Executar os smokes de inicialização do frontend e do middleware Express e verificar rotas públicas, healthcheck e segurança do admin deslogado.
+- [x] 5.6 Realizar verificação visual representativa das áreas pública e administrativa se as atualizações alterarem framework, DOM, CSS, ícones, assets ou baseline de navegador.
 
 ## 6. Evidência da manutenção
 
-- [ ] 6.1 Criar `dependency-update-report.md` com baseline, pacotes atualizados, advisories remediados, versões finais, overrides, exceções e validações executadas.
-- [ ] 6.2 Reconciliar no relatório a contagem final do Dependabot com o agrupamento do `npm audit` e associar cada advisory à mudança e à evidência correspondente.
-- [ ] 6.3 Revisar o diff final e confirmar que ele contém somente dependências, lockfile, documentação da change e ajustes de compatibilidade necessários.
+- [x] 6.1 Criar `dependency-update-report.md` com baseline, pacotes atualizados, advisories remediados, versões finais, overrides, exceções e validações executadas.
+- [x] 6.2 Reconciliar no relatório a contagem final do Dependabot com o agrupamento do `npm audit` e associar cada advisory à mudança e à evidência correspondente.
+- [x] 6.3 Revisar o diff final e confirmar que ele contém somente dependências, lockfile, documentação da change e ajustes de compatibilidade necessários.

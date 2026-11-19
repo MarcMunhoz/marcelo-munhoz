@@ -3,9 +3,9 @@
 ## Estado da passagem
 
 - Data do baseline: 2026-11-17.
-- Escopo concluído neste registro: grupos 1, 2, 3 e 4, incluindo baseline, remediação das dependências e reprodutibilidade do ambiente.
+- Escopo concluído neste registro: grupos 1 a 6, incluindo baseline, remediação, reprodutibilidade, validação funcional e reconciliação final.
 - Manifestos analisados: `app/package.json` e `app/package-lock.json`.
-- O baseline não alterou dependências; os grupos 2, 3 e 4 atualizaram somente os manifestos, as resoluções necessárias e as imagens de container vinculadas às cadeias selecionadas.
+- O baseline não alterou dependências; os grupos 2 a 5 atualizaram somente os manifestos, as resoluções, as imagens de container e o harness Cypress necessários à compatibilidade comprovada.
 - Toda operação npm, instalação limpa, inspeção, teste e build foi executada em container; nenhuma operação npm foi executada no host.
 
 ## Fronteira e metodologia
@@ -18,19 +18,19 @@ Forma sanitizada equivalente das consultas usadas como evidência; a consulta `o
 
 ```bash
 gh api --paginate 'repos/{owner}/{repo}/dependabot/alerts?state=open&per_page=100'
-docker run --rm --read-only --tmpfs /tmp --tmpfs /npm-cache -w /workspace \
-  -e NPM_CONFIG_CACHE=/npm-cache \
-  -e NODE_OPTIONS=--require=/tmp/<preload-bulk-only>.cjs \
-  -v <repo>/app/package.json:/workspace/package.json:ro \
-  -v <repo>/app/package-lock.json:/workspace/package-lock.json:ro \
-  -v <preload-bulk-only>:/tmp/<preload-bulk-only>.cjs:ro \
+docker run --rm --read-only --tmpfs <temporary-dir> --tmpfs <npm-cache> -w <workspace> \
+  -e NPM_CONFIG_CACHE=<npm-cache> \
+  -e NODE_OPTIONS=--require=<temporary-dir>/<preload-bulk-only>.cjs \
+  -v <repo>/app/package.json:<workspace>/package.json:ro \
+  -v <repo>/app/package-lock.json:<workspace>/package-lock.json:ro \
+  -v <preload-bulk-only>:<temporary-dir>/<preload-bulk-only>.cjs:ro \
   node:22.22.2-alpine npm audit --package-lock-only --ignore-scripts --json
-docker run --rm --read-only --tmpfs /tmp --tmpfs /npm-cache -w /workspace \
-  -e NPM_CONFIG_CACHE=/npm-cache \
-  -e NODE_OPTIONS=--require=/tmp/<preload-virtual-tree>.cjs \
-  -v <repo>/app/package.json:/workspace/package.json:ro \
-  -v <repo>/app/package-lock.json:/workspace/package-lock.json:ro \
-  -v <preload-virtual-tree>:/tmp/<preload-virtual-tree>.cjs:ro \
+docker run --rm --read-only --tmpfs <temporary-dir> --tmpfs <npm-cache> -w <workspace> \
+  -e NPM_CONFIG_CACHE=<npm-cache> \
+  -e NODE_OPTIONS=--require=<temporary-dir>/<preload-virtual-tree>.cjs \
+  -v <repo>/app/package.json:<workspace>/package.json:ro \
+  -v <repo>/app/package-lock.json:<workspace>/package-lock.json:ro \
+  -v <preload-virtual-tree>:<temporary-dir>/<preload-virtual-tree>.cjs:ro \
   node:22.22.2-alpine npm outdated --include=dev --include=optional --include=peer --ignore-scripts --json
 ```
 
@@ -129,7 +129,8 @@ Riscos adiados conforme `SECURITY.md`:
 | Cadeia | Impacto sanitizado | Mitigação | Racional do adiamento | Responsável | Acompanhamento |
 | --- | --- | --- | --- | --- | --- |
 | `@vue/test-utils@2.5.0 → js-beautify@2.0.3 → glob@13.0.6 → minimatch@10.2.6` | Ramo exclusivo de desenvolvimento; não foi demonstrado caminho de entrada não confiável até os padrões usados pelos testes. | Testes operam sobre paths controlados pelo repositório em containers isolados; `brace-expansion` foi atualizado para `5.0.13`. | `@vue/test-utils@2.6.0` conserva a mesma cadeia, e forçar `glob` 14 ou `minimatch` 11 ultrapassa as majors declaradas sem evidência de compatibilidade. | Mantenedor do repositório. | Reavaliar na tarefa 5.1 e quando `@vue/test-utils` ou `js-beautify` publicar uma cadeia corrigida. |
-| `picomatch@4.0.7` por Vite, Vitest, Vue Router e utilitários | Advisory alto no scanner, sem caminho fonte-destino alcançável confirmado para padrões controlados por usuário na aplicação. | Build e testes executam em container; nenhuma API de glob da aplicação é exposta a entrada não confiável; versão mais recente publicada foi mantida. | Não existe versão corrigida publicada, e os pais atuais e mais recentes continuam solicitando `^4.0.7`; downgrade não remove o risco com segurança. | Mantenedor do repositório. | Reavaliar na tarefa 5.1 e após publicação de correção no registry ou atualização dos pacotes pais. |
+
+O advisory GHSA-fc5q-39xc-vjpf de `picomatch@4.0.7`, tratado anteriormente como exceção, foi retirado em 2026-11-18. O pacote continua na árvore, mas não aparece no audit final e não representa vulnerabilidade pendente nesta passagem.
 
 ## Lockfile, overrides e reprodutibilidade — grupo 4
 
@@ -162,6 +163,84 @@ O estágio base passou a usar `npm ci --ignore-scripts`, tornando a instalação
 - O build SPA do target de produção concluiu com Quasar `2.35.5`, `@quasar/app-vite` `3.8.1` e Vite `8.3.8`.
 - A imagem de navegador confirmou Node `26.13.1`, Cypress `16.3.0`, Chrome `157.0.8103.50` e Firefox `160.0`.
 - O `npm ci` das imagens de teste passou a informar 5 vulnerabilidades moderadas, contra 18 vulnerabilidades ao fim do grupo 3. O detalhamento e a decisão sobre as exceções restantes permanecem reservados ao audit final da tarefa 5.1.
+
+## Validação funcional e de segurança — grupo 5
+
+### Audit final e exceções
+
+O audit foi executado contra o lockfile versionado e a árvore instalada correspondente. `npm ls --all` confirmou uma árvore válida. O audit completo retornou cinco nós moderados, todos propagados por dois advisories exclusivos de desenvolvimento; o audit com `--omit=dev` retornou zero vulnerabilidades.
+
+| Pacote e advisory | Cadeia | Versão e correção | Bloqueio e mitigação |
+| --- | --- | --- | --- |
+| `glob`, GHSA-3g3m-2fjr-6pw4 / CVE-2026-118773 | `@vue/test-utils@2.5.0 → js-beautify@2.0.3 → glob@13.0.6` | Instalada `13.0.6`; correção em `14.0.2` | `js-beautify@2.0.3` permanece a versão mais recente e declara Glob 13; forçar a major 14 não possui compatibilidade comprovada. |
+| `minimatch`, GHSA-g3hv-75wg-m249 / CVE-2026-118764 | `@vue/test-utils → js-beautify → glob/editorconfig → minimatch@10.2.6` | Instalada `10.2.6`; correção em `11.0.1` | Glob e EditorConfig restringem o ramo 10; forçar a major 11 viola os intervalos declarados. |
+
+Os cinco nós agregados são `@vue/test-utils`, `js-beautify`, `editorconfig`, `glob` e `minimatch`. As versões mais recentes dos pacotes pais conservam a cadeia, e o downgrade automático sugerido pelo npm também permanece em faixas vulneráveis. Não existe remediação segura diretamente acionável. O risco é mitigado pelo uso exclusivo em testes, paths controlados pelo repositório e execução em containers isolados.
+
+### Análise estática, build, assets e testes
+
+- O lint completo concluiu sem diagnósticos.
+- O build SPA de produção concluiu com Quasar `2.35.5`, `@quasar/app-vite` `3.8.1` e Vite `8.3.8`.
+- O scan dos assets gerados não encontrou credenciais nem padrões proibidos.
+- A suíte Vitest `4.1.12` aprovou 46 arquivos e 454 testes: 293 em `unit-node`, 81 em `unit-dom` e 80 em `component`.
+- A cobertura V8 atingiu 91,03% de statements, 83,49% de branches, 86,49% de functions e 92,56% de lines, atendendo respectivamente aos thresholds de 91%, 83%, 86% e 92%.
+
+### Smokes e verificação visual
+
+- O middleware respondeu `200 OK` em `/healthz`; o frontend respondeu 200 em `/`, `/about`, `/blog` e no shell `/admin`.
+- A API administrativa deslogada respondeu 401 tanto diretamente quanto pelo proxy do frontend.
+- A inspeção visual representativa em 1440×900 e 375×812 não encontrou clipping, sobreposição ou overflow horizontal nas áreas pública e administrativa. Menu, cards, filtros e conteúdo permaneceram responsivos.
+
+### Matriz de navegadores e correção de compatibilidade
+
+A matriz executou 29 cenários em cada combinação de Chrome 157 e Firefox 160 com viewports 1440×900 e 375×812. Na primeira passagem, 25 cenários passaram em cada perfil e os mesmos quatro testes de `session.cy.js` falharam. As jornadas públicas, editorial administrativa, artigo/autor, redirects e segurança deslogada já estavam aprovadas nos quatro perfis.
+
+Os testes de lifecycle gravavam `admin_browser_session` com atributo `Secure` sobre a origem HTTP do harness. Nos browsers atualizados, a aplicação não reconstruía essa sessão, caía em `Local preview` e retornava antes de iniciar timers, alerta de expiração e listener entre abas. A correção ficou restrita ao harness: o atributo `Secure` agora deriva do protocolo de `Cypress.config("baseUrl")`, permanecendo ativo em HTTPS e sendo omitido somente na origem HTTP local.
+
+Após reconstruir as imagens, `session.cy.js` foi executado novamente somente nos quatro perfis afetados. Chrome desktop, Chrome mobile, Firefox desktop e Firefox mobile aprovaram 4 de 4 cenários cada, totalizando 16 de 16 execuções direcionadas. Com os 25 cenários não afetados já aprovados em cada perfil, a matriz final cobre 116 de 116 execuções com sucesso, sem alterar o contrato de cookie da aplicação em produção.
+
+## Reconciliação final entre Dependabot e npm audit — grupo 6
+
+Na consulta final em modo somente leitura, o Dependabot ainda apresenta 34 alertas abertos, correspondentes a 27 advisories únicos em 11 pacotes. O conjunto de pacotes e GHSAs permanece igual ao snapshot do baseline. Essa permanência é esperada: as versões corrigidas estão na branch de trabalho, enquanto a branch padrão ainda contém os manifestos anteriores. A contagem remota atual não indica falha da remediação local e somente poderá ser recalculada pelo GitHub após o conteúdo atualizado chegar à branch padrão e a árvore ser reprocessada.
+
+As severidades atuais dos 34 alertas são 11 altas, 12 moderadas e 11 baixas, sem alertas críticos. No baseline eram 2 críticas, 13 altas, 12 moderadas e 7 baixas. A diferença decorre da reclassificação dos advisories GHSA-cg2g-xh64-v4q7 e GHSA-mrv2-3pqr-j5jr de DOMPurify para severidade baixa; os pacotes e as duplicidades entre manifesto e lockfile não mudaram.
+
+O baseline do npm audit continha 39 advisories em 19 pacotes. Na árvore final, 36 advisories foram remediados, o advisory GHSA-fc5q-39xc-vjpf de Picomatch foi retirado e dois advisories moderados exclusivos de desenvolvimento permanecem como exceções. O resultado final é de cinco nós propagados por Glob e Minimatch, com zero vulnerabilidades no audit de runtime:
+
+`39 advisories do baseline = 36 remediados + 1 retirado + 2 exceções de desenvolvimento`.
+
+| Grupo | Advisories | Mudança e versão final | Evidência final |
+| --- | --- | --- | --- |
+| `dompurify` | GHSA-c6gr-qvv4-5v3f, GHSA-mrv2-3pqr-j5jr, GHSA-cg2g-xh64-v4q7, GHSA-p98j-92pf-mc4p e GHSA-6688-9rhm-gjv2 | Atualização direta para `3.4.18` | Manifesto e lock sincronizados; grupo ausente do audit final; testes de sanitização aprovados. |
+| `follow-redirects` | GHSA-mrwp-f3q8-3g9p, GHSA-q3jh-wrc6-jgq8 e GHSA-8r9p-f939-6h3c | `axios@1.21.1` resolveu `follow-redirects@1.16.3` | Lock confirma a versão; audit final de runtime igual a zero. |
+| `body-parser` e `proxy-addr` | GHSA-27r3-jxmh-p828 e GHSA-jqcg-44mw-7w3h | `express@5.3.0` resolveu `body-parser@2.4.0` e `proxy-addr@2.0.8` | Lock confirma as versões; smokes do middleware e audit de runtime aprovados. |
+| `qs` | GHSA-4mjr-xmp4-gh2g, GHSA-x5fp-wj9c-mxmx e GHSA-6pq8-jhm2-2vcw | Ramos Express/Cypress convergiram em `6.17.1` | Lock confirma resolução única; audit final de runtime igual a zero. |
+| `source-map-js` | GHSA-68fv-2mgg-jv7q | Refresh dos consumidores resolveu `1.2.2` | Lock confirma a versão; advisory ausente do audit final. |
+| `quasar` | GHSA-89vp-x45c-52cq | Atualização direta para `2.35.5` | Manifesto/lock, build SPA e matriz de navegadores aprovados. |
+| `@vue/server-renderer` | GHSA-g2v6-rqmx-r4w6 | `vue@3.5.45` alinhou o renderer em `3.5.45` | Lock confirma alinhamento; audit final de runtime igual a zero. |
+| `happy-dom` | GHSA-5fpq-26gf-qwcr, GHSA-c8p4-j97h-3vg8 e GHSA-834v-8h66-3h79 | Atualização direta para `21.0.4` | Projetos DOM/component aprovados; grupo ausente do audit final. |
+| `@vitest/mocker` | GHSA-qxg6-89mg-rqv8 e GHSA-xp26-3454-mjgp | Vitest, coverage e mocker alinhados em `4.1.12` | Lock, descoberta de projetos, suíte completa e cobertura aprovados. |
+| `vite` | GHSA-9jrq-w75r-8gcw, GHSA-rq7h-c2jc-7f22, GHSA-vfpm-58rq-9qcg, GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm e GHSA-698v-4r3x-3vcv | Atualização transitiva para `8.3.8` | Lock, build SPA e Vitest aprovados. |
+| `systeminformation` | GHSA-3f7j-7jwc-fxfj, GHSA-7648-jmwf-vw7j e GHSA-4vjg-vx72-qq4g | Resolução elevada para `5.33.23`; Cypress final `16.3.0` | Lock, CLI e imagem Cypress validados. |
+| `postcss-selector-parser` | GHSA-rj75-hqrm-r3gf | `eslint-plugin-vue@10.12.1` resolveu `7.2.1` | Lock e lint completo aprovados. |
+| `brace-expansion` | GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7 e GHSA-6j4f-fj2g-mc7p | Resolução elevada para `5.0.13` | Lock confirma a versão; advisories ausentes do audit final. |
+| `serialize-javascript` e `shell-quote` | GHSA-m5mm-p8h7-m29v e GHSA-pqg4-j6r4-53mv | Resoluções finais `7.1.4` e `1.12.0` | Lock confirma as versões; advisories ausentes do audit final. |
+| `glob` | GHSA-3g3m-2fjr-6pw4 | Permanece `13.0.6` via `@vue/test-utils → js-beautify` | Exceção dev: a correção exige Glob 14 fora do intervalo do pai. |
+| `minimatch` | GHSA-g3hv-75wg-m249 | Ramos ESLint corrigidos em `11.0.9`; ramo de testes permanece `10.2.6` | Exceção dev: Glob e EditorConfig restringem a major 10. |
+| `picomatch` | GHSA-fc5q-39xc-vjpf | Permanece `4.0.7`; advisory retirado | Não aparece no audit final nem integra os cinco nós moderados. |
+
+### Revisão do diff final
+
+A comparação da branch de trabalho com o merge-base de `develop`, somada às alterações ainda não commitadas, confirmou somente as categorias autorizadas:
+
+| Categoria | Arquivos | Justificativa |
+| --- | --- | --- |
+| Dependências e resolução | `app/package.json` e `app/package-lock.json` | Atualizações diretas, transitivas, engines e remoção de overrides descritas nos grupos 2 a 4. |
+| Containers | `Dockerfile` | Pins de Node/browser, instalação reproduzível e remoção de CLIs globais sem pin. |
+| Compatibilidade de testes | `app/cypress/e2e/session.cy.js` | Ajuste mínimo para que o atributo `Secure` acompanhe o protocolo do harness, preservando HTTPS. |
+| OpenSpec | Arquivos da change e configuração associada | Proposta, design, spec, tarefas e relatório de evidências. |
+
+Não foram encontrados código de produto fora do escopo, artefatos gerados, binários, arquivos não rastreados, dados sensíveis ou identificadores do ambiente local. O diff final não introduz funcionalidade, refatoração independente nem mudança intencional de contrato da aplicação.
 
 ## Resumo reconciliado do baseline
 
@@ -228,7 +307,7 @@ Todos os 34 alertas informam uma primeira versão corrigida. O snapshot consulta
 | `serialize-javascript` | Baixa | GHSA-m5mm-p8h7-m29v / CVE-2026-115897 | `7.1.0` | `<7.1.3` | `7.1.3` | Transitiva | Desenvolvimento | `@quasar/app-vite → serialize-javascript` |
 | `shell-quote` | Crítica | GHSA-pqg4-j6r4-53mv / CVE-2026-102422 | `1.9.0` | `>=1.8.4 <1.11.0` | `1.11.0` | Transitiva | Desenvolvimento | `concurrently → shell-quote` |
 
-O GitHub ainda não publica `first_patched_version` para `picomatch`. O audit informa uma correção disponível por pacote pai, mas a versão sugerida precisa ser validada contra os peers atuais antes de qualquer alteração.
+No snapshot do baseline, o GitHub ainda não publicava `first_patched_version` para `picomatch`. O advisory foi posteriormente retirado, conforme a reconciliação final.
 
 ## Pacotes afetados por metapropagação do audit no baseline
 
@@ -324,8 +403,9 @@ Pins exatos atuais:
 
 O manifesto não possui mais overrides. `form-data@4.0.6` e `nanoid@3.3.20` são resolvidos naturalmente pelos consumidores, enquanto `esbuild` e `js-yaml` não integram a árvore. O `Dockerfile` também não instala CLIs globais sem pin; o build usa o binário Quasar local fornecido por `@quasar/app-vite`.
 
-## Limitações e decisões para os próximos grupos
+## Estado final e limitações
 
-- O ramo `glob`/`minimatch` de `@vue/test-utils` e `picomatch` permanece adiado com impacto, mitigação, racional, responsável e acompanhamento registrados na seção do grupo 3.
-- A incompatibilidade Node da imagem Cypress foi eliminada no grupo 4; a execução funcional dos fluxos de navegador permanece no grupo 5.
-- As contagens e tabelas identificadas como baseline preservam o snapshot anterior às alterações. As remediações dos grupos 2, 3 e 4 estão registradas nas seções próprias e serão reconciliadas com os grupos seguintes no audit final.
+- O ramo `glob`/`minimatch` de `@vue/test-utils` permanece como exceção exclusiva de desenvolvimento, com impacto, mitigação, bloqueio e acompanhamento registrados no grupo 5.
+- Picomatch não permanece como risco: o advisory foi retirado e não integra o audit final.
+- A incompatibilidade Node da imagem Cypress e o harness de cookie HTTP foram corrigidos; a matriz Chrome/Firefox desktop/mobile foi aprovada.
+- As contagens e tabelas identificadas como baseline preservam o snapshot histórico anterior às alterações; a seção do grupo 6 contém a reconciliação final.
