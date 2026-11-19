@@ -20,7 +20,7 @@ describe("release workflow contract", () => {
     assert.doesNotMatch(coverageRun, /\/app\/coverage/);
   });
 
-  it("uses Node 24 actions and applies an idempotent version bump to develop", () => {
+  it("uses Node 24 actions and validates a pre-applied version bump on protected develop", () => {
     const workflow = loadWorkflow();
     const allSteps = Object.values(workflow.jobs).flatMap((job) => job.steps || []);
     const checkoutSteps = allSteps.filter((step) => step.uses?.startsWith("actions/checkout@"));
@@ -35,27 +35,23 @@ describe("release workflow contract", () => {
     assert.match(bump.if, /needs\.source-policy\.result == 'success'/);
     assert.match(bump.if, /github\.event\.pull_request\.head\.ref == 'develop'/);
     assert.match(bump.if, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-    assert.deepEqual(bump.permissions, { contents: "write" });
+    assert.deepEqual(bump.permissions, { contents: "read" });
     assert.equal(bump.outputs["head-sha"], "${{ steps.release-head.outputs.sha }}");
     assert.equal(bump.steps[0].uses, "actions/checkout@v5");
     assert.equal(bump.steps[0].with.ref, "${{ github.event.pull_request.head.sha }}");
     assert.equal(bump.steps[0].with["persist-credentials"], false);
+    assert.equal(bump.steps[0].with["fetch-depth"], 0);
 
     const updateStep = bump.steps.find((step) => step.run?.includes("release-version.js"));
-    assert.match(updateStep.run, /git fetch origin main --depth=1/);
+    assert.match(updateStep.run, /git fetch origin main/);
     assert.match(updateStep.run, /git show origin\/main:app\/package\.json/);
-    assert.match(updateStep.run, /git log origin\/main\.\.HEAD/);
-    assert.match(updateStep.run, /git add app\/package\.json app\/package-lock\.json Dockerfile/);
+    assert.match(updateStep.run, /git log -z --format=%B origin\/main\.\.HEAD/);
+    assert.match(updateStep.run, /Release metadata is not synchronized/);
+    assert.match(updateStep.run, /exit 1/);
+    assert.doesNotMatch(updateStep.run, /git add|git commit/);
     assert.doesNotMatch(updateStep.run, /git push/);
     assert.doesNotMatch(updateStep.run, /CHANGELOG/);
-
-    const pushStep = bump.steps.find((step) => step.run?.includes("git push"));
-    assert.deepEqual(pushStep.env, {
-      GITHUB_TOKEN: "${{ github.token }}",
-      HEAD_REF: "${{ github.event.pull_request.head.ref }}",
-      EXPECTED_HEAD_SHA: "${{ steps.release-head.outputs.sha }}",
-    });
-    assert.match(pushStep.run, /git rev-parse HEAD.*EXPECTED_HEAD_SHA/);
+    assert.equal(bump.steps.some((step) => step.run?.includes("git push")), false);
 
     for (const name of ["lint", "build", "credential-scan", "coverage", "e2e-chrome", "e2e-firefox", "remote-smoke"]) {
       assert.equal(workflow.jobs[name].needs, "version-bump");
