@@ -2,7 +2,7 @@
 FROM node:22.22.2-alpine AS base
 
 LABEL author="Marcelo Munhoz <me@marcelomunhoz.com>" \
-  version="2.4.0" \
+  version="2.4.1" \
   date_created="2023-0-20" \
   modified="2026-09-19"
 
