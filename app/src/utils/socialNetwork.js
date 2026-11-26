@@ -23,13 +23,6 @@ const socialNetwork = [
     useItOn: ["share", "where"],
   },
   {
-    nameAccount: "twitter",
-    iconPrefix: "fa-brands fa",
-    urlAccount: "https://twitter.com/",
-    userAccount: "heyMunhoz",
-    useItOn: ["share", "where"],
-  },
-  {
     nameAccount: "facebook-square",
     iconPrefix: "fa-brands fa",
     urlAccount: "https://www.facebook.com/",

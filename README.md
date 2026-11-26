@@ -239,6 +239,8 @@ The Contentful API contract is:
 - `/api/contentful/tagged?page=<page>&tag=<tag>`
 - `/api/contentful/article/<slug>`
 
+Before opening or updating a `develop` to `main` release pull request, run `make release-prepare` from the branch containing the proposed release commits. The command fetches the current `main` baseline, calculates the bump from the commit messages, and updates `app/package.json`, `app/package-lock.json`, and `Dockerfile` together inside the project's test runtime image. It uses the existing local `marcelo-munhoz-tests-test` image and leaves Git staging, commits, and pushes to the release operator. The pull request checks validate the prepared version, and the publish workflow uses those committed files to create the matching tag and release.
+
 Every `develop` to `main` pull request receives mandatory read-only smoke validation against its exact Netlify Deploy Preview. The suite checks the preview commit identity, public pages and Functions, SPA behavior, headers, signed-out admin safety, and desktop/mobile layouts in Chrome. It blocks application mutations and requires no privileged credentials.
 
 The equivalent container entry point is:

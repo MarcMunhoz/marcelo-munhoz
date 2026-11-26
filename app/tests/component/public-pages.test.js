@@ -49,9 +49,9 @@ describe("public pages", () => {
     expect(wrapper.get(".about-biography img").attributes("src")).toContain("real_madrid.svg");
     expect(wrapper.get(".about-introduction").classes()).toContain("about-introduction");
     const buttons = wrapper.findAll(".social-links button");
-    expect(buttons).toHaveLength(6);
+    expect(buttons).toHaveLength(5);
     expect(buttons.map((button) => button.attributes("aria-label"))).toEqual([
-      "envelope", "facebook-square", "github", "gitlab", "linkedin", "twitter",
+      "envelope", "facebook-square", "github", "gitlab", "linkedin",
     ]);
 
     for (const button of buttons) await button.trigger("click");
@@ -61,7 +61,6 @@ describe("public pages", () => {
       ["https://github.com/MarcMunhoz", "project", "noopener,noreferrer"],
       ["https://gitlab.com/hiMunhoz", "project", "noopener,noreferrer"],
       ["https://www.linkedin.com/in/marcelomunhoz", "project", "noopener,noreferrer"],
-      ["https://twitter.com/heyMunhoz", "project", "noopener,noreferrer"],
     ]);
 
     const icon = wrapper.get(".social-links i");

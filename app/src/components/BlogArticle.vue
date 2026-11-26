@@ -33,60 +33,36 @@
       </cite>
 
       <section class="flex justify-end">
-        <q-btn flat color="blue-grey-5" icon="fa-solid fa-share" size="md">
-          <q-menu transition-show="flip-right" transition-hide="flip-left" class="min-w-fit">
-            <div class="social-share flex flex-row flex-nowrap gap-4 p-1 pt-1.5">
-              <s-email
-                :share-options="{
-                  mail: '',
-                  subject: `Marcelo Munhoz - ${article.title}`,
-                  body: `${article.description}\n${getUrlToShare}`,
-                }"
+        <q-btn flat color="blue-grey-5" icon="fa-solid fa-share" size="md" :aria-label="shareLabels.open">
+          <q-menu transition-show="flip-right" transition-hide="flip-left" @hide="resetCopyState">
+            <div class="social-share">
+              <a
+                v-for="destination in shareDestinations"
+                :key="destination.label"
+                class="social-share__action"
+                :href="destination.href"
+                :target="destination.target"
+                :rel="destination.target ? 'noopener noreferrer' : undefined"
+                v-close-popup
               >
-                <i class="fa-solid fa-envelope-open text-[20px]"></i>
-              </s-email>
-              <s-facebook
-                :share-options="{
-                  url: getUrlToShare,
-                  hashtag: `#${articleTags[0]}`,
-                }"
-                :window-features="{ width: '500', height: '600' }"
-                :use-native-behavior="true"
-              >
-                <i class="fa-brands fa-facebook text-[20px]"></i>
-              </s-facebook>
-              <s-linked-in :share-options="{ url: getUrlToShare }" :window-features="{ width: '500', height: '600' }" :use-native-behavior="true">
-                <i class="fa-brands fa-linkedin-in text-[20px]"></i>
-              </s-linked-in>
-              <s-telegram
-                :share-options="{
-                  url: getUrlToShare,
-                  text: `${article.title} #${articleTags[0]}`,
-                }"
-                :window-features="{ width: '700', height: '600' }"
-                :use-native-behavior="true"
-              >
-                <i class="fa-brands fa-telegram text-[20px]"></i>
-              </s-telegram>
-              <s-twitter
-                :share-options="{
-                  url: getUrlToShare,
-                  hashtags: articleTags,
-                  text: article.description,
-                }"
-                :window-features="{ width: '500', height: '600' }"
-              >
-                <i class="fa-brands fa-twitter text-[20px]"></i>
-              </s-twitter>
-              <s-whats-app
-                :share-options="{
-                  number: '',
-                  text: `${getUrlToShare} - ${article.title} #${articleTags[0]}`,
-                }"
-                :window-features="{ width: '700', height: '600' }"
-              >
-                <i class="fa-brands fa-whatsapp text-[20px]"></i>
-              </s-whats-app>
+                <q-icon :name="destination.icon" aria-hidden="true" />
+                <span>{{ destination.label }}</span>
+              </a>
+              <button type="button" class="social-share__action" @click="copyArticleLink">
+                <q-icon name="fa-solid fa-link" aria-hidden="true" />
+                <span>{{ shareLabels.copy }}</span>
+              </button>
+              <div class="social-share__feedback" role="status">
+                {{ copyState === "copied" ? shareLabels.copied : copyState === "failed" ? shareLabels.manual : "" }}
+              </div>
+              <input
+                v-if="copyState === 'failed'"
+                class="social-share__url"
+                :aria-label="shareLabels.url"
+                :value="getUrlToShare"
+                readonly
+                @focus="$event.target.select()"
+              />
             </div>
           </q-menu>
         </q-btn>
@@ -130,9 +106,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
-import { SEmail, SFacebook, SLinkedIn, STelegram, STwitter, SWhatsApp } from "vue-socials";
-import { useMeta } from "quasar";
+import { useRoute, useRouter } from "vue-router";
+import { ClosePopup as vClosePopup, useMeta } from "quasar";
 import ArticleContent from "./ArticleContent.vue";
 import { buildApiUrl } from "../utils/apiBase.js";
 import { articleBylineLabels, articleLocaleFromArticle, articleNavigationLabels, isArticleLanguageTag, publicArticleDates } from "../utils/articleDates.js";
@@ -148,6 +123,7 @@ import {
 import { articleHeroImageUrl } from "../utils/contentfulImages.js";
 
 const route = useRoute();
+const router = useRouter();
 const article = ref({});
 const articleImg = ref("");
 const articleAuthor = ref("");
@@ -162,7 +138,60 @@ let articleRequestId = 0;
 let navigationRequestId = 0;
 
 const archiveLocation = computed(() => blogReturnLocation(typeof window === "undefined" ? {} : window.history.state));
-const getUrlToShare = computed(() => document.baseURI);
+const getUrlToShare = computed(() => new URL(router.resolve(route.path).href, window.location.origin).href);
+const copyState = ref("");
+let copyRequestId = 0;
+
+const shareLabels = computed(() =>
+  articleLocale.value.toLowerCase().startsWith("en")
+    ? { open: "Share article", copy: "Copy link", copied: "Link copied", manual: "Copy the link below.", url: "Article link" }
+    : { open: "Compartilhar artigo", copy: "Copiar link", copied: "Link copiado", manual: "Copie o link abaixo.", url: "Link do artigo" }
+);
+
+const shareDestinations = computed(() => {
+  const url = getUrlToShare.value;
+  const { title, description = "" } = article.value;
+  const tags = articleTags.value;
+  const emailSubject = encodeURIComponent(`Marcelo Munhoz - ${title}`);
+  const emailBody = encodeURIComponent([description, url].filter(Boolean).join("\r\n"));
+  const message = [title, ...tags.map((tag) => `#${tag}`)].join(" ");
+
+  return [
+    { label: "Email", icon: "fa-solid fa-envelope", href: `mailto:?subject=${emailSubject}&body=${emailBody}` },
+    { label: "Facebook", icon: "fa-brands fa-facebook", href: `https://www.facebook.com/sharer/sharer.php?${new URLSearchParams({ u: url })}` },
+    { label: "LinkedIn", icon: "fa-brands fa-linkedin-in", href: `https://www.linkedin.com/sharing/share-offsite/?${new URLSearchParams({ url })}` },
+    { label: "Telegram", icon: "fa-brands fa-telegram", href: `https://t.me/share/url?${new URLSearchParams({ url, text: message })}` },
+    {
+      label: "X",
+      icon: "fa-brands fa-x-twitter",
+      href: `https://x.com/intent/tweet?${new URLSearchParams({ url, text: title, hashtags: tags.join(",") })}`,
+    },
+    {
+      label: "WhatsApp",
+      icon: "fa-brands fa-whatsapp",
+      href: `https://wa.me/?text=${encodeURIComponent(`${message}\n${url}`)}`,
+    },
+  ].map((destination) => ({ ...destination, target: destination.label === "Email" ? undefined : "_blank" }));
+});
+
+function resetCopyState() {
+  copyRequestId += 1;
+  copyState.value = "";
+}
+
+async function copyArticleLink() {
+  resetCopyState();
+  const requestId = copyRequestId;
+  let outcome = "copied";
+  try {
+    await navigator.clipboard.writeText(getUrlToShare.value);
+  } catch {
+    outcome = "failed";
+  }
+  if (requestId === copyRequestId) copyState.value = outcome;
+}
+
+watch(getUrlToShare, resetCopyState);
 const navigationLabels = computed(() => articleNavigationLabels(articleLocale.value));
 const bylineLabels = computed(() => articleBylineLabels(articleLocale.value, article.value));
 const articleDates = computed(() =>
@@ -318,6 +347,7 @@ const loadArticle = async (slug = route.params.slug) => {
 };
 
 onMounted(async () => {
+  document.head.querySelectorAll("meta[data-article-preview]").forEach((tag) => tag.remove());
   await loadArticle(route.params.slug);
 });
 
@@ -352,13 +382,50 @@ onBeforeUnmount(() => {
 }
 
 .social-share {
-  a {
-    color: $blue-grey-5;
+  display: grid;
+  min-width: 11rem;
+  max-width: min(20rem, calc(100vw - 2rem));
+  padding: 0.25rem;
+}
 
-    &:hover {
-      color: $blue-grey-3;
-    }
+.social-share__action {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: $blue-grey-8;
+  cursor: pointer;
+  display: flex;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    background-color: $blue-grey-1;
   }
+
+  &:focus-visible {
+    outline: 2px solid $blue-grey-7;
+    outline-offset: -2px;
+  }
+
+  .q-icon {
+    color: $blue-grey-6;
+    width: 1.25rem;
+  }
+}
+
+.social-share__feedback:not(:empty),
+.social-share__url {
+  margin: 0.25rem 0.75rem 0.5rem;
+}
+
+.social-share__url {
+  min-width: 0;
+  padding: 0.25rem;
 }
 
 .author-link {
