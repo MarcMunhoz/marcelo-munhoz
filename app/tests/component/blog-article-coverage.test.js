@@ -109,6 +109,66 @@ describe("blog article recovery paths", () => {
     expect(document.body.querySelector(".social-share")).not.toBeNull();
   });
 
+  it("offers labeled direct sharing links for the current article", async () => {
+    const { router, wrapper } = await mountArticle({
+      fetchImpl: (url) => Promise.resolve(response(
+        String(url).includes("article-navigation")
+          ? { previous: null, next: null }
+          : payload(new URL(url, window.location.origin).pathname.split("/").at(-1))
+      )),
+    });
+    await router.push("/blog/second");
+    await flushPromises();
+    await wrapper.get(".q-btn").trigger("click");
+    await flushPromises();
+
+    const links = [...document.querySelectorAll(".social-share a")];
+    expect(links.map((link) => link.textContent.trim())).toEqual([
+      "Email", "Facebook", "LinkedIn", "Telegram", "X", "WhatsApp",
+    ]);
+    expect(links.map((link) => new URL(link.href).hostname)).toEqual([
+      "", "www.facebook.com", "www.linkedin.com", "t.me", "x.com", "wa.me",
+    ]);
+    for (const link of links) {
+      expect(decodeURIComponent(link.href)).toContain("/blog/second");
+    }
+    expect(new URL(links[0].href).searchParams.get("subject")).toContain("Article second");
+  });
+
+  it("confirms a successful copy and offers manual copying on failure", async () => {
+    const { router, wrapper } = await mountArticle({
+      fetchImpl: (url) => Promise.resolve(response(
+        String(url).includes("article-navigation") ? { previous: null, next: null } : payload("first")
+      )),
+    });
+    const writeText = vi.fn().mockResolvedValueOnce().mockRejectedValueOnce(new Error("Clipboard denied"));
+    const navigatorObject = window.navigator;
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigatorObject, "clipboard");
+    Object.defineProperty(navigatorObject, "clipboard", { configurable: true, value: { writeText } });
+    cleanups.push(() => {
+      if (previousClipboard) Object.defineProperty(navigatorObject, "clipboard", previousClipboard);
+      else delete navigatorObject.clipboard;
+    });
+
+    await wrapper.get(".q-btn").trigger("click");
+    await flushPromises();
+    const copy = document.querySelector(".social-share button");
+    copy.click();
+    await flushPromises();
+    expect(writeText).toHaveBeenCalledWith(new URL("/blog/first", window.location.origin).href);
+    expect(document.querySelector(".social-share [role=status]").textContent).toContain("Link copiado");
+
+    await router.push("/blog/second");
+    await flushPromises();
+    await wrapper.get(".q-btn").trigger("click");
+    await flushPromises();
+    document.querySelector(".social-share button").click();
+    await flushPromises();
+    const nextUrl = new URL("/blog/second", window.location.origin).href;
+    expect(writeText).toHaveBeenLastCalledWith(nextUrl);
+    expect(document.querySelector(".social-share input").value).toBe(nextUrl);
+  });
+
   it("keeps the newest article and navigation when older requests resolve late", async () => {
     let resolveFirstArticle;
     let resolveFirstNavigation;
