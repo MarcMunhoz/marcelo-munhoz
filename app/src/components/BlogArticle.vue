@@ -347,6 +347,7 @@ const loadArticle = async (slug = route.params.slug) => {
 };
 
 onMounted(async () => {
+  document.head.querySelectorAll("meta[data-article-preview]").forEach((tag) => tag.remove());
   await loadArticle(route.params.slug);
 });
 
