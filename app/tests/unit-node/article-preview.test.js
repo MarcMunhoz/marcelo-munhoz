@@ -43,6 +43,25 @@ describe("article preview HTML", () => {
     expect(response.headers.has("etag")).toBe(false);
   });
 
+  it("loads the full HTML shell for crawlers requesting a byte range", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ fields: { title: "Backup" } })));
+    const request = new Request(url, { headers: { Range: "bytes=0-65535", "If-Range": '"shell"' } });
+    const next = vi.fn((downstream = request) =>
+      downstream.headers.has("range")
+        ? new Response("<html><head></head>", {
+            status: 206,
+            headers: { "content-type": "text/html", "content-range": "bytes 0-18/90" },
+          })
+        : shell(),
+    );
+
+    const response = await articlePreview(request, { next });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('property="og:title" content="Backup"');
+    expect(next.mock.calls[0][0].headers.has("if-range")).toBe(false);
+  });
+
   it("keeps the SPA response when loading metadata fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("API unavailable")));
     const original = shell();

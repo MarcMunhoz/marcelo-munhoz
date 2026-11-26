@@ -43,7 +43,11 @@ export default async function articlePreview(request, context) {
   const match = /^\/blog\/([^/]+)\/?$/.exec(url.pathname);
   if (request.method !== "GET" || !match) return;
 
-  const response = await context.next();
+  // Transform the complete SPA shell even when a crawler requests only its first bytes.
+  const downstreamRequest = new Request(request);
+  downstreamRequest.headers.delete("range");
+  downstreamRequest.headers.delete("if-range");
+  const response = await context.next(downstreamRequest);
   if (response.status !== 200 || !response.headers.get("content-type")?.includes("text/html")) return response;
 
   try {
