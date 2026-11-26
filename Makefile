@@ -16,3 +16,7 @@ restart:
 
 logs:
 	docker compose --profile dev logs
+
+.PHONY: release-prepare
+release-prepare:
+	sh app/scripts/prepare-release.sh
